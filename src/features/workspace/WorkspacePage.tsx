@@ -5,11 +5,11 @@ import { RuntimePanel } from './RuntimePanel'
 export function WorkspacePage({
   status,
   onRetry,
-  onSettings,
+  onWorkflow,
 }: {
   status: RuntimeStatus
   onRetry: () => void
-  onSettings: () => void
+  onWorkflow: () => void
 }) {
   return (
     <div className="workspace-page">
@@ -26,8 +26,8 @@ export function WorkspacePage({
             <br className="desktop-break" />
             从这里开始。
           </p>
-          <button className="button primary" onClick={onSettings}>
-            设置工作环境
+          <button className="button primary" onClick={onWorkflow}>
+            打开工作流画布
             <Icon name="arrow" />
           </button>
           <div className="hero-caption">
@@ -68,7 +68,7 @@ export function WorkspacePage({
           <p className="section-description">
             围绕故事组织素材，让每个镜头都有自己的位置。
           </p>
-          <div className="coming-row">
+          <button className="coming-row coming-row-button" onClick={onWorkflow}>
             <span className="feature-symbol">
               <Icon name="workflow" />
             </span>
@@ -77,7 +77,7 @@ export function WorkspacePage({
               <p>节点编排、素材连接与逐步执行</p>
             </div>
             <span className="coming-label">待接入</span>
-          </div>
+          </button>
           <div className="coming-row">
             <span className="feature-symbol">
               <Icon name="asset" />

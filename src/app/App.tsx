@@ -1,18 +1,23 @@
 import { useState } from 'react'
 import { WorkspacePage } from '@/features/workspace/WorkspacePage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { WorkflowPage } from '@/features/workflow/WorkflowPage'
+import { ConnectionsPage } from '@/features/workflow/ConnectionsPage'
+import { useWorkflow } from '@/features/workflow/useWorkflow'
 import { useTheme } from '@/features/settings/useTheme'
 import { useRuntime } from '@/shared/hooks/useRuntime'
 import { Icon } from '@/shared/ui/Icon'
 import packageInfo from '../../package.json'
 import './styles.css'
 
-type Page = 'workspace' | 'settings'
+type Page = 'workspace' | 'workflow' | 'connections' | 'settings'
 
 export function App() {
   const [page, setPage] = useState<Page>('workspace')
   const { theme, changeTheme, storageError } = useTheme()
   const { status, retry } = useRuntime()
+  const workflow = useWorkflow()
+  const [modelsRevision, setModelsRevision] = useState(0)
 
   return (
     <div className="app-shell">
@@ -38,15 +43,23 @@ export function App() {
             <Icon name="home" />
             <span>工作台</span>
           </button>
-          <button className="nav-item" aria-label="工作流 即将推出" disabled>
+          <button
+            className={`nav-item ${page === 'workflow' ? 'active' : ''}`}
+            aria-label="工作流"
+            aria-current={page === 'workflow' ? 'page' : undefined}
+            onClick={() => setPage('workflow')}
+          >
             <Icon name="workflow" />
             <span>工作流</span>
-            <small>即将推出</small>
           </button>
-          <button className="nav-item" aria-label="素材库 即将推出" disabled>
+          <button
+            className={`nav-item ${page === 'connections' ? 'active' : ''}`}
+            aria-label="模型连接"
+            aria-current={page === 'connections' ? 'page' : undefined}
+            onClick={() => setPage('connections')}
+          >
             <Icon name="asset" />
-            <span>素材库</span>
-            <small>即将推出</small>
+            <span>模型连接</span>
           </button>
           <div className="nav-divider" />
           <button
@@ -72,7 +85,15 @@ export function App() {
           <div>
             <span className="breadcrumb-muted">工作空间</span>
             <span className="breadcrumb-slash">/</span>
-            <span>{page === 'workspace' ? '工作台' : '设置'}</span>
+            <span>
+              {page === 'workspace'
+                ? '工作台'
+                : page === 'workflow'
+                  ? '工作流'
+                  : page === 'connections'
+                    ? '模型连接'
+                    : '设置'}
+            </span>
           </div>
           <span className="mode-badge">
             <span className="status-dot" />
@@ -84,7 +105,18 @@ export function App() {
             <WorkspacePage
               status={status}
               onRetry={retry}
-              onSettings={() => setPage('settings')}
+              onWorkflow={() => setPage('workflow')}
+            />
+          ) : page === 'workflow' ? (
+            <WorkflowPage
+              controller={workflow}
+              onModels={() => setPage('connections')}
+              modelsRevision={modelsRevision}
+            />
+          ) : page === 'connections' ? (
+            <ConnectionsPage
+              busy={workflow.busy}
+              onChanged={() => setModelsRevision((revision) => revision + 1)}
             />
           ) : (
             <SettingsPage

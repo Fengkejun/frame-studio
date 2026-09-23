@@ -448,6 +448,12 @@ h3 {
   align-items: center;
   gap: 14px;
 }
+.coming-row-button {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .feature-symbol {
   width: 37px;
   height: 37px;
