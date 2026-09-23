@@ -82,6 +82,7 @@ test('browser canvas persists graph edits and rejects native execution honestly'
   await page.getByRole('textbox', { name: '工作流名称' }).fill('雨夜书店分镜')
   await page.getByRole('button', { name: '提示词助手' }).click()
   await expect(page.getByRole('heading', { name: '提示词助手' })).toBeVisible()
+  await expect(page.getByText('已保存到本机')).toBeVisible()
   await page.reload()
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await expect(page.getByRole('textbox', { name: '工作流名称' })).toHaveValue(
