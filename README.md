@@ -1,6 +1,6 @@
 # 帧序 · Frame Studio
 
-AI 短视频创作桌面应用的基础工程。当前阶段只搭建桌面壳、React 界面、设置和原生通信，**尚未实现工作流画布、AI 调用或视频生成**。
+AI 短视频创作桌面应用。当前已完成故事、分镜和提示词的可视化工作流第一阶段，支持本地 Ollama 或 OpenAI 兼容文本服务；图片、视频和成片合成适配器留待后续阶段。
 
 ## 技术栈
 
@@ -8,6 +8,9 @@ AI 短视频创作桌面应用的基础工程。当前阶段只搭建桌面壳�
 - React 19 / TypeScript 严格模式：页面与交互。
 - Vite 8：开发服务、热更新、生产构建。
 - CSS 变量：深色、浅色与系统主题。
+- React Flow：节点画布、端口连接、缩放与小地图。
+- SQLite / Rust：项目、模型连接、运行快照和任务状态的本地持久化。
+- Zod：前端工作流与结构化模型输出校验。
 - ESLint / Prettier / Playwright：静态检查、格式与浏览器冒烟测试。
 - npm：唯一包管理器；提交 `package-lock.json` 与 `src-tauri/Cargo.lock`。
 
@@ -54,7 +57,7 @@ Windows 调试程序：`src-tauri/target/debug/frame-studio.exe`。
 发布程序与安装包：`src-tauri/target/release/` 和其中的 `bundle/`。
 安装包尚未配置代码签名、自动更新或发布渠道。
 
-本机已验证前端生产构建、3 项浏览器测试、Windows 调试程序构建与原生 IPC、Clippy 和 Rust 格式检查。`test:desktop` 使用隔离的 WebView2 测试目录，截图与临时测试数据放在被 Git 忽略的 `artifacts/`。macOS / Linux 和发布安装包尚未验证。
+本机已验证前端生产构建、4 项浏览器测试、Windows 调试程序构建与原生 IPC、画布入口、模型连接入口、Clippy 和 Rust 格式检查。`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`。macOS / Linux 和发布安装包尚未验证。
 
 ## 目录
 
@@ -64,6 +67,7 @@ src/
   features/
     workspace/               # 工作台首页与运行环境信息
     settings/                # 外观设置与主题持久化
+    workflow/                # 画布、节点校验、模型连接与运行记录
   shared/
     hooks/                   # 原生连接状态
     lib/desktop.ts           # 唯一前端 IPC 入口
@@ -71,6 +75,7 @@ src/
     ui/                      # 图标、错误边界等基础组件
 src-tauri/
   src/commands/              # Rust 原生命令
+  src/workflow/              # SQLite、模型适配器和 DAG 执行器
   capabilities/              # 主窗口权限
   tauri.conf.json            # 窗口、前端构建、CSP、打包配置
 tests/                       # 浏览器冒烟测试
@@ -85,8 +90,12 @@ docs/architecture.md         # 当前边界与后续扩展约定
 - `get_app_info` 命令：读取真实的应用名、版本、平台、架构。
 - 原生连接错误、超时与手动重试；React 渲染错误兜底。
 - 主窗口命令白名单及生产 CSP；没有开放文件系统、Shell 或远程页面权限。
+- 工作流画布：创作需求 → 故事编剧 → 分镜导演 → 提示词助手；支持拖入节点、合法连线检查、撤销/重做、项目切换、JSON 导入导出和本地自动保存。
+- 结构化 Agent 输出：故事字段、分镜镜头 ID、数量与总时长在前后端双重校验。
+- 模型连接：Ollama 本地服务和 OpenAI Chat Completions 兼容服务；API Key 只写入系统凭据库，工作流文件只保存连接 ID。
+- 后台运行：按 DAG 顺序执行并保存每个节点的结果、运行快照和失败/中断状态；浏览器预览不会伪造原生调用成功。
 
-当前没有账号、数据库、项目文件格式、模型密钥输入、任务队列或画布节点执行器。侧栏“工作流”和“素材库”是明确禁用的未来入口。
+当前还没有接入图片生成、视频生成、素材版本库、音频和成片合成；侧栏中的“模型连接”目前只管理文本模型。
 
 ## 官方参考
 
