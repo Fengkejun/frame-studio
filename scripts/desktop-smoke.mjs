@@ -34,6 +34,7 @@ const app = spawn(executable, [], {
     ...process.env,
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
     WEBVIEW2_USER_DATA_FOLDER: profile,
+    FRAME_STUDIO_TEST_DATA_DIR: profile,
   },
 })
 let launchError
@@ -91,6 +92,13 @@ try {
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
   await expect(page.getByRole('status')).toHaveText('桌面连接正常')
+  await page.getByRole('button', { name: '工作流', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '工作流画布' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '▶ 运行工作流' })).toBeEnabled()
+  await page.getByRole('button', { name: '模型连接', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: /让每位 Agent/ }),
+  ).toBeVisible()
   expect(errors).toEqual([])
   console.log(
     'PASS: native Windows app, embedded assets, real Rust IPC, retry and persistent theme.',
