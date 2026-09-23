@@ -30,6 +30,9 @@ import {
 } from './model'
 import { errorMessage, listProviders } from './api'
 import type { useWorkflow } from './useWorkflow'
+import { useMedia } from './useMedia'
+import { ImageStudio, type ShotTarget } from './ImageStudio'
+import { AssetImage } from './AssetImage'
 import './workflow.css'
 
 const nodeTypes = { agent: FlowNode }
@@ -58,10 +61,20 @@ function WorkflowEditor({
   const [providers, setProviders] = useState<Provider[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
-  const [tab, setTab] = useState<'shots' | 'runs'>('shots')
+  const [tab, setTab] = useState<'shots' | 'runs' | 'images'>('shots')
+  const [mediaTarget, setMediaTarget] = useState<ShotTarget | null>(null)
+  const media = useMedia(w?.id)
   const [confirmRun, setConfirmRun] = useState<{ target?: string } | null>(null)
   const importInput = useRef<HTMLInputElement>(null)
   const { screenToFlowPosition, fitView } = useReactFlow<CanvasNode>()
+  const bottomPanel = useRef<HTMLElement>(null)
+  useEffect(() => {
+    if (tab === 'images')
+      bottomPanel.current?.scrollIntoView({
+        block: 'start',
+        behavior: 'smooth',
+      })
+  }, [tab])
   useEffect(() => {
     let alive = true
     listProviders()
@@ -408,10 +421,14 @@ function WorkflowEditor({
             </button>
           ))}
           <div className="library-divider" />
+          <button className="library-node" onClick={() => setTab('images')}>
+            <span className="library-mark">▧</span>
+            <strong>镜头首帧</strong>
+            <small>ComfyUI 生图与本地素材</small>
+          </button>
           <p className="eyebrow">即将接入</p>
-          <div className="future-node">▧ 图片生成</div>
           <div className="future-node">▷ 视频生成</div>
-          <div className="future-node">▤ 素材与合成</div>
+          <div className="future-node">▤ 剪辑与合成</div>
           <p className="field-hint">先打磨故事，再让每一帧发生。</p>
         </aside>
         <div
@@ -547,7 +564,7 @@ function WorkflowEditor({
           />
         )}
       </div>
-      <section className="workflow-bottom">
+      <section className="workflow-bottom" ref={bottomPanel}>
         <div className="bottom-tabs">
           <button
             className={tab === 'shots' ? 'active' : ''}
@@ -561,6 +578,12 @@ function WorkflowEditor({
           >
             运行记录 <span>{c.runs.length}</span>
           </button>
+          <button
+            className={tab === 'images' ? 'active' : ''}
+            onClick={() => setTab('images')}
+          >
+            首帧与素材 {media.running && <span>生成中</span>}
+          </button>
           <small>结果按版本保留在运行记录中</small>
         </div>
         {tab === 'shots' ? (
@@ -569,10 +592,9 @@ function WorkflowEditor({
               storyboards.flatMap((node) =>
                 node.output && 'shots' in node.output.value
                   ? node.output.value.shots.map((shot) => (
-                      <button
+                      <article
                         key={`${node.id}-${shot.id}`}
                         className="storyboard-card"
-                        onClick={() => setSelected([node.id])}
                       >
                         <span>
                           {shot.id} <em>{shot.duration}s</em>
@@ -582,7 +604,46 @@ function WorkflowEditor({
                         <small>
                           {node.stale ? '上游已修改 · 待更新' : shot.camera}
                         </small>
-                      </button>
+                        {media.frames
+                          .filter(
+                            (f) =>
+                              f.context.nodeId === node.id &&
+                              f.context.artifactId === node.output?.id &&
+                              f.context.shotId === shot.id,
+                          )
+                          .map((f) => (
+                            <div
+                              className="shot-frame-preview"
+                              key={f.versionId}
+                            >
+                              <AssetImage
+                                versionId={f.versionId}
+                                alt={`${shot.title} 首帧`}
+                              />
+                            </div>
+                          ))}
+                        <div className="shot-actions">
+                          <button
+                            className="text-button"
+                            onClick={() => setSelected([node.id])}
+                          >
+                            查看分镜
+                          </button>
+                          <button
+                            className="small-button"
+                            disabled={busy || node.stale}
+                            onClick={() => {
+                              setMediaTarget({
+                                nodeId: node.id,
+                                shotId: shot.id,
+                              })
+                              setTab('images')
+                            }}
+                          >
+                            制作首帧
+                          </button>
+                        </div>
+                      </article>
                     ))
                   : [],
               )
@@ -596,6 +657,16 @@ function WorkflowEditor({
               </div>
             )}
           </div>
+        ) : tab === 'images' ? (
+          <ImageStudio
+            key={w.id}
+            workflow={w}
+            target={mediaTarget}
+            onTarget={setMediaTarget}
+            media={media}
+            busy={busy}
+            save={c.save}
+          />
         ) : (
           <div className="run-history">
             {!c.runs.length && (

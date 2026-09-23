@@ -32,7 +32,7 @@ export function WorkspacePage({
           </button>
           <div className="hero-caption">
             <span className="status-dot" />
-            桌面框架 · 初始版本
+            故事、分镜与镜头首帧
           </div>
         </div>
         <div className="frame-art" aria-hidden="true">
@@ -60,10 +60,10 @@ export function WorkspacePage({
         <section className="next-section" aria-labelledby="next-title">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">WHAT'S NEXT</p>
-              <h2 id="next-title">创作空间，正在准备</h2>
+              <p className="eyebrow">YOUR WORKFLOW</p>
+              <h2 id="next-title">从故事走向画面</h2>
             </div>
-            <span className="badge">下一阶段</span>
+            <span className="badge">创作工具</span>
           </div>
           <p className="section-description">
             围绕故事组织素材，让每个镜头都有自己的位置。
@@ -76,17 +76,17 @@ export function WorkspacePage({
               <h3>工作流画布</h3>
               <p>节点编排、素材连接与逐步执行</p>
             </div>
-            <span className="coming-label">待接入</span>
+            <span className="coming-label">打开</span>
           </button>
           <div className="coming-row">
             <span className="feature-symbol">
               <Icon name="asset" />
             </span>
             <div>
-              <h3>项目与素材</h3>
-              <p>故事、角色和镜头的统一管理</p>
+              <h3>首帧与素材</h3>
+              <p>分镜生图、导入图片与首帧版本选择</p>
             </div>
-            <span className="coming-label">待接入</span>
+            <span className="coming-label">画布内使用</span>
           </div>
         </section>
         <RuntimePanel status={status} onRetry={onRetry} />
