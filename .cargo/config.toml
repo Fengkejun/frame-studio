@@ -1,0 +1,4 @@
+# Rust 1.98.1 overflowed the compiler thread stack while compiling tao on Windows.
+# Keep the workaround project-local, without replacing an explicit user override.
+[env]
+RUST_MIN_STACK = { value = "16777216", force = false }

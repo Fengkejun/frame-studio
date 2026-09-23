@@ -1,0 +1,19 @@
+[package]
+name = "frame-studio"
+version = "0.1.0"
+description = "Frame Studio desktop workflow workspace"
+authors = ["Frame Studio"]
+edition = "2021"
+rust-version = "1.85"
+publish = false
+
+[lib]
+name = "frame_studio_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
