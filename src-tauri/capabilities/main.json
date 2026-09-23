@@ -15,6 +15,17 @@
     "allow-get-run",
     "allow-start-run",
     "allow-cancel-run",
-    "allow-validate-artifact"
+    "allow-validate-artifact",
+    "allow-import-image",
+    "allow-list-image-assets",
+    "allow-image-preview",
+    "allow-select-first-frame",
+    "allow-list-first-frames",
+    "allow-test-comfy",
+    "allow-image-settings",
+    "allow-list-image-jobs",
+    "allow-start-image-job",
+    "allow-resume-image-job",
+    "allow-pause-image-job"
   ]
 }

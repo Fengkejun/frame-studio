@@ -13,6 +13,17 @@ fn main() {
             "start_run",
             "cancel_run",
             "validate_artifact",
+            "import_image",
+            "list_image_assets",
+            "image_preview",
+            "select_first_frame",
+            "list_first_frames",
+            "test_comfy",
+            "image_settings",
+            "list_image_jobs",
+            "start_image_job",
+            "resume_image_job",
+            "pause_image_job",
         ]),
     ))
     .expect("failed to build Tauri application metadata");

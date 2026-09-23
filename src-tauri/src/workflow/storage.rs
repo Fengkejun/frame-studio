@@ -13,7 +13,21 @@ impl Store {
             CREATE TABLE IF NOT EXISTS workflows(id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS providers(id TEXT PRIMARY KEY, json TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS runs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, started_at INTEGER NOT NULL);
-            PRAGMA user_version=1;").map_err(|e| e.to_string())?;
+            ").map_err(|e| e.to_string())?;
+        let version: u32 = c
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .map_err(|e| e.to_string())?;
+        if version > 2 {
+            return Err("项目数据库版本较新，请升级应用".into());
+        }
+        if version < 2 {
+            c.execute_batch("BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS image_assets(id TEXT PRIMARY KEY, json TEXT NOT NULL, created_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS image_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS first_frames(workflow_id TEXT NOT NULL, node_id TEXT NOT NULL, artifact_id TEXT NOT NULL, shot_id TEXT NOT NULL, version_id TEXT NOT NULL, PRIMARY KEY(workflow_id,node_id,artifact_id,shot_id));
+                CREATE TABLE IF NOT EXISTS media_settings(id TEXT PRIMARY KEY, json TEXT NOT NULL);
+                PRAGMA user_version=2; COMMIT;").map_err(|e| e.to_string())?;
+        }
         let store = Self(Mutex::new(c));
         // A text request has no pollable provider task ID. Never resubmit after a crash.
         for mut run in store.runs(None)? {
@@ -99,5 +113,32 @@ impl Store {
             serde_json::from_str(&r.map_err(|e| e.to_string())?).map_err(|e| e.to_string())
         })
         .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn upgrades_v1_without_losing_existing_data() {
+        let path = std::env::temp_dir().join(format!("frame-studio-migration-{}.sqlite", uid()));
+        {
+            let db = Connection::open(&path).unwrap();
+            db.execute_batch("CREATE TABLE providers(id TEXT PRIMARY KEY,json TEXT NOT NULL); INSERT INTO providers VALUES ('existing','{\"id\":\"existing\",\"name\":\"Ollama\",\"kind\":\"ollama\",\"baseUrl\":\"http://localhost:11434\",\"model\":\"text\",\"hasKey\":false}'); PRAGMA user_version=1;").unwrap();
+        }
+        {
+            let store = Store::open(&path).unwrap();
+            assert_eq!(store.providers().unwrap()[0].id, "existing");
+            assert_eq!(
+                store
+                    .db()
+                    .unwrap()
+                    .pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
+                    .unwrap(),
+                2
+            );
+        }
+        assert_eq!(Store::open(&path).unwrap().providers().unwrap().len(), 1);
+        std::fs::remove_file(path).unwrap();
     }
 }

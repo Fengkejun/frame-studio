@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-first-frames"
+description = "Enables the list_first_frames command without any pre-configured scope."
+commands.allow = ["list_first_frames"]
+
+[[permission]]
+identifier = "deny-list-first-frames"
+description = "Denies the list_first_frames command without any pre-configured scope."
+commands.deny = ["list_first_frames"]

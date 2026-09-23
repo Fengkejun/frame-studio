@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-select-first-frame"
+description = "Enables the select_first_frame command without any pre-configured scope."
+commands.allow = ["select_first_frame"]
+
+[[permission]]
+identifier = "deny-select-first-frame"
+description = "Denies the select_first_frame command without any pre-configured scope."
+commands.deny = ["select_first_frame"]

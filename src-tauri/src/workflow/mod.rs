@@ -1,3 +1,4 @@
+pub mod media;
 mod providers;
 mod storage;
 mod types;
@@ -20,6 +21,8 @@ pub struct ActiveRun {
 pub struct WorkflowState {
     store: Store,
     active: Mutex<Option<ActiveRun>>,
+    media_active: Mutex<Option<ActiveRun>>,
+    directory: std::path::PathBuf,
 }
 
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -34,7 +37,10 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(WorkflowState {
         store: Store::open(&directory.join("studio.sqlite"))?,
         active: Mutex::new(None),
+        media_active: Mutex::new(None),
+        directory,
     });
+    media::comfy::recover(&app.state::<WorkflowState>())?;
     Ok(())
 }
 fn idle(state: &WorkflowState) -> AppResult<()> {
@@ -161,7 +167,11 @@ pub fn start_run(
         if !order.contains(id) {
             return Err("节点不存在".into());
         }
-        let selected = workflow.nodes.iter().find(|n| &n.id == id).ok_or("节点不存在")?;
+        let selected = workflow
+            .nodes
+            .iter()
+            .find(|n| &n.id == id)
+            .ok_or("节点不存在")?;
         if selected.kind == NodeKind::Brief && selected.config.text.trim().is_empty() {
             return Err("请填写创作需求".into());
         }

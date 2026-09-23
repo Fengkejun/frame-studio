@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-test-comfy"
+description = "Enables the test_comfy command without any pre-configured scope."
+commands.allow = ["test_comfy"]
+
+[[permission]]
+identifier = "deny-test-comfy"
+description = "Denies the test_comfy command without any pre-configured scope."
+commands.deny = ["test_comfy"]
