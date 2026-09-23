@@ -92,3 +92,24 @@ test('browser canvas persists graph edits and rejects native execution honestly'
     page.getByRole('button', { name: '▶ 运行工作流' }),
   ).toBeDisabled()
 })
+
+test('image studio keeps native-only operations disabled in browser preview', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await page.getByRole('button', { name: '工作流', exact: true }).click()
+  await page.getByRole('button', { name: '首帧与素材', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: '让分镜成为画面' }),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: '＋ 导入图片' })).toBeDisabled()
+  await expect(page.getByText('请先生成或录入分镜')).toBeAttached()
+  await page.getByRole('button', { name: '本地素材库', exact: true }).click()
+  await expect(page.getByText('你的本地图片素材库')).toBeVisible()
+  await page.setViewportSize({ width: 960, height: 640 })
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true)
+})

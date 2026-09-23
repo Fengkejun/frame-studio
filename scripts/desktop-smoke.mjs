@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { chromium, expect } from '@playwright/test'
+import { testMedia } from './media-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -99,6 +100,7 @@ try {
   await expect(
     page.getByRole('heading', { name: /让每位 Agent/ }),
   ).toBeVisible()
+  await testMedia(page, root)
   expect(errors).toEqual([])
   console.log(
     'PASS: native Windows app, embedded assets, real Rust IPC, retry and persistent theme.',
