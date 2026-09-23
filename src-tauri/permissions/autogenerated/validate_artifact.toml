@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-validate-artifact"
+description = "Enables the validate_artifact command without any pre-configured scope."
+commands.allow = ["validate_artifact"]
+
+[[permission]]
+identifier = "deny-validate-artifact"
+description = "Denies the validate_artifact command without any pre-configured scope."
+commands.deny = ["validate_artifact"]

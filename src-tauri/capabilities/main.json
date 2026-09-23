@@ -1,7 +1,20 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
-  "description": "Only the local main window may read application information.",
+  "description": "The local main window can edit projects and invoke the native text workflow engine. No raw filesystem or shell access.",
   "windows": ["main"],
-  "permissions": ["allow-get-app-info"]
+  "permissions": [
+    "allow-get-app-info",
+    "allow-list-workflows",
+    "allow-save-workflow",
+    "allow-list-providers",
+    "allow-save-provider",
+    "allow-remove-provider",
+    "allow-test-provider",
+    "allow-list-runs",
+    "allow-get-run",
+    "allow-start-run",
+    "allow-cancel-run",
+    "allow-validate-artifact"
+  ]
 }
