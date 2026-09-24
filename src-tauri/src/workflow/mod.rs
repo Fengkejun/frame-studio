@@ -23,6 +23,7 @@ pub struct WorkflowState {
     active: Mutex<Option<ActiveRun>>,
     media_active: Mutex<Option<ActiveRun>>,
     video_active: Mutex<HashMap<String, media::video::ActiveVideo>>,
+    export_active: Mutex<Option<ActiveRun>>,
     directory: std::path::PathBuf,
 }
 
@@ -40,11 +41,13 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         active: Mutex::new(None),
         media_active: Mutex::new(None),
         video_active: Mutex::new(HashMap::new()),
+        export_active: Mutex::new(None),
         directory,
     });
     media::comfy::recover(&app.state::<WorkflowState>())?;
     media::cloud::recover(&app.state::<WorkflowState>())?;
     media::video::recover(&app.state::<WorkflowState>())?;
+    media::composition::recover(&app.state::<WorkflowState>())?;
     Ok(())
 }
 fn idle(state: &WorkflowState) -> AppResult<()> {
@@ -149,7 +152,7 @@ pub fn cancel_run(state: tauri::State<WorkflowState>, id: String) -> AppResult<(
 }
 #[tauri::command]
 pub fn validate_artifact(kind: NodeKind, value: serde_json::Value) -> AppResult<Artifact> {
-    if matches!(kind, NodeKind::Image | NodeKind::Video) {
+    if matches!(kind, NodeKind::Image | NodeKind::Video | NodeKind::Timeline) {
         return Err("媒体节点结果只能由已确认的素材版本生成".into());
     }
     validate_output(&kind, &value)?;
@@ -203,7 +206,10 @@ pub fn start_run(
     let mut used = vec![];
     for n in workflow.nodes.iter().filter(|n| {
         selected.contains(&n.id)
-            && !matches!(n.kind, NodeKind::Brief | NodeKind::Image | NodeKind::Video)
+            && !matches!(
+                n.kind,
+                NodeKind::Brief | NodeKind::Image | NodeKind::Video | NodeKind::Timeline
+            )
     }) {
         let provider = all_providers
             .iter()
@@ -323,7 +329,22 @@ async fn execute(
                 .iter()
                 .find(|e| e.target == node.id)
                 .ok_or("缺少输入")?;
-            if node.kind == NodeKind::Video {
+            if node.kind == NodeKind::Timeline {
+                let video_artifact = artifacts.get(&edge.source).ok_or("上游视频结果不可用")?;
+                if let Some(value) =
+                    media::composition::collect_export(state, &run.workflow_id, video_artifact)?
+                {
+                    validate_output(&NodeKind::Timeline, &value)?;
+                    (value, "selection")
+                } else {
+                    run.nodes[index].status = "needs_export".into();
+                    run.nodes[index].message =
+                        "请在时间线工作台完成 MP4 导出，再运行成片节点".into();
+                    run.status = "needs_export".into();
+                    state.store.save_run(run)?;
+                    return Ok(());
+                }
+            } else if node.kind == NodeKind::Video {
                 let image_artifact = artifacts.get(&edge.source).ok_or("上游图片结果不可用")?;
                 let storyboard_node_id = run
                     .snapshot

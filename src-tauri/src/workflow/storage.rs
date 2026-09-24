@@ -17,7 +17,7 @@ impl Store {
         let version: u32 = c
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(|e| e.to_string())?;
-        if version > 5 {
+        if version > 6 {
             return Err("项目数据库版本较新，请升级应用".into());
         }
         if version < 2 {
@@ -47,6 +47,13 @@ impl Store {
                 CREATE TABLE IF NOT EXISTS selected_videos(workflow_id TEXT NOT NULL, node_id TEXT NOT NULL, artifact_id TEXT NOT NULL, shot_id TEXT NOT NULL, version_id TEXT NOT NULL, PRIMARY KEY(workflow_id,node_id,artifact_id,shot_id));
                 PRAGMA user_version=5; COMMIT;")
                 .map_err(|e| e.to_string())?;
+        }
+        if version < 6 {
+            c.execute_batch("BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS compositions(workflow_id TEXT PRIMARY KEY, json TEXT NOT NULL, updated_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS audio_assets(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS export_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
+                PRAGMA user_version=6; COMMIT;").map_err(|e| e.to_string())?;
         }
         let store = Self(Mutex::new(c));
         // A text request has no pollable provider task ID. Never resubmit after a crash.
@@ -155,7 +162,7 @@ mod tests {
                     .unwrap()
                     .pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
                     .unwrap(),
-                5
+                6
             );
         }
         assert_eq!(Store::open(&path).unwrap().providers().unwrap().len(), 1);
@@ -183,7 +190,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!((count, version, cloud_table), (1, 5, 1));
+        assert_eq!((count, version, cloud_table), (1, 6, 1));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();
@@ -207,7 +214,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!((version, table), (5, 1));
+        assert_eq!((version, table), (6, 1));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();
@@ -225,7 +232,25 @@ mod tests {
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
         let count: u32 = db.query_row("SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('video_jobs','video_assets','selected_videos')", [], |r| r.get(0)).unwrap();
-        assert_eq!((version, count), (5, 3));
+        assert_eq!((version, count), (6, 3));
+        drop(db);
+        drop(store);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn upgrades_v5_with_composition_tables() {
+        let path = std::env::temp_dir().join(format!("frame-studio-v5-{}.sqlite", uid()));
+        {
+            let db = Connection::open(&path).unwrap();
+            db.execute_batch("CREATE TABLE video_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL); PRAGMA user_version=5;").unwrap();
+        }
+        let store = Store::open(&path).unwrap();
+        let db = store.db().unwrap();
+        let version: u32 = db
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .unwrap();
+        let count: u32 = db.query_row("SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('compositions','audio_assets','export_jobs')",[],|row|row.get(0)).unwrap();
+        assert_eq!((version, count), (6, 3));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();

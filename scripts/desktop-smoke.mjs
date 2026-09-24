@@ -8,6 +8,7 @@ import { chromium, expect } from '@playwright/test'
 import { testMedia } from './media-smoke.mjs'
 import { createCloudFixture, testCloudMedia } from './cloud-media-smoke.mjs'
 import { createVideoFixture, testVideoMedia } from './video-media-smoke.mjs'
+import { testTimelineMedia } from './timeline-media-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -42,6 +43,7 @@ const app = spawn(executable, [], {
     FRAME_STUDIO_TEST_DATA_DIR: profile,
     FRAME_STUDIO_TEST_OPENAI_IMAGE_URL: cloudFixture.url,
     FRAME_STUDIO_TEST_WAN_URL: videoFixture.url,
+    FRAME_STUDIO_TEST_EXPORT_PATH: path.join(profile, 'finished.mp4'),
   },
 })
 let launchError
@@ -109,6 +111,7 @@ try {
   await testMedia(page, root)
   await testCloudMedia(page, cloudFixture)
   await testVideoMedia(page, root, videoFixture)
+  await testTimelineMedia(page, root, profile)
   for (const file of ['studio.sqlite', 'studio.sqlite-wal']) {
     const bytes = await readFile(path.join(profile, file)).catch(() => null)
     if (bytes) expect(bytes.includes(Buffer.from('fixture-key'))).toBe(false)

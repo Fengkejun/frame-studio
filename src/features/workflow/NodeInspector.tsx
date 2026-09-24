@@ -21,6 +21,7 @@ export function NodeInspector({
   onImages,
   videoProgress,
   onVideos,
+  onTimeline,
 }: {
   node: WorkflowNode
   providers: Provider[]
@@ -33,6 +34,7 @@ export function NodeInspector({
   onImages: () => void
   videoProgress?: { ready: number; total: number }
   onVideos: () => void
+  onTimeline: () => void
 }) {
   const [outputText, setOutputText] = useState(() =>
     node.output ? JSON.stringify(node.output.value, null, 2) : '',
@@ -81,6 +83,16 @@ export function NodeInspector({
               onChange={(e) => patch({ text: e.target.value })}
             />
           </label>
+        ) : node.kind === 'timeline' ? (
+          <div className="field">
+            <strong>本地 MP4 成片</strong>
+            <p className="field-hint">
+              连接视频节点，在时间线工作台完成合成，再汇集导出结果。
+            </p>
+            <button className="small-button" onClick={onTimeline}>
+              打开时间线与导出
+            </button>
+          </div>
         ) : node.kind === 'image' || node.kind === 'video' ? (
           <div className="field">
             <strong>
@@ -201,10 +213,14 @@ export function NodeInspector({
             ? '汇集已选首帧'
             : node.kind === 'video'
               ? '汇集已选片段'
-              : '运行当前节点'}
+              : node.kind === 'timeline'
+                ? '汇集已导出成片'
+                : '运行当前节点'}
         </button>
         <p className="field-hint">
-          {node.kind === 'image' || node.kind === 'video'
+          {node.kind === 'image' ||
+          node.kind === 'video' ||
+          node.kind === 'timeline'
             ? '素材选择按分镜结果版本保存。上游内容变化后需要重新确认并汇集。'
             : '使用上游已确认结果。改动参数会将当前及下游结果标记为待更新。'}
         </p>
@@ -226,7 +242,9 @@ export function NodeInspector({
         </div>
         {!value && !editing && (
           <p className="empty-copy">
-            {node.kind === 'image' || node.kind === 'video'
+            {node.kind === 'image' ||
+            node.kind === 'video' ||
+            node.kind === 'timeline'
               ? '确认每个镜头的素材后，运行当前节点以记录所选版本。'
               : '运行后，结果会出现在这里。你也可以录入已有内容，再继续后续节点。'}
           </p>
@@ -292,6 +310,17 @@ export function NodeInspector({
                   </div>
                 ))}
               </>
+            ) : 'exportId' in value ? (
+              <>
+                <strong>
+                  MP4 已导出 · {(value.durationMs / 1000).toFixed(1)} 秒
+                </strong>
+                <p>
+                  {value.aspect} · {value.resolution}p ·{' '}
+                  {value.clipVersionIds.length} 个片段
+                </p>
+                <small>{value.outputPath}</small>
+              </>
             ) : (
               <p className="preserve-lines">{value.text}</p>
             )}
@@ -299,6 +328,7 @@ export function NodeInspector({
         )}
         {node.kind !== 'image' &&
           node.kind !== 'video' &&
+          node.kind !== 'timeline' &&
           (!editing ? (
             <button
               className="text-button"

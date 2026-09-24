@@ -19,7 +19,7 @@
     "test:desktop": "node scripts/desktop-smoke.mjs",
     "tauri": "tauri",
     "desktop:dev": "tauri dev",
-    "desktop:build": "tauri build",
+    "desktop:build": "node scripts/prepare-ffmpeg-sidecars.mjs && tauri build --config src-tauri/tauri.sidecar.conf.json --bundles nsis",
     "desktop:check": "cargo check --manifest-path src-tauri/Cargo.toml --locked",
     "desktop:lint": "cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings"
   },

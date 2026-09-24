@@ -45,7 +45,15 @@ pub fn run() {
             workflow::media::video::list_video_assets,
             workflow::media::video::video_preview,
             workflow::media::video::list_selected_videos,
-            workflow::media::video::select_video
+            workflow::media::video::select_video,
+            workflow::media::composition::get_composition,
+            workflow::media::composition::save_composition,
+            workflow::media::composition::import_audio,
+            workflow::media::composition::list_audio_assets,
+            workflow::media::composition::choose_export_path,
+            workflow::media::composition::start_export,
+            workflow::media::composition::list_export_jobs,
+            workflow::media::composition::cancel_export
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Frame Studio");

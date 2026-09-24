@@ -34,6 +34,7 @@ import { useMedia } from './useMedia'
 import * as api from './mediaApi'
 import { ImageStudio, type ShotTarget } from './ImageStudio'
 import { VideoStudio } from './VideoStudio'
+import { TimelineStudio } from './TimelineStudio'
 import { AssetImage } from './AssetImage'
 import './workflow.css'
 
@@ -63,9 +64,9 @@ function WorkflowEditor({
   const [providers, setProviders] = useState<Provider[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
-  const [tab, setTab] = useState<'shots' | 'runs' | 'images' | 'videos'>(
-    'shots',
-  )
+  const [tab, setTab] = useState<
+    'shots' | 'runs' | 'images' | 'videos' | 'timeline'
+  >('shots')
   const [mediaTarget, setMediaTarget] = useState<ShotTarget | null>(null)
   const media = useMedia(w?.id)
   const [confirmRun, setConfirmRun] = useState<{ target?: string } | null>(null)
@@ -73,7 +74,7 @@ function WorkflowEditor({
   const { screenToFlowPosition, fitView } = useReactFlow<CanvasNode>()
   const bottomPanel = useRef<HTMLElement>(null)
   useEffect(() => {
-    if (tab === 'images' || tab === 'videos')
+    if (tab === 'images' || tab === 'videos' || tab === 'timeline')
       bottomPanel.current?.scrollIntoView({
         block: 'start',
         behavior: 'smooth',
@@ -490,8 +491,11 @@ function WorkflowEditor({
             <strong>镜头视频</strong>
             <small>首帧图生视频与片段版本</small>
           </button>
-          <p className="eyebrow">即将接入</p>
-          <div className="future-node">▤ 剪辑与合成</div>
+          <button className="library-node" onClick={() => setTab('timeline')}>
+            <span className="library-mark">▤</span>
+            <strong>剪辑与合成</strong>
+            <small>排列镜头、字幕、音乐与 MP4 导出</small>
+          </button>
           <p className="field-hint">先打磨故事，再让每一帧发生。</p>
         </aside>
         <div
@@ -664,6 +668,7 @@ function WorkflowEditor({
               }
               setTab('videos')
             }}
+            onTimeline={() => setTab('timeline')}
           />
         )}
       </div>
@@ -692,6 +697,12 @@ function WorkflowEditor({
             onClick={() => setTab('videos')}
           >
             镜头视频 {media.videoRunning && <span>生成中</span>}
+          </button>
+          <button
+            className={tab === 'timeline' ? 'active' : ''}
+            onClick={() => setTab('timeline')}
+          >
+            时间线与导出
           </button>
           <small>结果按版本保留在运行记录中</small>
         </div>
@@ -855,6 +866,14 @@ function WorkflowEditor({
               )
                 c.change(invalidate(w, videoNodes))
             }}
+          />
+        ) : tab === 'timeline' ? (
+          <TimelineStudio
+            key={w.id}
+            workflow={w}
+            media={media}
+            save={c.save}
+            onVideos={() => setTab('videos')}
           />
         ) : (
           <div className="run-history">

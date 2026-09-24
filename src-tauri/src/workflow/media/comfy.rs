@@ -445,6 +445,7 @@ mod tests {
             active: std::sync::Mutex::new(None),
             media_active: std::sync::Mutex::new(None),
             video_active: std::sync::Mutex::new(std::collections::HashMap::new()),
+            export_active: std::sync::Mutex::new(None),
             directory: directory.clone(),
         };
         let request = ImageRequest {

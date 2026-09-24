@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-save-composition"
+description = "Enables the save_composition command without any pre-configured scope."
+commands.allow = ["save_composition"]
+
+[[permission]]
+identifier = "deny-save-composition"
+description = "Denies the save_composition command without any pre-configured scope."
+commands.deny = ["save_composition"]

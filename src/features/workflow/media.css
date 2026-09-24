@@ -363,3 +363,116 @@
     flex-wrap: wrap;
   }
 }
+.timeline-studio {
+  display: grid;
+  gap: 20px;
+  padding: 24px 32px 40px;
+}
+.timeline-section {
+  border: 1px solid var(--line, #d9ded1);
+  border-radius: 18px;
+  padding: 20px;
+  background: var(--surface, #fff);
+}
+.timeline-section h3 {
+  margin: 0 0 14px;
+}
+.timeline-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.timeline-candidates {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+.timeline-choice {
+  flex: 0 0 178px;
+  border: 1px solid var(--line, #d9ded1);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.timeline-choice img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+.timeline-choice > div {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+.timeline-choice small {
+  overflow-wrap: anywhere;
+}
+.timeline-clips {
+  display: grid;
+  gap: 12px;
+}
+.timeline-clip {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--line, #d9ded1);
+  border-radius: 14px;
+  padding: 14px;
+}
+.timeline-clip-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.timeline-clip-head > span {
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #536b29;
+  color: white;
+}
+.timeline-clip-head img {
+  width: 88px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 8px;
+}
+.timeline-clip-head div {
+  display: grid;
+  gap: 3px;
+}
+.timeline-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+}
+.timeline-caption {
+  grid-column: span 2;
+}
+.timeline-actions {
+  display: flex;
+  gap: 8px;
+}
+.timeline-export {
+  padding: 12px 0;
+  border-top: 1px solid var(--line, #d9ded1);
+}
+.timeline-export > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.timeline-path {
+  display: block;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 760px) {
+  .timeline-studio {
+    padding: 14px;
+  }
+  .timeline-caption {
+    grid-column: span 1;
+  }
+}

@@ -23,6 +23,7 @@ pub enum NodeKind {
     Prompt,
     Image,
     Video,
+    Timeline,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -130,6 +131,7 @@ pub fn compatible(source: &NodeKind, target: &NodeKind) -> bool {
         ),
         NodeKind::Image => *source == NodeKind::Storyboard,
         NodeKind::Video => *source == NodeKind::Image,
+        NodeKind::Timeline => *source == NodeKind::Video,
     }
 }
 
@@ -297,6 +299,20 @@ pub fn validate_output(kind: &NodeKind, value: &Value) -> AppResult<()> {
                                 && matches!(clip["resolution"].as_str(), Some("720P" | "1080P"))
                                 && ids.insert(clip["shotId"].as_str().unwrap_or_default())
                         })
+                })
+        }
+        NodeKind::Timeline => {
+            required_text(value, "exportId")
+                && required_text(value, "outputPath")
+                && matches!(value["aspect"].as_str(), Some("9:16" | "16:9" | "1:1"))
+                && matches!(value["resolution"].as_u64(), Some(720 | 1080))
+                && value["durationMs"].as_u64().is_some_and(|n| n > 0)
+                && value["clipVersionIds"].as_array().is_some_and(|ids| {
+                    !ids.is_empty()
+                        && ids.len() <= 24
+                        && ids
+                            .iter()
+                            .all(|id| id.as_str().is_some_and(|s| !s.is_empty()))
                 })
         }
     };

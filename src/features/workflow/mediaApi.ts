@@ -104,6 +104,44 @@ export interface SelectedVideo {
   context: ShotContext
   versionId: string
 }
+export interface TimelineClip {
+  versionId: string
+  trimStartMs: number
+  trimEndMs: number
+  caption: string
+}
+export interface Composition {
+  workflowId: string
+  clips: TimelineClip[]
+  aspect: '9:16' | '16:9' | '1:1'
+  resolution: 720 | 1080
+  musicVersionId: string | null
+  voiceVersionId: string | null
+  musicVolume: number
+  subtitleFormat: 'none' | 'srt' | 'vtt'
+  subtitleText: string
+}
+export interface AudioAsset {
+  versionId: string
+  workflowId: string
+  name: string
+  fileName: string
+  bytes: number
+  durationMs: number
+  createdAt: number
+}
+export interface ExportJob {
+  id: string
+  workflowId: string
+  draft: Composition
+  outputPath: string
+  coverPath: string | null
+  status: string
+  progress: number
+  message: string
+  createdAt: number
+  updatedAt: number
+}
 export const isVideoRunning = (j: VideoJob) =>
   ['submitting', 'queued', 'running', 'downloading'].includes(j.status)
 export const isImageRunning = (j: ImageJob) =>
@@ -194,6 +232,35 @@ export const selectVideo = (
   context: ShotContext,
   versionId: string,
 ): Promise<void> => invoke('select_video', { context, versionId })
+export const getComposition = (
+  workflowId: string,
+): Promise<Composition | null> =>
+  isDesktop ? invoke('get_composition', { workflowId }) : Promise.resolve(null)
+export const saveComposition = (draft: Composition): Promise<void> =>
+  invoke('save_composition', { draft })
+export const listAudioAssets = (workflowId: string): Promise<AudioAsset[]> =>
+  isDesktop ? invoke('list_audio_assets', { workflowId }) : Promise.resolve([])
+export const listExportJobs = (workflowId: string): Promise<ExportJob[]> =>
+  isDesktop ? invoke('list_export_jobs', { workflowId }) : Promise.resolve([])
+export const chooseExportPath = (): Promise<string | null> =>
+  invoke('choose_export_path')
+export const startExport = (
+  draft: Composition,
+  outputPath: string,
+): Promise<ExportJob> => invoke('start_export', { draft, outputPath })
+export const cancelExport = (id: string): Promise<void> =>
+  invoke('cancel_export', { id })
+export async function importAudio(
+  workflowId: string,
+  file: File,
+): Promise<AudioAsset> {
+  if (file.size > 20 * 1024 * 1024) throw new Error('音频不能超过 20 MB')
+  return invoke('import_audio', {
+    workflowId,
+    name: file.name,
+    bytes: Array.from(new Uint8Array(await file.arrayBuffer())),
+  })
+}
 export const selectFirstFrame = (
   context: ShotContext,
   versionId: string,

@@ -44,6 +44,14 @@
     "allow-list-video-assets",
     "allow-video-preview",
     "allow-list-selected-videos",
-    "allow-select-video"
+    "allow-select-video",
+    "allow-get-composition",
+    "allow-save-composition",
+    "allow-import-audio",
+    "allow-list-audio-assets",
+    "allow-choose-export-path",
+    "allow-start-export",
+    "allow-list-export-jobs",
+    "allow-cancel-export"
   ]
 }

@@ -1,0 +1,6 @@
+{
+  "bundle": {
+    "externalBin": ["binaries/ffmpeg", "binaries/ffprobe"],
+    "resources": ["binaries/LICENSE-FFMPEG.txt", "binaries/README-FFMPEG.txt"]
+  }
+}

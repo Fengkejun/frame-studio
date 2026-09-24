@@ -42,6 +42,14 @@ fn main() {
             "video_preview",
             "list_selected_videos",
             "select_video",
+            "get_composition",
+            "save_composition",
+            "import_audio",
+            "list_audio_assets",
+            "choose_export_path",
+            "start_export",
+            "list_export_jobs",
+            "cancel_export",
         ]),
     ))
     .expect("failed to build Tauri application metadata");

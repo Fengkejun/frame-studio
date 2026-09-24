@@ -116,6 +116,11 @@ export async function testMedia(page, root) {
         source: 'image-fixture',
         target: 'video-fixture',
       },
+      {
+        id: 'video-to-timeline',
+        source: 'video-fixture',
+        target: 'timeline-fixture',
+      },
     ],
     nodes: [
       {
@@ -161,6 +166,22 @@ export async function testMedia(page, root) {
         kind: 'video',
         label: '视频节点',
         position: { x: 760, y: 80 },
+        config: {
+          text: '',
+          providerId: '',
+          instructions: '',
+          temperature: 0.7,
+          shotCount: 1,
+          duration: 5,
+        },
+        output: null,
+        stale: false,
+      },
+      {
+        id: 'timeline-fixture',
+        kind: 'timeline',
+        label: '成片节点',
+        position: { x: 1100, y: 80 },
         config: {
           text: '',
           providerId: '',

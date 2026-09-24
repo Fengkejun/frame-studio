@@ -7,6 +7,7 @@ export const kinds = [
   'prompt',
   'image',
   'video',
+  'timeline',
 ] as const
 export type NodeKind = (typeof kinds)[number]
 export const catalog: Record<
@@ -23,6 +24,7 @@ export const catalog: Record<
   prompt: { title: '提示词助手', subtitle: '优化正面与负面提示词', mark: '✦' },
   image: { title: '图片节点', subtitle: '汇集已确认的镜头首帧', mark: '▧' },
   video: { title: '视频节点', subtitle: '汇集已确认的镜头片段', mark: '▷' },
+  timeline: { title: '成片节点', subtitle: '记录本地 MP4 导出版本', mark: '▤' },
 }
 const text = z.string().max(250_000)
 const required = text.min(1).refine((s) => s.trim().length > 0, '请填写内容')
@@ -98,6 +100,14 @@ export const outputSchemas = {
         '镜头 ID 不能重复',
       ),
   }),
+  timeline: z.object({
+    exportId: required,
+    outputPath: required,
+    durationMs: z.number().int().positive(),
+    aspect: z.enum(['9:16', '16:9', '1:1']),
+    resolution: z.union([z.literal(720), z.literal(1080)]),
+    clipVersionIds: z.array(required).min(1).max(24),
+  }),
 }
 export type Shot = z.infer<typeof shotSchema>
 export const artifactSchema = z.object({
@@ -110,6 +120,7 @@ export const artifactSchema = z.object({
     outputSchemas.brief,
     outputSchemas.image,
     outputSchemas.video,
+    outputSchemas.timeline,
   ]),
   createdAt: z.number(),
   source: z.enum(['model', 'manual', 'selection']),
@@ -200,6 +211,7 @@ export const statusLabels: Record<string, string> = {
   skipped: '未执行',
   needs_input: '等待首帧',
   needs_video: '等待片段',
+  needs_export: '等待导出',
 }
 export function makeNode(kind: NodeKind, x = 80, y = 120): WorkflowNode {
   return {
@@ -250,7 +262,9 @@ export function compatible(source: NodeKind, target: NodeKind) {
           ? source === 'storyboard'
           : target === 'video'
             ? source === 'image'
-            : false
+            : target === 'timeline'
+              ? source === 'video'
+              : false
 }
 export function graphError(w: Workflow): string | null {
   const ids = new Set(w.nodes.map((n) => n.id))
@@ -331,7 +345,9 @@ export function outputSummary(node: WorkflowNode): string {
         ? '连接分镜并确认每个镜头首帧'
         : node.kind === 'video'
           ? '连接图片节点并确认每个镜头片段'
-          : '连接模型后，等待你的第一次创作'
+          : node.kind === 'timeline'
+            ? '连接视频节点并完成本地 MP4 导出'
+            : '连接模型后，等待你的第一次创作'
   return 'shots' in v
     ? `${v.shots.length} 个镜头 · ${v.shots.reduce((a, s) => a + s.duration, 0)} 秒`
     : 'title' in v
@@ -340,5 +356,7 @@ export function outputSummary(node: WorkflowNode): string {
         ? `${v.frames.length} 个首帧版本已就绪`
         : 'clips' in v
           ? `${v.clips.length} 个视频片段已就绪`
-          : v.text
+          : 'exportId' in v
+            ? `MP4 已导出 · ${Math.round(v.durationMs / 1000)} 秒`
+            : v.text
 }
