@@ -167,6 +167,7 @@ export async function testMedia(page, root) {
     )
     await confirmStoryboard(storyboard)
     await page.getByRole('button', { name: '制作首帧', exact: true }).click()
+    await page.getByRole('button', { name: '本机 ComfyUI' }).click()
     await expect(
       page.getByRole('textbox', { name: '生图正面提示词' }),
     ).toHaveValue(shot.imagePrompt)
@@ -207,6 +208,7 @@ export async function testMedia(page, root) {
     await page.reload()
     await page.getByRole('button', { name: '工作流', exact: true }).click()
     await openStudio()
+    await page.getByRole('button', { name: '本机 ComfyUI' }).click()
     await expect(page.locator('.first-frame-target')).toHaveText(firstFrame)
     hold = false
     await jobs.first().getByRole('button', { name: '继续查询原任务' }).click()

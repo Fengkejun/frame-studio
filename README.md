@@ -1,6 +1,6 @@
 # 帧序 · Frame Studio
 
-AI 短视频创作桌面应用。支持故事、分镜和提示词可视化工作流、本地 Ollama 或 OpenAI 兼容文本服务，以及分镜首帧的 ComfyUI 生图、本地素材和版本选择。视频与成片合成适配器留待后续阶段。
+AI 短视频创作桌面应用。支持故事、分镜和提示词可视化工作流、本地 Ollama 或 OpenAI 兼容文本服务，以及分镜首帧的云端 OpenAI 生图、本机 ComfyUI 生图、本地素材和版本选择。视频与成片合成适配器留待后续阶段。
 
 ## 技术栈
 
@@ -57,7 +57,7 @@ Windows 调试程序：`src-tauri/target/debug/frame-studio.exe`。
 发布程序与安装包：`src-tauri/target/release/` 和其中的 `bundle/`。
 安装包尚未配置代码签名、自动更新或发布渠道。
 
-本机已验证前端生产构建、5 项浏览器测试、4 项 Rust 测试、Windows 调试程序与原生 IPC、首帧制作的 HTTP 协议和文件持久化。`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；图片测试使用固定 PNG，不执行真实模型推理。macOS / Linux 和发布安装包尚未验证。
+本机已验证前端生产构建、5 项浏览器测试、6 项 Rust 测试、Windows 调试程序与原生 IPC、本机和云端首帧制作的 HTTP 协议及文件持久化。`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；图片测试使用固定 PNG 与本机假服务，不执行真实模型推理，也不调用真实 OpenAI API。macOS / Linux 和发布安装包尚未验证。
 
 ## 目录
 
@@ -95,9 +95,9 @@ docs/architecture.md         # 当前边界与后续扩展约定
 - 模型连接：Ollama 本地服务和 OpenAI Chat Completions 兼容服务；API Key 只写入系统凭据库，工作流文件只保存连接 ID。
 - 后台运行：按 DAG 顺序执行并保存每个节点的结果、运行快照和失败/中断状态；浏览器预览不会伪造原生调用成功。
 
-分镜卡片的「制作首帧」可连接本机 ComfyUI，生成 1–4 张候选图，或导入本地图片；明确选择首帧后按分镜结果版本保存。图片任务支持停止等待和按原任务 ID 恢复查询，旧素材持续保留。详见 [首帧工作流使用说明](docs/image-workflow.md)。
+分镜卡片的「制作首帧」可选择云端 OpenAI Images API（无需安装 ComfyUI，需 API Key，会产生云端费用）、本机 ComfyUI 或导入本地图片。候选图存入本地素材库，明确选择首帧后按分镜结果版本保存。ComfyUI 任务支持停止等待和按原任务 ID 恢复查询；云端图片请求无法远程取消，结果未知时不会自动重发。详见 [首帧工作流使用说明](docs/image-workflow.md)。
 
-当前还没有接入视频、音频和成片合成；侧栏中的“模型连接”目前只管理文本模型。ComfyUI 在「首帧与素材」中配置。画布 JSON 导出暂不打包图片或首帧绑定。
+当前还没有接入视频、音频和成片合成；侧栏中的“模型连接”目前只管理文本模型。图片服务在「首帧与素材」中配置，其密钥与文本连接分开保存。画布 JSON 导出暂不打包图片或首帧绑定。
 
 ## 官方参考
 
@@ -107,4 +107,4 @@ docs/architecture.md         # 当前边界与后续扩展约定
 - [Tauri 权限](https://v2.tauri.app/security/capabilities/)
 - [React 从零创建应用](https://react.dev/learn/build-a-react-app-from-scratch)
 
-第二阶段通过 Context7 核对 ComfyUI 官方接口和图片解码库文档。
+第二阶段通过 Context7 核对 ComfyUI 官方接口和图片解码库文档；云端图片接入核对了 OpenAI Images API 当前文档。
