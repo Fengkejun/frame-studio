@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { isDesktop } from '@/shared/lib/desktop'
+import { listen } from '@tauri-apps/api/event'
 import * as api from './api'
 import type { Provider } from './model'
 
@@ -28,13 +29,20 @@ export function ConnectionsPage({
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
+  const [models, setModels] = useState<api.OllamaModel[]>([])
+  const [pulling, setPulling] = useState(false)
+  const [pullProgress, setPullProgress] = useState<{
+    status: string
+    completed: number
+    total: number
+  } | null>(null)
   useEffect(() => {
     api
       .listProviders()
       .then(setProviders)
       .catch((e: unknown) => setError(api.errorMessage(e)))
   }, [])
-  const locked = !isDesktop || pending || busy
+  const locked = !isDesktop || pending || pulling || busy
   const exists = providers.some((p) => p.id === form.id)
   function edit(p: Provider) {
     setForm(p)
@@ -43,6 +51,52 @@ export function ConnectionsPage({
     setMessage('')
     setError('')
     setDeleting(false)
+    setModels([])
+    setPullProgress(null)
+  }
+  async function refreshModels() {
+    setPending(true)
+    setError('')
+    try {
+      const installed = await api.listOllamaModels(form.baseUrl)
+      setModels(installed)
+      setMessage(
+        installed.length
+          ? `找到 ${installed.length} 个已安装模型。点击名称可填入模型 ID。`
+          : 'Ollama 已连接，尚未安装模型。',
+      )
+    } catch (e) {
+      setError(api.errorMessage(e))
+    } finally {
+      setPending(false)
+    }
+  }
+  async function pullModel() {
+    setPulling(true)
+    setError('')
+    setMessage('正在从 Ollama 下载模型；下载大小取决于所选模型。')
+    setPullProgress(null)
+    let unlisten: (() => void) | undefined
+    try {
+      unlisten = await listen<{
+        model: string
+        status: string
+        completed: number
+        total: number
+      }>('ollama-pull-progress', (event) => {
+        if (event.payload.model === form.model.trim())
+          setPullProgress(event.payload)
+      })
+      await api.pullOllamaModel(form.baseUrl, form.model)
+      const installed = await api.listOllamaModels(form.baseUrl)
+      setModels(installed)
+      setMessage('模型下载完成。保存连接后即可在画布中使用。')
+    } catch (e) {
+      setError(api.errorMessage(e))
+    } finally {
+      unlisten?.()
+      setPulling(false)
+    }
   }
   async function save() {
     setPending(true)
@@ -206,9 +260,10 @@ export function ConnectionsPage({
                   value={form.baseUrl}
                   type="url"
                   required
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setForm({ ...form, baseUrl: e.target.value })
-                  }
+                    setModels([])
+                  }}
                 />
                 <small>
                   {form.kind === 'ollama'
@@ -226,6 +281,55 @@ export function ConnectionsPage({
                   onChange={(e) => setForm({ ...form, model: e.target.value })}
                 />
               </label>
+              {form.kind === 'ollama' && (
+                <div className="ollama-model-tools">
+                  <div className="form-actions">
+                    <button
+                      className="button secondary"
+                      type="button"
+                      onClick={() => void refreshModels()}
+                    >
+                      刷新已安装模型
+                    </button>
+                    <button
+                      className="button secondary"
+                      type="button"
+                      disabled={!form.model.trim() || pulling}
+                      onClick={() => void pullModel()}
+                    >
+                      下载当前模型 ID
+                    </button>
+                  </div>
+                  {models.length > 0 && (
+                    <div
+                      className="model-choices"
+                      aria-label="已安装的 Ollama 模型"
+                    >
+                      {models.map((model) => (
+                        <button
+                          className="small-button"
+                          type="button"
+                          key={model.name}
+                          onClick={() =>
+                            setForm({ ...form, model: model.name })
+                          }
+                        >
+                          {model.name} · {(model.size / 1024 ** 3).toFixed(1)}{' '}
+                          GB
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {pullProgress && (
+                    <p className="field-hint" role="status">
+                      {pullProgress.status}{' '}
+                      {pullProgress.total > 0
+                        ? `${Math.round((pullProgress.completed / pullProgress.total) * 100)}%`
+                        : ''}
+                    </p>
+                  )}
+                </div>
+              )}
               <label className="field">
                 API Key{' '}
                 <span className="muted">
@@ -280,6 +384,15 @@ export function ConnectionsPage({
               </div>
             </fieldset>
           </form>
+          {pulling && (
+            <button
+              className="button secondary"
+              type="button"
+              onClick={() => void api.cancelOllamaPull()}
+            >
+              停止下载
+            </button>
+          )}
           {error && (
             <p className="workflow-error" role="alert">
               {error}

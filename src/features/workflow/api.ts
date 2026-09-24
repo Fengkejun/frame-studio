@@ -48,6 +48,18 @@ export const removeProvider = (id: string): Promise<void> =>
   invoke('remove_provider', { id })
 export const testProvider = (id: string): Promise<string> =>
   invoke('test_provider', { id })
+export interface OllamaModel {
+  name: string
+  size: number
+}
+export const listOllamaModels = (baseUrl: string): Promise<OllamaModel[]> =>
+  invoke('list_ollama_models', { baseUrl })
+export const pullOllamaModel = (
+  baseUrl: string,
+  model: string,
+): Promise<void> => invoke('pull_ollama_model', { baseUrl, model })
+export const cancelOllamaPull = (): Promise<void> =>
+  invoke('cancel_ollama_pull')
 export const listRuns = (workflowId: string): Promise<RunRecord[]> =>
   isDesktop ? invoke('list_runs', { workflowId }) : Promise.resolve([])
 export const getRun = (id: string): Promise<RunRecord> =>

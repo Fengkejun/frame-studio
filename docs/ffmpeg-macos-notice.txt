@@ -1,0 +1,8 @@
+Frame Studio bundles FFmpeg and FFprobe on macOS from the pinned
+vanloctech/ffmpeg-macos ffmpeg-2026.06.11 release:
+https://github.com/vanloctech/ffmpeg-macos/releases/tag/ffmpeg-2026.06.11
+
+The bundled build includes GPL components such as x264. The included LICENSE
+file is the FFmpeg GPLv2 license. FFmpeg source and build scripts are available
+from https://ffmpeg.org/ and the release repository above. Review component
+licenses and distribution obligations before publishing a signed release.

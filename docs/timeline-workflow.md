@@ -20,7 +20,9 @@
 
 ## FFmpeg 配置与打包
 
-桌面开发运行时优先使用应用程序旁的 `ffmpeg`、`ffprobe`，其次使用系统 PATH 中的安装。`npm run desktop:build` 会运行 `scripts/prepare-ffmpeg-sidecars.mjs`，从 `FRAME_STUDIO_FFMPEG_DIR` 指定的目录或 PATH 查找两个可执行文件，按 Rust target triple 放入忽略版本控制的 `src-tauri/binaries/`，再通过 Tauri `externalBin` 打包。脚本同时拷贝所选 FFmpeg 发布包中的 LICENSE 与 README；自定义发布包可通过 `FRAME_STUDIO_FFMPEG_LICENSE` 和 `FRAME_STUDIO_FFMPEG_README` 指定对应文件。每个目标系统与架构需要对应的 FFmpeg/FFprobe 二进制。所选 FFmpeg 构建须支持 `libx264`、`subtitles` 滤镜和 AAC 编码。当前 Windows 开发机安装的 FFmpeg 自报 GPL 授权；正式分发时应核对所选构建及其依赖许可。
+桌面开发运行时优先使用应用程序旁的 `ffmpeg`、`ffprobe`，其次使用系统 PATH 中的安装。`npm run desktop:build` 在 Windows 生成 NSIS `.exe` 安装包，在 macOS 生成 `.dmg` 安装包。构建脚本从 `FRAME_STUDIO_FFMPEG_DIR` 指定的目录或 PATH 查找两个可执行文件，按 Rust target triple 放入忽略版本控制的 `src-tauri/binaries/`，再通过 Tauri `externalBin` 打包。脚本同时拷贝所选 FFmpeg 发布包中的 LICENSE 与 README；自定义发布包可通过 `FRAME_STUDIO_FFMPEG_LICENSE` 和 `FRAME_STUDIO_FFMPEG_README` 指定对应文件。每个目标系统与架构需要对应的 FFmpeg/FFprobe 二进制。所选 FFmpeg 构建须支持 `libx264`、`subtitles` 滤镜和 AAC 编码；macOS 构建还会拒绝依赖包外第三方动态库的二进制。
+
+`.github/workflows/macos-installers.yml` 在原生 Apple Silicon 与 Intel runner 上分别构建 DMG，使用固定版本且校验 SHA256 的 FFmpeg 发布包，并在上传前运行应用内的 FFmpeg/FFprobe。两种 DMG 当前未配置 Apple Developer ID 签名或公证；面向普通用户发布前需配置签名与公证，并核对 FFmpeg 构建及其依赖许可。Windows 开发机所用 FFmpeg 也自报 GPL 授权。
 
 ## 验证范围
 

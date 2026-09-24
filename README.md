@@ -1,6 +1,6 @@
 # 帧序 · Frame Studio
 
-AI 短视频创作桌面应用。支持故事、分镜和提示词可视化工作流、本地 Ollama 或 OpenAI 兼容文本服务，以及分镜首帧的云端 OpenAI 生图、本机 ComfyUI 生图、本地素材和版本选择。视频与成片合成适配器留待后续阶段。
+AI 短视频创作桌面应用。支持故事、分镜和提示词可视化工作流、本地 Ollama 或 OpenAI 兼容文本服务，以及首帧生图、镜头视频、素材版本和本地成片导出。
 
 ## 技术栈
 
@@ -55,9 +55,9 @@ Windows 浏览器测试默认使用已安装的 Edge；其他系统先执行 `np
 
 Windows 调试程序：`src-tauri/target/debug/frame-studio.exe`。
 发布程序与安装包：`src-tauri/target/release/` 和其中的 `bundle/`。
-安装包尚未配置代码签名、自动更新或发布渠道。
+Windows 构建生成 NSIS `.exe`，macOS 构建生成 Apple Silicon 或 Intel `.dmg`。Mac 构建流程见 [成片时间线与打包](docs/timeline-workflow.md)；当前尚未配置 Apple Developer ID 签名、公证、自动更新或发布渠道。
 
-本机已验证前端生产构建、5 项浏览器测试、6 项 Rust 测试、Windows 调试程序与原生 IPC、本机和云端首帧制作的 HTTP 协议及文件持久化。`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；图片测试使用固定 PNG 与本机假服务，不执行真实模型推理，也不调用真实 OpenAI API。macOS / Linux 和发布安装包尚未验证。
+`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；图片测试使用固定 PNG 与本机假服务，不执行真实模型推理，也不调用真实 OpenAI API。macOS 安装包由 GitHub Actions 的两个原生 Mac runner 分别构建。
 
 ## 目录
 
@@ -92,12 +92,12 @@ docs/architecture.md         # 当前边界与后续扩展约定
 - 主窗口命令白名单及生产 CSP；没有开放文件系统、Shell 或远程页面权限。
 - 工作流画布：创作需求 → 故事编剧 → 分镜导演 → 提示词助手；支持拖入节点、合法连线检查、撤销/重做、项目切换、JSON 导入导出和本地自动保存。
 - 结构化 Agent 输出：故事字段、分镜镜头 ID、数量与总时长在前后端双重校验。
-- 模型连接：Ollama 本地服务和 OpenAI Chat Completions 兼容服务；API Key 只写入系统凭据库，工作流文件只保存连接 ID。
+- 模型连接：Ollama 本地服务和 OpenAI Chat Completions 兼容服务；可列出本机 Ollama 模型、选择模型 ID、按 ID 手动下载并查看进度；API Key 只写入系统凭据库，工作流文件只保存连接 ID。
 - 后台运行：按 DAG 顺序执行并保存每个节点的结果、运行快照和失败/中断状态；浏览器预览不会伪造原生调用成功。
 
 分镜卡片的「制作首帧」可选择云端 OpenAI Images API（无需安装 ComfyUI，需 API Key，会产生云端费用）、本机 ComfyUI 或导入本地图片。候选图存入本地素材库，明确选择首帧后按分镜结果版本保存。ComfyUI 任务支持停止等待和按原任务 ID 恢复查询；云端图片请求无法远程取消，结果未知时不会自动重发。详见 [首帧工作流使用说明](docs/image-workflow.md)。
 
-当前还没有接入视频、音频和成片合成；侧栏中的“模型连接”目前只管理文本模型。图片服务在「首帧与素材」中配置，其密钥与文本连接分开保存。画布 JSON 导出暂不打包图片或首帧绑定。
+侧栏中的“模型连接”管理文本模型。图片服务在「首帧与素材」中配置，其密钥与文本连接分开保存。镜头视频和成片时间线分别在专属页面配置。画布 JSON 导出保存资产引用，不打包大文件。
 
 ## 官方参考
 

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { copyFile, mkdir, realpath, stat } from 'node:fs/promises'
+import { copyFile, mkdir, realpath, stat, chmod } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -36,6 +36,23 @@ for (const name of ['ffmpeg', 'ffprobe']) {
   if (name === 'ffmpeg') encoderBinary = resolved
   const target = path.join(directory, `${name}-${triple}${extension}`)
   await copyFile(resolved, target)
+  if (process.platform === 'darwin') {
+    await chmod(target, 0o755)
+    const linked = execFileSync('otool', ['-L', target], { encoding: 'utf8' })
+    const dependencies = linked
+      .split('\n')
+      .slice(1)
+      .map((line) => line.trim().split(' (')[0])
+      .filter(Boolean)
+    const external = dependencies.filter(
+      (item) =>
+        !item.startsWith('/usr/lib/') && !item.startsWith('/System/Library/'),
+    )
+    if (external.length)
+      throw new Error(
+        `${name} has unbundled macOS libraries: ${external.join(', ')}`,
+      )
+  }
   const size = (await stat(target)).size
   console.log(`Prepared ${name} sidecar for ${triple}: ${size} bytes`)
 }

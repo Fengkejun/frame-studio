@@ -1,7 +1,131 @@
 use super::types::*;
 use reqwest::{Client, Url};
+use serde::Serialize;
 use serde_json::{json, Value};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::time::Duration;
+use tauri::Emitter;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OllamaModel {
+    name: String,
+    size: u64,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PullProgress {
+    model: String,
+    status: String,
+    completed: u64,
+    total: u64,
+}
+
+fn ollama_provider(base_url: &str, model: &str) -> AppResult<Provider> {
+    let provider = Provider {
+        id: "local-discovery".into(),
+        name: "Ollama".into(),
+        kind: "ollama".into(),
+        base_url: base_url.trim().into(),
+        model: model.into(),
+        has_key: false,
+    };
+    validate_provider(&provider)?;
+    if !provider.base_url.trim_end_matches('/').ends_with("/api") {
+        return Err("Ollama 地址须以 /api 结尾".into());
+    }
+    Ok(provider)
+}
+
+pub async fn list_ollama_models(base_url: &str) -> AppResult<Vec<OllamaModel>> {
+    let provider = ollama_provider(base_url, "list")?;
+    let response = client(15)?
+        .get(endpoint(&provider, "tags"))
+        .send()
+        .await
+        .map_err(|_| "无法连接 Ollama，请检查服务是否启动")?;
+    let data = response_json(response).await?;
+    let models = data["models"].as_array().ok_or("Ollama 模型列表格式无效")?;
+    Ok(models
+        .iter()
+        .filter_map(|item| {
+            Some(OllamaModel {
+                name: item["name"].as_str()?.to_owned(),
+                size: item["size"].as_u64().unwrap_or(0),
+            })
+        })
+        .collect())
+}
+
+pub async fn pull_ollama_model(
+    app: &tauri::AppHandle,
+    base_url: &str,
+    model: &str,
+    cancel: Arc<AtomicBool>,
+) -> AppResult<()> {
+    let model = model.trim();
+    if model.is_empty() || model.len() > 200 || model.chars().any(char::is_whitespace) {
+        return Err("模型 ID 无效，请填写 Ollama 模型名称".into());
+    }
+    let provider = ollama_provider(base_url, model)?;
+    let mut response = Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|_| "无法创建模型连接")?
+        .post(endpoint(&provider, "pull"))
+        .json(&json!({"model": model, "stream": true}))
+        .send()
+        .await
+        .map_err(|_| "无法连接 Ollama，请检查服务是否启动")?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "Ollama 下载请求返回 HTTP {}",
+            response.status().as_u16()
+        ));
+    }
+    let mut buffer = Vec::new();
+    let mut succeeded = false;
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("已停止模型下载；已获取的数据可能由 Ollama 保留".into());
+        }
+        let chunk = tokio::select! {
+            result = response.chunk() => result.map_err(|_| "模型下载连接中断，请刷新已安装列表核实")?,
+            _ = tokio::time::sleep(Duration::from_millis(250)) => continue,
+        };
+        let Some(chunk) = chunk else { break };
+        buffer.extend_from_slice(&chunk);
+        if buffer.len() > 64 * 1024 {
+            return Err("模型下载状态过长".into());
+        }
+        while let Some(end) = buffer.iter().position(|byte| *byte == b'\n') {
+            let line: Vec<u8> = buffer.drain(..=end).collect();
+            let data: Value =
+                serde_json::from_slice(&line).map_err(|_| "Ollama 下载状态格式无效")?;
+            if let Some(error) = data["error"].as_str() {
+                return Err(format!("Ollama 下载失败：{error}"));
+            }
+            let status = data["status"].as_str().unwrap_or("下载中").to_owned();
+            succeeded |= status == "success";
+            let progress = PullProgress {
+                model: model.into(),
+                status,
+                completed: data["completed"].as_u64().unwrap_or(0),
+                total: data["total"].as_u64().unwrap_or(0),
+            };
+            let _ = app.emit("ollama-pull-progress", progress);
+        }
+    }
+    if !succeeded {
+        return Err("下载连接结束但未确认成功，请刷新已安装列表核实".into());
+    }
+    Ok(())
+}
 
 pub fn validate_provider(p: &Provider) -> AppResult<Url> {
     if p.id.is_empty()
@@ -193,4 +317,31 @@ pub async fn generate(p: &Provider, node: &WorkflowNode, input: &Value) -> AppRe
         }
     }
     Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+
+    #[tokio::test]
+    async fn discovers_ollama_model_ids_from_tags() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut request = [0; 2048];
+            let count = stream.read(&mut request).unwrap();
+            assert!(String::from_utf8_lossy(&request[..count]).starts_with("GET /api/tags "));
+            let body = r#"{"models":[{"name":"gemma4:latest","size":1234}]}"#;
+            write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+        });
+        let models = list_ollama_models(&format!("http://127.0.0.1:{port}/api"))
+            .await
+            .unwrap();
+        server.join().unwrap();
+        assert_eq!(models.len(), 1);
+        assert_eq!(models[0].name, "gemma4:latest");
+        assert_eq!(models[0].size, 1234);
+    }
 }

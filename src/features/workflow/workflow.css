@@ -589,6 +589,17 @@
   background: var(--surface);
   padding: 15px;
 }
+.ollama-model-tools {
+  display: grid;
+  gap: 10px;
+  margin: 2px 0 16px;
+}
+.ollama-model-tools .form-actions,
+.model-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .connection-item {
   width: 100%;
   display: grid;

@@ -24,6 +24,7 @@ pub struct WorkflowState {
     media_active: Mutex<Option<ActiveRun>>,
     video_active: Mutex<HashMap<String, media::video::ActiveVideo>>,
     export_active: Mutex<Option<ActiveRun>>,
+    model_pull: Mutex<Option<Arc<AtomicBool>>>,
     directory: std::path::PathBuf,
 }
 
@@ -42,6 +43,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         media_active: Mutex::new(None),
         video_active: Mutex::new(HashMap::new()),
         export_active: Mutex::new(None),
+        model_pull: Mutex::new(None),
         directory,
     });
     media::comfy::recover(&app.state::<WorkflowState>())?;
@@ -68,6 +70,40 @@ pub fn save_workflow(state: tauri::State<WorkflowState>, workflow: Workflow) -> 
 #[tauri::command]
 pub fn list_providers(state: tauri::State<WorkflowState>) -> AppResult<Vec<Provider>> {
     state.store.providers()
+}
+
+#[tauri::command]
+pub async fn list_ollama_models(base_url: String) -> AppResult<Vec<providers::OllamaModel>> {
+    providers::list_ollama_models(&base_url).await
+}
+
+#[tauri::command]
+pub async fn pull_ollama_model(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, WorkflowState>,
+    base_url: String,
+    model: String,
+) -> AppResult<()> {
+    let cancel = Arc::new(AtomicBool::new(false));
+    {
+        let mut active = state.model_pull.lock().map_err(|_| "模型任务锁不可用")?;
+        if active.is_some() {
+            return Err("已有模型正在下载，请等待或先取消".into());
+        }
+        *active = Some(cancel.clone());
+    }
+    let result = providers::pull_ollama_model(&app, &base_url, &model, cancel).await;
+    *state.model_pull.lock().map_err(|_| "模型任务锁不可用")? = None;
+    result
+}
+
+#[tauri::command]
+pub fn cancel_ollama_pull(state: tauri::State<WorkflowState>) -> AppResult<()> {
+    let active = state.model_pull.lock().map_err(|_| "模型任务锁不可用")?;
+    if let Some(cancel) = active.as_ref() {
+        cancel.store(true, Ordering::Relaxed);
+    }
+    Ok(())
 }
 #[tauri::command]
 pub fn save_provider(

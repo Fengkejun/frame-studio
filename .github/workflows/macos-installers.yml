@@ -1,0 +1,44 @@
+name: macOS installers
+
+on:
+  push:
+    branches: [codex/macos-packaging-and-model-setup]
+  workflow_dispatch:
+
+jobs:
+  dmg:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: x64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm ci
+      - name: Prepare pinned FFmpeg sidecars
+        run: bash scripts/prepare-macos-ffmpeg.sh
+      - name: Build DMG
+        run: npm run desktop:build
+      - name: Inspect bundled app
+        run: |
+          app=$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name '*.app' -print -quit)
+          test -n "$app"
+          test -x "$app/Contents/MacOS/ffmpeg"
+          test -x "$app/Contents/MacOS/ffprobe"
+          "$app/Contents/MacOS/ffmpeg" -hide_banner -encoders | grep libx264
+          "$app/Contents/MacOS/ffmpeg" -hide_banner -filters | grep subtitles
+          "$app/Contents/MacOS/ffprobe" -version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frame-studio-macos-${{ matrix.architecture }}
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
