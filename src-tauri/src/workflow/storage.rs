@@ -17,7 +17,7 @@ impl Store {
         let version: u32 = c
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(|e| e.to_string())?;
-        if version > 2 {
+        if version > 3 {
             return Err("项目数据库版本较新，请升级应用".into());
         }
         if version < 2 {
@@ -27,6 +27,12 @@ impl Store {
                 CREATE TABLE IF NOT EXISTS first_frames(workflow_id TEXT NOT NULL, node_id TEXT NOT NULL, artifact_id TEXT NOT NULL, shot_id TEXT NOT NULL, version_id TEXT NOT NULL, PRIMARY KEY(workflow_id,node_id,artifact_id,shot_id));
                 CREATE TABLE IF NOT EXISTS media_settings(id TEXT PRIMARY KEY, json TEXT NOT NULL);
                 PRAGMA user_version=2; COMMIT;").map_err(|e| e.to_string())?;
+        }
+        if version < 3 {
+            c.execute_batch("BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS cloud_image_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
+                PRAGMA user_version=3; COMMIT;")
+                .map_err(|e| e.to_string())?;
         }
         let store = Self(Mutex::new(c));
         // A text request has no pollable provider task ID. Never resubmit after a crash.
@@ -135,10 +141,37 @@ mod tests {
                     .unwrap()
                     .pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
                     .unwrap(),
-                2
+                3
             );
         }
         assert_eq!(Store::open(&path).unwrap().providers().unwrap().len(), 1);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn upgrades_v2_without_losing_image_jobs() {
+        let path = std::env::temp_dir().join(format!("frame-studio-v2-{}.sqlite", uid()));
+        {
+            let db = Connection::open(&path).unwrap();
+            db.execute_batch("CREATE TABLE image_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL); INSERT INTO image_jobs VALUES ('existing','workflow','{}',1); PRAGMA user_version=2;").unwrap();
+        }
+        let store = Store::open(&path).unwrap();
+        let db = store.db().unwrap();
+        let count: u32 = db
+            .query_row("SELECT count(*) FROM image_jobs", [], |r| r.get(0))
+            .unwrap();
+        let version: u32 = db
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        let cloud_table: u32 = db
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='cloud_image_jobs'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!((count, version, cloud_table), (1, 3, 1));
+        drop(db);
+        drop(store);
         std::fs::remove_file(path).unwrap();
     }
 }

@@ -24,6 +24,11 @@ fn main() {
             "start_image_job",
             "resume_image_job",
             "pause_image_job",
+            "cloud_image_key_status",
+            "save_cloud_image_key",
+            "clear_cloud_image_key",
+            "list_cloud_image_jobs",
+            "start_cloud_image_job",
         ]),
     ))
     .expect("failed to build Tauri application metadata");

@@ -41,6 +41,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         directory,
     });
     media::comfy::recover(&app.state::<WorkflowState>())?;
+    media::cloud::recover(&app.state::<WorkflowState>())?;
     Ok(())
 }
 fn idle(state: &WorkflowState) -> AppResult<()> {

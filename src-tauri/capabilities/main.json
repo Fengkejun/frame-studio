@@ -26,6 +26,11 @@
     "allow-list-image-jobs",
     "allow-start-image-job",
     "allow-resume-image-job",
-    "allow-pause-image-job"
+    "allow-pause-image-job",
+    "allow-cloud-image-key-status",
+    "allow-save-cloud-image-key",
+    "allow-clear-cloud-image-key",
+    "allow-list-cloud-image-jobs",
+    "allow-start-cloud-image-job"
   ]
 }

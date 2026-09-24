@@ -1,4 +1,5 @@
 //! Immutable local image versions and explicit, version-scoped shot selections.
+pub mod cloud;
 pub mod comfy;
 use super::{types::*, WorkflowState};
 use base64::{engine::general_purpose::STANDARD, Engine};

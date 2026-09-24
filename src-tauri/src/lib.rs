@@ -27,7 +27,12 @@ pub fn run() {
             workflow::media::comfy::list_image_jobs,
             workflow::media::comfy::start_image_job,
             workflow::media::comfy::resume_image_job,
-            workflow::media::comfy::pause_image_job
+            workflow::media::comfy::pause_image_job,
+            workflow::media::cloud::cloud_image_key_status,
+            workflow::media::cloud::save_cloud_image_key,
+            workflow::media::cloud::clear_cloud_image_key,
+            workflow::media::cloud::list_cloud_image_jobs,
+            workflow::media::cloud::start_cloud_image_job
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Frame Studio");

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-cloud-image-key-status"
+description = "Enables the cloud_image_key_status command without any pre-configured scope."
+commands.allow = ["cloud_image_key_status"]
+
+[[permission]]
+identifier = "deny-cloud-image-key-status"
+description = "Denies the cloud_image_key_status command without any pre-configured scope."
+commands.deny = ["cloud_image_key_status"]
