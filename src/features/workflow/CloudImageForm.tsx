@@ -10,12 +10,16 @@ export function CloudImageForm({
   disabled,
   onStart,
   onError,
+  roleReferences,
+  assets,
 }: {
   context: api.ShotContext
   shot: Shot
   disabled: boolean
   onStart: (request: api.CloudImageRequest) => Promise<void>
   onError: (message: string) => void
+  roleReferences: api.RoleReference[]
+  assets: api.ImageAsset[]
 }) {
   const [request, setRequest] = useState<api.CloudImageRequest>({
     context,
@@ -124,6 +128,35 @@ export function CloudImageForm({
             : '请先保存密钥。'}
         </p>
         <label className="field-label">
+          生图方式
+          <select
+            aria-label="云端生图方式"
+            value={request.referenceVersionId ?? ''}
+            onChange={(e) =>
+              setRequest((r) => ({
+                ...r,
+                referenceVersionId: e.target.value || null,
+              }))
+            }
+          >
+            <option value="">文生图 · 仅使用提示词</option>
+            {roleReferences.map((reference) => {
+              const asset = assets.find(
+                (item) => item.versionId === reference.versionId,
+              )
+              return (
+                <option key={reference.roleName} value={reference.versionId}>
+                  图生图 · {reference.roleName} ·{' '}
+                  {asset?.name ?? reference.versionId.slice(0, 8)}
+                </option>
+              )
+            })}
+          </select>
+        </label>
+        <p className="field-hint">
+          图生图会读取所选角色参考图的固定版本，生成新候选图；不会覆盖参考图。
+        </p>
+        <label className="field-label">
           图片模型
           <select
             aria-label="云端图片模型"
@@ -222,7 +255,9 @@ export function CloudImageForm({
           type="submit"
           disabled={!hasKey}
         >
-          生成 1 张云端候选图
+          {request.referenceVersionId
+            ? '参考图生成 1 张候选图'
+            : '生成 1 张云端候选图'}
         </button>
         <p className="field-hint">
           请求提交后无法远程取消。网络超时或应用关闭时会标记结果未知，请先核对服务商用量再重试。

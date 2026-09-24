@@ -72,6 +72,7 @@ export function ImageStudio({
   const [filter, setFilter] = useState<'shot' | 'all'>('shot')
   const [generator, setGenerator] = useState<'cloud' | 'local'>('cloud')
   const [limit, setLimit] = useState(40)
+  const [roleName, setRoleName] = useState('')
   const fileInput = useRef<HTMLInputElement>(null)
   const library =
     filter === 'all'
@@ -209,6 +210,8 @@ export function ImageStudio({
                     })
                   }
                   onError={media.setError}
+                  roleReferences={media.roleReferences}
+                  assets={media.assets}
                 />
               ) : (
                 <ImageForm
@@ -240,6 +243,51 @@ export function ImageStudio({
           )}
         </aside>
         <div className="image-results">
+          <section className="role-reference-panel" aria-label="角色参考图">
+            <h3>角色参考图</h3>
+            <p className="field-hint">
+              给角色命名，再从下方素材中绑定一个固定版本。文生图候选和导入图片都可作为参考图。
+            </p>
+            <label className="field-label">
+              角色名称
+              <input
+                aria-label="角色名称"
+                maxLength={80}
+                value={roleName}
+                onChange={(e) => setRoleName(e.target.value)}
+                placeholder="例如：主角小猫"
+              />
+            </label>
+            <div className="role-reference-list">
+              {media.roleReferences.map((reference) => {
+                const asset = media.assets.find(
+                  (item) => item.versionId === reference.versionId,
+                )
+                return (
+                  <div key={reference.roleName} className="role-reference-item">
+                    <AssetImage
+                      versionId={reference.versionId}
+                      alt={reference.roleName}
+                    />
+                    <div>
+                      <strong>{reference.roleName}</strong>
+                      <small>
+                        版本 {versionLabel(reference.versionId)} ·{' '}
+                        {asset?.name ?? '素材不可用'}
+                      </small>
+                    </div>
+                    <button
+                      className="small-button"
+                      onClick={() => setRoleName(reference.roleName)}
+                    >
+                      更新
+                    </button>
+                  </div>
+                )
+              })}
+              {!media.roleReferences.length && <small>尚无角色参考图</small>}
+            </div>
+          </section>
           <div
             className="first-frame-target"
             onDragOver={(e) => {
@@ -327,6 +375,22 @@ export function ImageStudio({
                       ? '✓ 当前首帧'
                       : '选为首帧'}
                   </button>
+                  <button
+                    className="small-button"
+                    disabled={!isDesktop || working || !roleName.trim()}
+                    onClick={() =>
+                      void action(async () => {
+                        await save(workflow)
+                        await api.setRoleReference(
+                          workflow.id,
+                          roleName,
+                          a.versionId,
+                        )
+                      })
+                    }
+                  >
+                    绑定为角色参考图
+                  </button>
                 </div>
               </article>
             ))}
@@ -380,6 +444,12 @@ export function ImageStudio({
                     {job.request.quality}
                   </p>
                   <p>提示词：{job.request.positive}</p>
+                  <p>
+                    方式：
+                    {job.request.referenceVersionId
+                      ? `图生图 · 参考版本 ${versionLabel(job.request.referenceVersionId)}`
+                      : '文生图'}
+                  </p>
                   <p>避免元素：{job.request.negative || '无'}</p>
                 </details>
               </article>

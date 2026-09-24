@@ -9,15 +9,21 @@ export async function createCloudFixture(root) {
   const requests = []
   let mode = 'success'
   const server = http.createServer(async (req, res) => {
-    let body = ''
-    for await (const chunk of req) body += chunk
-    if (req.url !== '/v1/images/generations' || req.method !== 'POST') {
+    const chunks = []
+    for await (const chunk of req) chunks.push(chunk)
+    const body = Buffer.concat(chunks)
+    const edit = req.url === '/v1/images/edits'
+    if (
+      !['/v1/images/generations', '/v1/images/edits'].includes(req.url) ||
+      req.method !== 'POST'
+    ) {
       res.writeHead(404).end()
       return
     }
     requests.push({
       authorization: req.headers.authorization,
-      body: JSON.parse(body),
+      path: req.url,
+      body: edit ? body.toString('latin1') : JSON.parse(body.toString()),
     })
     if (mode === 'lost') {
       req.socket.destroy()
@@ -75,6 +81,27 @@ export async function testCloudMedia(page, fixture) {
   await expect(page.locator('.first-frame-target')).toContainText(
     '已选定镜头首帧',
   )
+  await page.getByLabel('角色名称').fill('主角小猫')
+  await candidate.getByRole('button', { name: '绑定为角色参考图' }).click()
+  await expect(page.locator('.role-reference-list')).toContainText('主角小猫')
+  await page.getByLabel('云端生图方式').selectOption({ index: 1 })
+  await page.getByRole('button', { name: '参考图生成 1 张候选图' }).click()
+  await expect(jobs).toHaveCount(2, { timeout: 20000 })
+  await expect(jobs.first().getByText('已完成', { exact: true })).toBeVisible({
+    timeout: 20000,
+  })
+  expect(fixture.requests).toHaveLength(2)
+  expect(fixture.requests[1].path).toBe('/v1/images/edits')
+  expect(fixture.requests[1].authorization).toBe('Bearer fixture-key')
+  expect(fixture.requests[1].body).toContain('name="image[]"')
+  expect(fixture.requests[1].body).toContain('name="prompt"')
+  expect(fixture.requests[1].body).toContain('New storyboard version')
+  expect(fixture.requests[1].body).toContain('PNG')
+  await expect(page.locator('.first-frame-target')).toContainText(
+    '已选定镜头首帧',
+  )
+  await expect(candidate).toHaveCount(2)
+  await page.getByLabel('云端生图方式').selectOption('')
   await page.screenshot({ path: fixture.screenshotPath, fullPage: true })
 
   fixture.setMode('reject')
@@ -89,7 +116,7 @@ export async function testCloudMedia(page, fixture) {
   ).toBeVisible({
     timeout: 20000,
   })
-  expect(fixture.requests).toHaveLength(3)
+  expect(fixture.requests).toHaveLength(4)
   await page.reload()
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '首帧与素材', exact: true }).click()
@@ -99,6 +126,7 @@ export async function testCloudMedia(page, fixture) {
   await expect(page.locator('.image-job-history').first()).toContainText(
     '结果未知',
   )
+  await expect(page.locator('.role-reference-list')).toContainText('主角小猫')
   await page.getByRole('button', { name: '移除密钥' }).click()
   await expect(page.getByText('请先保存密钥。')).toBeVisible()
   console.log(

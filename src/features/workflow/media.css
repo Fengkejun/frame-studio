@@ -84,6 +84,52 @@
   min-height: 136px;
   background: var(--accent-soft);
 }
+.role-reference-panel {
+  padding: 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.role-reference-panel h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.role-reference-panel input {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+.role-reference-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+.role-reference-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.role-reference-item img,
+.role-reference-item .asset-placeholder {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.role-reference-item div {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+}
+.role-reference-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
 .first-frame-target img,
 .first-frame-target .asset-placeholder {
   width: 88px;

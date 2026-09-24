@@ -39,6 +39,76 @@ pub struct FirstFrame {
     pub context: ShotContext,
     pub version_id: String,
 }
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoleReference {
+    pub workflow_id: String,
+    pub role_name: String,
+    pub version_id: String,
+}
+
+#[tauri::command]
+pub fn list_role_references(
+    state: tauri::State<WorkflowState>,
+    workflow_id: String,
+) -> AppResult<Vec<RoleReference>> {
+    let db = state.store.db()?;
+    let mut query = db
+        .prepare("SELECT role_name,version_id FROM role_references WHERE workflow_id=?1 ORDER BY role_name")
+        .map_err(|e| e.to_string())?;
+    let rows = query
+        .query_map([&workflow_id], |row| {
+            Ok(RoleReference {
+                workflow_id: workflow_id.clone(),
+                role_name: row.get(0)?,
+                version_id: row.get(1)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.map(|row| row.map_err(|e| e.to_string())).collect()
+}
+
+#[tauri::command]
+pub fn set_role_reference(
+    state: tauri::State<WorkflowState>,
+    workflow_id: String,
+    role_name: String,
+    version_id: String,
+) -> AppResult<()> {
+    let role_name = role_name.trim();
+    if role_name.is_empty()
+        || role_name.chars().count() > 80
+        || role_name.chars().any(char::is_control)
+    {
+        return Err("角色名称需为 1–80 个可见字符".into());
+    }
+    let exists: bool = state
+        .store
+        .db()?
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM workflows WHERE id=?1)",
+            [&workflow_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if !exists {
+        return Err("工作流不存在".into());
+    }
+    let entry = asset(&state, &version_id)?;
+    if !state
+        .directory
+        .join("assets")
+        .join(entry.file_name)
+        .is_file()
+    {
+        return Err("原图文件已丢失，请重新导入".into());
+    }
+    state.store.db()?.execute(
+        "INSERT INTO role_references VALUES (?1,?2,?3) ON CONFLICT(workflow_id,role_name) DO UPDATE SET version_id=excluded.version_id",
+        params![workflow_id, role_name, version_id],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
 
 pub enum FrameCollection {
     Complete(serde_json::Value),

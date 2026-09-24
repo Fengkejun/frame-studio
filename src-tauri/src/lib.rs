@@ -22,6 +22,8 @@ pub fn run() {
             workflow::media::image_preview,
             workflow::media::select_first_frame,
             workflow::media::list_first_frames,
+            workflow::media::list_role_references,
+            workflow::media::set_role_reference,
             workflow::media::comfy::test_comfy,
             workflow::media::comfy::image_settings,
             workflow::media::comfy::list_image_jobs,

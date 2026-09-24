@@ -10,7 +10,15 @@
 
 云端请求没有可用于恢复查询的任务 ID，也不能远程取消。应用先在 SQLite 记录请求，再发起一次 POST；请求超时、连接中断或应用退出后标记为「结果未知」，不会自动重发。此时先核对 OpenAI 平台用量与扣费，再决定是否手动生成新的候选图。确定被 API 拒绝的 4xx 错误标记为失败。若图片已经落盘但任务状态未写完，重启后会找回该候选图。支持在面板中移除已保存的密钥。
 
-云端图片目前只支持文字生成单张候选图；角色参考图、图生图与批量调度属于后续阶段。模型费用随模型、画幅、画质和实际 token 用量变化，以 [OpenAI 官方价格](https://developers.openai.com/api/docs/pricing) 为准。
+云端支持镜头文生图与角色参考图驱动的图生图，每次生成一张候选图。批量调度仍属后续阶段。模型费用随模型、画幅、画质和实际 token 用量变化，以 [OpenAI 官方价格](https://developers.openai.com/api/docs/pricing) 为准。
+
+## 角色参考图与图生图
+
+1. 在「首帧与素材」的角色参考图区域输入角色名称。可以从文生图候选、本机 ComfyUI 候选或导入图片中点击「绑定为角色参考图」。绑定按工作流和角色名保存准确的 `versionId`，更新同名角色时要明确选择新素材版本；镜头已选首帧不随角色绑定变化。
+2. 在云端生图表单的「生图方式」中选择该角色参考图。提交后，桌面端读取本地原图，通过 OpenAI Images `/v1/images/edits` 的 multipart `image[]` 发送图片和提示词。返回图作为新版本保存，不覆盖参考图，也不自动改变首帧。
+3. 检查候选后按需要再次绑定角色或选为镜头首帧。任务记录保存请求时所选的参考图版本，重启后仍可核对来源。图生图同样可能产生云端费用，提交结果未知时不会自动重发。
+
+角色参考图需要先存在本地素材库，图生图目前通过云端 OpenAI 图片编辑接口实现。本机 ComfyUI 适配器仍是文生图模板。
 
 ## 本机 ComfyUI 使用
 
@@ -19,9 +27,9 @@
 3. 点击镜头卡片的「制作首帧」，进入「首帧与素材」，选择「本机 ComfyUI」。填本机根地址（默认 `http://127.0.0.1:8188`），检测连接并选择 checkpoint。
 4. 镜头的 `imagePrompt` 自动带入正面提示词；可编辑正面/负面词。设置尺寸、步数、种子和候选数后生成。初始 512 × 768、20 步、1 张；按模型要求调整，SDXL 常需更高尺寸及更多显存。
 5. 从候选图选择，或把素材拖到首帧区域，再确认使用该版本。再次生成只增加候选，不替换已选首帧。相同种子和参数通常生成同样的图，探索时更换种子。
-6. 可导入 PNG、JPEG、WebP（最多 20 MiB、最长边 8192、最多 16,777,216 像素），并明确绑定到镜头。导入图片目前用于选作首帧，不作为 ComfyUI 图生图或角色参考输入。
+6. 可导入 PNG、JPEG、WebP（最多 20 MiB、最长边 8192、最多 16,777,216 像素），并明确绑定到镜头或角色。导入图片可作为云端图生图参考输入。
 
-目前适配标准 `CheckpointLoaderSimple → CLIPTextEncode → EmptyLatentImage → KSampler → VAEDecode → SaveImage` 文生图流程。Flux、LoRA、ControlNet、参考图一致性、自定义 ComfyUI 工作流及云端图片 API 待后续适配。UI 的检测仅验证服务及模型列表，不保证选中的模型架构兼容该模板。
+目前 ComfyUI 适配标准 `CheckpointLoaderSimple → CLIPTextEncode → EmptyLatentImage → KSampler → VAEDecode → SaveImage` 文生图流程。Flux、LoRA、ControlNet、ComfyUI 图生图与自定义工作流待后续适配。UI 的检测仅验证服务及模型列表，不保证选中的模型架构兼容该模板。
 
 ## 任务与版本行为
 
@@ -37,15 +45,15 @@
 
 ## 本地数据与备份
 
-应用数据目录下 `studio.sqlite` 保存项目、任务快照、素材元数据、首帧选择及最近使用的 ComfyUI 参数；`assets/` 保存图片原件和 640 像素以内的 PNG 预览。数据库版本 3 增加云端图片任务，保留原有项目和图片数据。API Key 由操作系统凭据库保存。
+应用数据目录下 `studio.sqlite` 保存项目、任务快照、素材元数据、角色参考图版本、首帧选择及最近使用的 ComfyUI 参数；`assets/` 保存图片原件和 640 像素以内的 PNG 预览。数据库版本 4 增加角色参考图绑定，保留原有项目和图片数据。API Key 由操作系统凭据库保存。
 
 本地素材库显示最近 500 个版本，分页显示缩略图；当前项目显示最近 100 条图片任务。旧文件和记录不会被自动删除。尚无自动磁盘清理功能。
 
-当前画布 JSON 导出包含节点和版本引用，不打包图片、图片任务或首帧绑定。复制/导入工作流产生新项目 ID，需要重新选择首帧。完整备份请在退出应用后保存整个应用数据目录，不能只复制 JSON。跨设备项目素材包属于后续任务。
+当前画布 JSON 导出包含节点和首帧输出的版本引用，不打包图片、图片任务、角色参考图或首帧绑定。复制/导入工作流产生新项目 ID，需要重新绑定角色参考图与首帧。完整备份请在退出应用后保存整个应用数据目录，不能只复制 JSON。跨设备项目素材包属于后续任务。
 
 ## 验证范围
 
-`npm run test:desktop` 在隔离 WebView2 配置和数据库内执行真实 Rust IPC，使用 localhost 协议测试服务返回固定 PNG。覆盖候选入库、选择、暂停恢复、下载失败后恢复、执行错误、HTTP 拒绝、导入校验、页面重载持久化、分镜版本隔离，以及图片节点的等待、汇集和版本变更后待更新状态；云端路径使用假 API Key 和本机假服务，不发起真实 OpenAI 请求。Rust 单元测试覆盖重启恢复及 v1 数据库迁移。
+`npm run test:desktop` 在隔离 WebView2 配置和数据库内执行真实 Rust IPC，使用 localhost 协议测试服务返回固定 PNG。覆盖候选入库、选择、角色版本绑定、文生图与图生图 multipart 请求、暂停恢复、下载失败后恢复、执行错误、HTTP 拒绝、导入校验、页面重载持久化、分镜版本隔离，以及图片节点的等待、汇集和版本变更后待更新状态；云端路径使用假 API Key 和本机假服务，不发起真实 OpenAI 请求。Rust 单元测试覆盖重启恢复及 v1/v2/v3 数据库迁移。
 
 协议测试不执行 AI 推理，不评估模型权限、模型兼容性、显存占用和图片质量。真实模型验收需配置可用 API Key 或启动本机 ComfyUI，并运行一条镜头。
 
@@ -53,4 +61,4 @@
 
 本次通过 Context7 核对 [ComfyUI API 示例](https://github.com/comfy-org/ComfyUI/blob/master/script_examples/basic_api_example.py)、[服务端路由](https://github.com/comfy-org/ComfyUI/blob/master/server.py) 与 [执行历史状态](https://github.com/comfy-org/ComfyUI/blob/master/execution.py)。
 
-云端图片接口对照 [OpenAI 图片生成指南](https://developers.openai.com/api/docs/guides/image-generation) 与 [Images API 参考](https://developers.openai.com/api/reference/resources/images/methods/generate)。
+云端图片接口对照 [OpenAI 图片生成指南](https://developers.openai.com/api/docs/guides/image-generation)、[生成接口](https://developers.openai.com/api/reference/resources/images/methods/generate) 与 [编辑接口](https://developers.openai.com/api/reference/resources/images/methods/edit)。

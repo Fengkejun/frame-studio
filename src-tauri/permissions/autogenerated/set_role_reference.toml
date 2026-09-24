@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-set-role-reference"
+description = "Enables the set_role_reference command without any pre-configured scope."
+commands.allow = ["set_role_reference"]
+
+[[permission]]
+identifier = "deny-set-role-reference"
+description = "Denies the set_role_reference command without any pre-configured scope."
+commands.deny = ["set_role_reference"]

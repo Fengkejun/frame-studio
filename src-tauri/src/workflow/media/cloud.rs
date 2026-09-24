@@ -11,6 +11,7 @@ use std::{
 use tauri::Manager;
 
 const API_URL: &str = "https://api.openai.com/v1/images/generations";
+const EDIT_URL: &str = "https://api.openai.com/v1/images/edits";
 const RESPONSE_LIMIT: usize = 32 * 1024 * 1024;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -22,6 +23,8 @@ pub struct CloudImageRequest {
     pub negative: String,
     pub size: String,
     pub quality: String,
+    #[serde(default)]
+    pub reference_version_id: Option<String>,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -169,6 +172,25 @@ pub fn start_cloud_image_job(
 ) -> AppResult<CloudImageJob> {
     validate(&request)?;
     validate_context(&state, &request.context)?;
+    if let Some(version_id) = &request.reference_version_id {
+        let bound: bool = state.store.db()?.query_row(
+            "SELECT EXISTS(SELECT 1 FROM role_references WHERE workflow_id=?1 AND version_id=?2)",
+            params![request.context.workflow_id, version_id],
+            |row| row.get(0),
+        ).map_err(|e| e.to_string())?;
+        if !bound {
+            return Err("请先将此图片绑定为当前工作流的角色参考图".into());
+        }
+        let entry = asset(&state, version_id)?;
+        if !state
+            .directory
+            .join("assets")
+            .join(entry.file_name)
+            .is_file()
+        {
+            return Err("角色参考图原文件已丢失".into());
+        }
+    }
     let key = get_key()?.ok_or("请先保存 OpenAI 图片 API Key")?;
     let mut active = state.media_active.lock().map_err(|_| "图片任务锁不可用")?;
     if active.is_some() {
@@ -231,7 +253,7 @@ fn request_body(request: &CloudImageRequest) -> Value {
     })
 }
 
-fn endpoint() -> AppResult<Url> {
+fn endpoint(edit: bool) -> AppResult<Url> {
     if cfg!(debug_assertions) && std::env::var_os("FRAME_STUDIO_TEST_DATA_DIR").is_some() {
         if let Ok(override_url) = std::env::var("FRAME_STUDIO_TEST_OPENAI_IMAGE_URL") {
             let url = Url::parse(&override_url).map_err(|_| "测试图片接口地址无效")?;
@@ -243,12 +265,16 @@ fn endpoint() -> AppResult<Url> {
                 && url.query().is_none()
                 && url.fragment().is_none()
             {
+                let mut url = url;
+                if edit {
+                    url.set_path("/v1/images/edits");
+                }
                 return Ok(url);
             }
             return Err("测试图片接口仅允许本机固定路径".into());
         }
     }
-    Url::parse(API_URL).map_err(|_| "云端图片接口地址无效".into())
+    Url::parse(if edit { EDIT_URL } else { API_URL }).map_err(|_| "云端图片接口地址无效".into())
 }
 
 async fn response_bytes(mut response: reqwest::Response) -> AppResult<Vec<u8>> {
@@ -284,10 +310,43 @@ async fn execute(
         .timeout(Duration::from_secs(300))
         .build()
         .map_err(|_| "无法初始化云端图片连接")?;
-    let response = client
-        .post(endpoint()?)
-        .bearer_auth(key)
-        .json(&request_body(&job.request))
+    let edit = job.request.reference_version_id.is_some();
+    let mut submit = client.post(endpoint(edit)?).bearer_auth(key);
+    if let Some(version_id) = &job.request.reference_version_id {
+        let entry = asset(state, version_id)?;
+        let image = std::fs::read(state.directory.join("assets").join(&entry.file_name))
+            .map_err(|_| "角色参考图原文件已丢失")?;
+        if image.len() > MAX_IMAGE_BYTES {
+            return Err("角色参考图超过 20 MB 限制".into());
+        }
+        let mime = if entry.file_name.ends_with(".jpg") {
+            "image/jpeg"
+        } else if entry.file_name.ends_with(".webp") {
+            "image/webp"
+        } else {
+            "image/png"
+        };
+        let part = reqwest::multipart::Part::bytes(image)
+            .file_name(entry.file_name)
+            .mime_str(mime)
+            .map_err(|_| "参考图格式无效")?;
+        let prompt = request_body(&job.request)["prompt"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        submit = submit.multipart(
+            reqwest::multipart::Form::new()
+                .text("model", job.request.model.clone())
+                .text("prompt", prompt)
+                .text("size", job.request.size.clone())
+                .text("quality", job.request.quality.clone())
+                .text("output_format", "png")
+                .part("image[]", part),
+        );
+    } else {
+        submit = submit.json(&request_body(&job.request));
+    }
+    let response = submit
         .send()
         .await
         .map_err(|_| "提交结果未知；请核对服务商用量，避免重复计费")?;
@@ -345,7 +404,7 @@ async fn execute(
     .map_err(|_| "云端图片保存任务失败")??;
     job.asset_ids.push(id);
     job.status = "succeeded".into();
-    job.message = "图片已保存，请确认是否选为镜头首帧".into();
+    job.message = "图片已保存，请确认是否选为镜头首帧或角色参考图".into();
     Ok(())
 }
 
@@ -366,6 +425,7 @@ mod tests {
             negative: "blur".into(),
             size: "1024x1024".into(),
             quality: "low".into(),
+            reference_version_id: None,
         };
         assert!(validate(&request).is_ok());
         let body = request_body(&request);

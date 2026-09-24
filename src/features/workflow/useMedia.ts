@@ -8,7 +8,8 @@ export function useMedia(workflowId?: string) {
     frames: api.FirstFrame[]
     jobs: api.ImageJob[]
     cloudJobs: api.CloudImageJob[]
-  }>({ assets: [], frames: [], jobs: [], cloudJobs: [] })
+    roleReferences: api.RoleReference[]
+  }>({ assets: [], frames: [], jobs: [], cloudJobs: [], roleReferences: [] })
   const [error, setError] = useState('')
   const current = useRef(workflowId)
   const generation = useRef(0)
@@ -21,14 +22,17 @@ export function useMedia(workflowId?: string) {
   const refresh = useCallback(async () => {
     if (!workflowId) return
     const revision = ++generation.current
-    const [assets, frames, jobs, cloudJobs] = await Promise.all([
-      api.listImageAssets(),
-      api.listFirstFrames(workflowId),
-      api.listImageJobs(workflowId),
-      api.listCloudImageJobs(workflowId),
-    ])
+    const [assets, frames, jobs, cloudJobs, roleReferences] = await Promise.all(
+      [
+        api.listImageAssets(),
+        api.listFirstFrames(workflowId),
+        api.listImageJobs(workflowId),
+        api.listCloudImageJobs(workflowId),
+        api.listRoleReferences(workflowId),
+      ],
+    )
     if (current.current === workflowId && revision === generation.current)
-      setData({ assets, frames, jobs, cloudJobs })
+      setData({ assets, frames, jobs, cloudJobs, roleReferences })
   }, [workflowId])
   useEffect(() => {
     let alive = true
@@ -73,6 +77,7 @@ export function useMedia(workflowId?: string) {
     frames,
     jobs,
     cloudJobs,
+    roleReferences: data.roleReferences,
     error,
     setError,
     refresh,

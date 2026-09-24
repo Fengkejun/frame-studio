@@ -18,6 +18,8 @@ fn main() {
             "image_preview",
             "select_first_frame",
             "list_first_frames",
+            "list_role_references",
+            "set_role_reference",
             "test_comfy",
             "image_settings",
             "list_image_jobs",

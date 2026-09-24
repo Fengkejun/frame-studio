@@ -21,6 +21,8 @@
     "allow-image-preview",
     "allow-select-first-frame",
     "allow-list-first-frames",
+    "allow-list-role-references",
+    "allow-set-role-reference",
     "allow-test-comfy",
     "allow-image-settings",
     "allow-list-image-jobs",

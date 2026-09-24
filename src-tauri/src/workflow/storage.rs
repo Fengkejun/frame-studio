@@ -17,7 +17,7 @@ impl Store {
         let version: u32 = c
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(|e| e.to_string())?;
-        if version > 3 {
+        if version > 4 {
             return Err("项目数据库版本较新，请升级应用".into());
         }
         if version < 2 {
@@ -32,6 +32,12 @@ impl Store {
             c.execute_batch("BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS cloud_image_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
                 PRAGMA user_version=3; COMMIT;")
+                .map_err(|e| e.to_string())?;
+        }
+        if version < 4 {
+            c.execute_batch("BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS role_references(workflow_id TEXT NOT NULL, role_name TEXT NOT NULL, version_id TEXT NOT NULL, PRIMARY KEY(workflow_id,role_name));
+                PRAGMA user_version=4; COMMIT;")
                 .map_err(|e| e.to_string())?;
         }
         let store = Self(Mutex::new(c));
@@ -141,7 +147,7 @@ mod tests {
                     .unwrap()
                     .pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
                     .unwrap(),
-                3
+                4
             );
         }
         assert_eq!(Store::open(&path).unwrap().providers().unwrap().len(), 1);
@@ -169,7 +175,31 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!((count, version, cloud_table), (1, 3, 1));
+        assert_eq!((count, version, cloud_table), (1, 4, 1));
+        drop(db);
+        drop(store);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn upgrades_v3_with_role_bindings() {
+        let path = std::env::temp_dir().join(format!("frame-studio-v3-{}.sqlite", uid()));
+        {
+            let db = Connection::open(&path).unwrap();
+            db.execute_batch("CREATE TABLE cloud_image_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL); PRAGMA user_version=3;").unwrap();
+        }
+        let store = Store::open(&path).unwrap();
+        let db = store.db().unwrap();
+        let version: u32 = db
+            .pragma_query_value(None, "user_version", |r| r.get(0))
+            .unwrap();
+        let table: u32 = db
+            .query_row(
+                "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='role_references'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!((version, table), (4, 1));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();

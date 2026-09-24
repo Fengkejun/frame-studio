@@ -24,6 +24,11 @@ export interface FirstFrame {
   context: ShotContext
   versionId: string
 }
+export interface RoleReference {
+  workflowId: string
+  roleName: string
+  versionId: string
+}
 export interface ImageRequest {
   context: ShotContext
   baseUrl: string
@@ -53,6 +58,7 @@ export interface CloudImageRequest {
   negative: string
   size: '1024x1024' | '1024x1536' | '1536x1024'
   quality: 'low' | 'medium' | 'high'
+  referenceVersionId?: string | null
 }
 export interface CloudImageJob {
   id: string
@@ -78,6 +84,18 @@ export const listImageAssets = (): Promise<ImageAsset[]> =>
   isDesktop ? invoke('list_image_assets') : Promise.resolve([])
 export const listFirstFrames = (workflowId: string): Promise<FirstFrame[]> =>
   isDesktop ? invoke('list_first_frames', { workflowId }) : Promise.resolve([])
+export const listRoleReferences = (
+  workflowId: string,
+): Promise<RoleReference[]> =>
+  isDesktop
+    ? invoke('list_role_references', { workflowId })
+    : Promise.resolve([])
+export const setRoleReference = (
+  workflowId: string,
+  roleName: string,
+  versionId: string,
+): Promise<void> =>
+  invoke('set_role_reference', { workflowId, roleName, versionId })
 export const listImageJobs = (workflowId: string): Promise<ImageJob[]> =>
   isDesktop ? invoke('list_image_jobs', { workflowId }) : Promise.resolve([])
 export const imageSettings = (): Promise<ImageRequest | null> =>
