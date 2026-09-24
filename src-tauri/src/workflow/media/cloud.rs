@@ -188,25 +188,28 @@ pub fn start_cloud_image_job(
         id: job.id.clone(),
         cancel: Arc::new(AtomicBool::new(false)),
     });
-    let response_job = job.clone();
+    let task_job = job.clone();
     tauri::async_runtime::spawn(async move {
         let state = app.state::<WorkflowState>();
-        let mut job = job;
-        if let Err(error) = execute(&app, &state, &mut job, &key).await {
-            if job.status != "failed" {
-                job.status = "unknown".into();
+        let mut task_job = task_job;
+        if let Err(error) = execute(&app, &state, &mut task_job, &key).await {
+            if task_job.status != "failed" {
+                task_job.status = "unknown".into();
             }
-            job.message = error;
+            task_job.message = error;
         }
-        job.updated_at = now();
-        if save(&state, &job).is_err() {
+        task_job.updated_at = now();
+        if save(&state, &task_job).is_err() {
             eprintln!("Could not persist final cloud image job state");
         }
-        if let Ok(mut active) = state.media_active.lock() {
-            *active = None;
-        };
+        {
+            let lock = state.media_active.lock();
+            if let Ok(mut active) = lock {
+                *active = None;
+            }
+        }
     });
-    Ok(response_job)
+    Ok(job)
 }
 
 fn request_body(request: &CloudImageRequest) -> Value {
