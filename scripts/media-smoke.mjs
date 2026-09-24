@@ -111,6 +111,11 @@ export async function testMedia(page, root) {
         source: 'storyboard-fixture',
         target: 'image-fixture',
       },
+      {
+        id: 'image-to-video',
+        source: 'image-fixture',
+        target: 'video-fixture',
+      },
     ],
     nodes: [
       {
@@ -140,6 +145,22 @@ export async function testMedia(page, root) {
         kind: 'image',
         label: '图片节点',
         position: { x: 420, y: 80 },
+        config: {
+          text: '',
+          providerId: '',
+          instructions: '',
+          temperature: 0.7,
+          shotCount: 1,
+          duration: 5,
+        },
+        output: null,
+        stale: false,
+      },
+      {
+        id: 'video-fixture',
+        kind: 'video',
+        label: '视频节点',
+        position: { x: 760, y: 80 },
         config: {
           text: '',
           providerId: '',
@@ -183,8 +204,7 @@ export async function testMedia(page, root) {
         element.scrollIntoView({ block: 'start', behavior: 'instant' }),
       )
     await page
-      .locator('.react-flow__node')
-      .filter({ hasText: '图片节点' })
+      .getByTestId('rf__node-image-fixture')
       .locator('.node-mark')
       .click()
   }
@@ -234,7 +254,7 @@ export async function testMedia(page, root) {
     await expect(page.locator('.first-frame-target')).toContainText(
       '已选定镜头首帧',
     )
-    const firstFrame = await page.locator('.first-frame-target').textContent()
+    const firstFrame = await page.locator('.first-frame-target p').textContent()
     await selectImageNode()
     await expect(page.getByText('已确认首帧 1 / 1')).toBeVisible()
     await page.getByRole('button', { name: '汇集已选首帧' }).click()
@@ -269,7 +289,7 @@ export async function testMedia(page, root) {
     await page.getByRole('button', { name: '工作流', exact: true }).click()
     await openStudio()
     await page.getByRole('button', { name: '本机 ComfyUI' }).click()
-    await expect(page.locator('.first-frame-target')).toHaveText(firstFrame)
+    await expect(page.locator('.first-frame-target p')).toHaveText(firstFrame)
     hold = false
     await jobs.first().getByRole('button', { name: '继续查询原任务' }).click()
     await expect(jobs.first().getByText('已完成', { exact: true })).toBeVisible(
@@ -277,7 +297,7 @@ export async function testMedia(page, root) {
     )
     expect(submissions).toHaveLength(2)
     await expect(page.locator('.asset-card')).toHaveCount(4)
-    await expect(page.locator('.first-frame-target')).toHaveText(firstFrame)
+    await expect(page.locator('.first-frame-target p')).toHaveText(firstFrame)
 
     // Download failure retains prompt ID and resumes without another generation.
     downloadFails = true
@@ -347,10 +367,7 @@ export async function testMedia(page, root) {
       '导入参考图.png',
     )
     await expect(
-      page
-        .locator('.react-flow__node')
-        .filter({ hasText: '图片节点' })
-        .getByText('待更新'),
+      page.getByTestId('rf__node-image-fixture').getByText('待更新'),
     ).toBeVisible()
     await page.getByLabel('导入本地图片').setInputFiles({
       name: 'bad.png',

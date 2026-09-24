@@ -444,6 +444,7 @@ mod tests {
             store: crate::workflow::storage::Store::open(&directory.join("test.sqlite")).unwrap(),
             active: std::sync::Mutex::new(None),
             media_active: std::sync::Mutex::new(None),
+            video_active: std::sync::Mutex::new(std::collections::HashMap::new()),
             directory: directory.clone(),
         };
         let request = ImageRequest {

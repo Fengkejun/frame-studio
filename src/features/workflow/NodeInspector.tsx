@@ -19,6 +19,8 @@ export function NodeInspector({
   onModels,
   imageProgress,
   onImages,
+  videoProgress,
+  onVideos,
 }: {
   node: WorkflowNode
   providers: Provider[]
@@ -29,6 +31,8 @@ export function NodeInspector({
   onModels: () => void
   imageProgress?: { ready: number; total: number }
   onImages: () => void
+  videoProgress?: { ready: number; total: number }
+  onVideos: () => void
 }) {
   const [outputText, setOutputText] = useState(() =>
     node.output ? JSON.stringify(node.output.value, null, 2) : '',
@@ -77,17 +81,28 @@ export function NodeInspector({
               onChange={(e) => patch({ text: e.target.value })}
             />
           </label>
-        ) : node.kind === 'image' ? (
+        ) : node.kind === 'image' || node.kind === 'video' ? (
           <div className="field">
             <strong>
-              已确认首帧 {imageProgress?.ready ?? 0} /{' '}
-              {imageProgress?.total ?? 0}
+              {node.kind === 'image' ? '已确认首帧' : '已确认片段'}{' '}
+              {node.kind === 'image'
+                ? (imageProgress?.ready ?? 0)
+                : (videoProgress?.ready ?? 0)}{' '}
+              /{' '}
+              {node.kind === 'image'
+                ? (imageProgress?.total ?? 0)
+                : (videoProgress?.total ?? 0)}
             </strong>
             <p className="field-hint">
-              连接分镜节点，在每个镜头中选择一张首帧。图片节点只汇集所选版本，不会发起生图请求。
+              {node.kind === 'image'
+                ? '连接分镜节点，在每个镜头中选择一张首帧。图片节点只汇集所选版本，不会发起生图请求。'
+                : '连接图片节点，在每个镜头中确认一段视频。视频节点只汇集所选版本，不会发起生成请求。'}
             </p>
-            <button className="small-button" onClick={onImages}>
-              打开首帧与素材
+            <button
+              className="small-button"
+              onClick={node.kind === 'image' ? onImages : onVideos}
+            >
+              {node.kind === 'image' ? '打开首帧与素材' : '打开镜头视频'}
             </button>
           </div>
         ) : (
@@ -182,11 +197,15 @@ export function NodeInspector({
           disabled={!isDesktop}
           onClick={onRun}
         >
-          {node.kind === 'image' ? '汇集已选首帧' : '运行当前节点'}
+          {node.kind === 'image'
+            ? '汇集已选首帧'
+            : node.kind === 'video'
+              ? '汇集已选片段'
+              : '运行当前节点'}
         </button>
         <p className="field-hint">
-          {node.kind === 'image'
-            ? '首帧选择按分镜结果版本保存。更换分镜后需要重新选择并汇集。'
+          {node.kind === 'image' || node.kind === 'video'
+            ? '素材选择按分镜结果版本保存。上游内容变化后需要重新确认并汇集。'
             : '使用上游已确认结果。改动参数会将当前及下游结果标记为待更新。'}
         </p>
       </fieldset>
@@ -207,8 +226,8 @@ export function NodeInspector({
         </div>
         {!value && !editing && (
           <p className="empty-copy">
-            {node.kind === 'image'
-              ? '确认每个镜头的首帧后，运行图片节点以记录所选版本。'
+            {node.kind === 'image' || node.kind === 'video'
+              ? '确认每个镜头的素材后，运行当前节点以记录所选版本。'
               : '运行后，结果会出现在这里。你也可以录入已有内容，再继续后续节点。'}
           </p>
         )}
@@ -254,12 +273,32 @@ export function NodeInspector({
                   </div>
                 ))}
               </>
+            ) : 'clips' in value ? (
+              <>
+                <strong>{value.clips.length} 个视频片段版本</strong>
+                {value.clips.map((clip) => (
+                  <div className="shot-preview" key={clip.shotId}>
+                    <span>
+                      {clip.shotId} · {clip.duration}s
+                    </span>
+                    <div className="shot-frame-preview">
+                      <AssetImage
+                        versionId={clip.firstFrameVersionId}
+                        alt={`${clip.shotId} 视频首帧`}
+                      />
+                    </div>
+                    <p>版本 {clip.versionId}</p>
+                    <small>{clip.resolution}</small>
+                  </div>
+                ))}
+              </>
             ) : (
               <p className="preserve-lines">{value.text}</p>
             )}
           </div>
         )}
         {node.kind !== 'image' &&
+          node.kind !== 'video' &&
           (!editing ? (
             <button
               className="text-button"

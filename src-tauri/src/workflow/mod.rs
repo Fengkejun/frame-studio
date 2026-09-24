@@ -22,6 +22,7 @@ pub struct WorkflowState {
     store: Store,
     active: Mutex<Option<ActiveRun>>,
     media_active: Mutex<Option<ActiveRun>>,
+    video_active: Mutex<HashMap<String, media::video::ActiveVideo>>,
     directory: std::path::PathBuf,
 }
 
@@ -38,10 +39,12 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         store: Store::open(&directory.join("studio.sqlite"))?,
         active: Mutex::new(None),
         media_active: Mutex::new(None),
+        video_active: Mutex::new(HashMap::new()),
         directory,
     });
     media::comfy::recover(&app.state::<WorkflowState>())?;
     media::cloud::recover(&app.state::<WorkflowState>())?;
+    media::video::recover(&app.state::<WorkflowState>())?;
     Ok(())
 }
 fn idle(state: &WorkflowState) -> AppResult<()> {
@@ -146,8 +149,8 @@ pub fn cancel_run(state: tauri::State<WorkflowState>, id: String) -> AppResult<(
 }
 #[tauri::command]
 pub fn validate_artifact(kind: NodeKind, value: serde_json::Value) -> AppResult<Artifact> {
-    if kind == NodeKind::Image {
-        return Err("图片节点结果只能由已确认的首帧版本生成".into());
+    if matches!(kind, NodeKind::Image | NodeKind::Video) {
+        return Err("媒体节点结果只能由已确认的素材版本生成".into());
     }
     validate_output(&kind, &value)?;
     Ok(Artifact {
@@ -199,7 +202,8 @@ pub fn start_run(
     let all_providers = state.store.providers()?;
     let mut used = vec![];
     for n in workflow.nodes.iter().filter(|n| {
-        selected.contains(&n.id) && !matches!(n.kind, NodeKind::Brief | NodeKind::Image)
+        selected.contains(&n.id)
+            && !matches!(n.kind, NodeKind::Brief | NodeKind::Image | NodeKind::Video)
     }) {
         let provider = all_providers
             .iter()
@@ -319,7 +323,37 @@ async fn execute(
                 .iter()
                 .find(|e| e.target == node.id)
                 .ok_or("缺少输入")?;
-            if node.kind == NodeKind::Image {
+            if node.kind == NodeKind::Video {
+                let image_artifact = artifacts.get(&edge.source).ok_or("上游图片结果不可用")?;
+                let storyboard_node_id = run
+                    .snapshot
+                    .edges
+                    .iter()
+                    .find(|candidate| candidate.target == edge.source)
+                    .map(|candidate| candidate.source.as_str())
+                    .ok_or("图片节点缺少分镜输入")?;
+                match media::video::collect_video_clips(
+                    state,
+                    &run.workflow_id,
+                    storyboard_node_id,
+                    image_artifact,
+                )? {
+                    media::FrameCollection::Complete(value) => {
+                        validate_output(&NodeKind::Video, &value)?;
+                        (value, "selection")
+                    }
+                    media::FrameCollection::Missing(shots) => {
+                        run.nodes[index].status = "needs_video".into();
+                        run.nodes[index].message = format!(
+                            "请为 {} 选择当前首帧版本的视频片段，再运行视频节点",
+                            shots.join("、")
+                        );
+                        run.status = "needs_video".into();
+                        state.store.save_run(run)?;
+                        return Ok(());
+                    }
+                }
+            } else if node.kind == NodeKind::Image {
                 let storyboard = artifacts.get(&edge.source).ok_or("上游分镜结果不可用")?;
                 match media::collect_first_frames(
                     state,

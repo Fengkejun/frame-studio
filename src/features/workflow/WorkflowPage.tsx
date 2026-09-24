@@ -31,7 +31,9 @@ import {
 import { errorMessage, listProviders } from './api'
 import type { useWorkflow } from './useWorkflow'
 import { useMedia } from './useMedia'
+import * as api from './mediaApi'
 import { ImageStudio, type ShotTarget } from './ImageStudio'
+import { VideoStudio } from './VideoStudio'
 import { AssetImage } from './AssetImage'
 import './workflow.css'
 
@@ -61,7 +63,9 @@ function WorkflowEditor({
   const [providers, setProviders] = useState<Provider[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
-  const [tab, setTab] = useState<'shots' | 'runs' | 'images'>('shots')
+  const [tab, setTab] = useState<'shots' | 'runs' | 'images' | 'videos'>(
+    'shots',
+  )
   const [mediaTarget, setMediaTarget] = useState<ShotTarget | null>(null)
   const media = useMedia(w?.id)
   const [confirmRun, setConfirmRun] = useState<{ target?: string } | null>(null)
@@ -69,7 +73,7 @@ function WorkflowEditor({
   const { screenToFlowPosition, fitView } = useReactFlow<CanvasNode>()
   const bottomPanel = useRef<HTMLElement>(null)
   useEffect(() => {
-    if (tab === 'images')
+    if (tab === 'images' || tab === 'videos')
       bottomPanel.current?.scrollIntoView({
         block: 'start',
         behavior: 'smooth',
@@ -289,6 +293,38 @@ function WorkflowEditor({
         frame.context.shotId === shot.id,
     ),
   ).length
+  const videoSource =
+    focused?.kind === 'video'
+      ? w.nodes.find((node) =>
+          w.edges.some(
+            (edge) => edge.target === focused.id && edge.source === node.id,
+          ),
+        )
+      : undefined
+  const videoStoryboard = videoSource
+    ? w.nodes.find((node) =>
+        w.edges.some(
+          (edge) => edge.target === videoSource.id && edge.source === node.id,
+        ),
+      )
+    : undefined
+  const videoFrames =
+    videoSource?.output?.value && 'frames' in videoSource.output.value
+      ? videoSource.output.value.frames
+      : []
+  const videoReady = videoFrames.filter((frame) =>
+    media.selectedVideos.some(
+      (selected) =>
+        selected.context.nodeId === videoStoryboard?.id &&
+        selected.context.artifactId === videoStoryboard?.output?.id &&
+        selected.context.shotId === frame.shotId &&
+        media.videoAssets.some(
+          (asset) =>
+            asset.versionId === selected.versionId &&
+            asset.firstFrameVersionId === frame.versionId,
+        ),
+    ),
+  ).length
   return (
     <div
       className="workflow-page"
@@ -449,8 +485,12 @@ function WorkflowEditor({
             <strong>镜头首帧</strong>
             <small>云端或本机生图与本地素材</small>
           </button>
+          <button className="library-node" onClick={() => setTab('videos')}>
+            <span className="library-mark">▷</span>
+            <strong>镜头视频</strong>
+            <small>首帧图生视频与片段版本</small>
+          </button>
           <p className="eyebrow">即将接入</p>
-          <div className="future-node">▷ 视频生成</div>
           <div className="future-node">▤ 剪辑与合成</div>
           <p className="field-hint">先打磨故事，再让每一帧发生。</p>
         </aside>
@@ -586,6 +626,7 @@ function WorkflowEditor({
             }}
             onRun={() => setConfirmRun({ target: focused.id })}
             imageProgress={{ ready: imageReady, total: imageShots.length }}
+            videoProgress={{ ready: videoReady, total: videoFrames.length }}
             onImages={() => {
               if (imageSource && imageShots.length) {
                 const missing = imageShots.find(
@@ -603,6 +644,25 @@ function WorkflowEditor({
                 })
               }
               setTab('images')
+            }}
+            onVideos={() => {
+              if (videoStoryboard && videoFrames.length) {
+                const missing = videoFrames.find(
+                  (frame) =>
+                    !media.selectedVideos.some(
+                      (selected) =>
+                        selected.context.nodeId === videoStoryboard.id &&
+                        selected.context.artifactId ===
+                          videoStoryboard.output?.id &&
+                        selected.context.shotId === frame.shotId,
+                    ),
+                )
+                setMediaTarget({
+                  nodeId: videoStoryboard.id,
+                  shotId: (missing ?? videoFrames[0])!.shotId,
+                })
+              }
+              setTab('videos')
             }}
           />
         )}
@@ -626,6 +686,12 @@ function WorkflowEditor({
             onClick={() => setTab('images')}
           >
             首帧与素材 {media.running && <span>生成中</span>}
+          </button>
+          <button
+            className={tab === 'videos' ? 'active' : ''}
+            onClick={() => setTab('videos')}
+          >
+            镜头视频 {media.videoRunning && <span>生成中</span>}
           </button>
           <small>结果按版本保留在运行记录中</small>
         </div>
@@ -685,6 +751,19 @@ function WorkflowEditor({
                           >
                             制作首帧
                           </button>
+                          <button
+                            className="small-button"
+                            disabled={busy || node.stale}
+                            onClick={() => {
+                              setMediaTarget({
+                                nodeId: node.id,
+                                shotId: shot.id,
+                              })
+                              setTab('videos')
+                            }}
+                          >
+                            制作视频
+                          </button>
                         </div>
                       </article>
                     ))
@@ -729,6 +808,52 @@ function WorkflowEditor({
                 )
               )
                 c.change(invalidate(w, images))
+            }}
+          />
+        ) : tab === 'videos' ? (
+          <VideoStudio
+            key={w.id}
+            workflow={w}
+            target={mediaTarget}
+            onTarget={setMediaTarget}
+            media={media}
+            busy={busy}
+            save={c.save}
+            onImages={() => setTab('images')}
+            onClipSelected={(context, versionId) => {
+              if (
+                media.selectedVideos.some(
+                  (selected) =>
+                    api.sameShot(selected.context, context) &&
+                    selected.versionId === versionId,
+                )
+              )
+                return
+              const videoNodes = w.nodes
+                .filter(
+                  (node) =>
+                    node.kind === 'video' &&
+                    w.edges.some(
+                      (edge) =>
+                        w.nodes.some(
+                          (image) =>
+                            image.id === edge.source &&
+                            image.kind === 'image' &&
+                            w.edges.some(
+                              (upstream) =>
+                                upstream.source === context.nodeId &&
+                                upstream.target === image.id,
+                            ),
+                        ) && edge.target === node.id,
+                    ),
+                )
+                .map((node) => node.id)
+              if (
+                videoNodes.some((id) =>
+                  w.nodes.some((node) => node.id === id && node.output),
+                )
+              )
+                c.change(invalidate(w, videoNodes))
             }}
           />
         ) : (

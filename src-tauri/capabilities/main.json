@@ -33,6 +33,17 @@
     "allow-save-cloud-image-key",
     "allow-clear-cloud-image-key",
     "allow-list-cloud-image-jobs",
-    "allow-start-cloud-image-job"
+    "allow-start-cloud-image-job",
+    "allow-video-key-status",
+    "allow-save-video-key",
+    "allow-clear-video-key",
+    "allow-list-video-jobs",
+    "allow-start-video-job",
+    "allow-resume-video-job",
+    "allow-pause-video-job",
+    "allow-list-video-assets",
+    "allow-video-preview",
+    "allow-list-selected-videos",
+    "allow-select-video"
   ]
 }

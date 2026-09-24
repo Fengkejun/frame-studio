@@ -34,7 +34,18 @@ pub fn run() {
             workflow::media::cloud::save_cloud_image_key,
             workflow::media::cloud::clear_cloud_image_key,
             workflow::media::cloud::list_cloud_image_jobs,
-            workflow::media::cloud::start_cloud_image_job
+            workflow::media::cloud::start_cloud_image_job,
+            workflow::media::video::video_key_status,
+            workflow::media::video::save_video_key,
+            workflow::media::video::clear_video_key,
+            workflow::media::video::list_video_jobs,
+            workflow::media::video::start_video_job,
+            workflow::media::video::resume_video_job,
+            workflow::media::video::pause_video_job,
+            workflow::media::video::list_video_assets,
+            workflow::media::video::video_preview,
+            workflow::media::video::list_selected_videos,
+            workflow::media::video::select_video
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Frame Studio");

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-selected-videos"
+description = "Enables the list_selected_videos command without any pre-configured scope."
+commands.allow = ["list_selected_videos"]
+
+[[permission]]
+identifier = "deny-list-selected-videos"
+description = "Denies the list_selected_videos command without any pre-configured scope."
+commands.deny = ["list_selected_videos"]

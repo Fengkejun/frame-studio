@@ -7,6 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { chromium, expect } from '@playwright/test'
 import { testMedia } from './media-smoke.mjs'
 import { createCloudFixture, testCloudMedia } from './cloud-media-smoke.mjs'
+import { createVideoFixture, testVideoMedia } from './video-media-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -30,6 +31,7 @@ const port = await new Promise((resolve, reject) => {
 })
 const endpoint = `http://127.0.0.1:${port}`
 const cloudFixture = await createCloudFixture(root)
+const videoFixture = await createVideoFixture(root)
 const app = spawn(executable, [], {
   windowsHide: true,
   stdio: ['ignore', 'ignore', 'pipe'],
@@ -39,6 +41,7 @@ const app = spawn(executable, [], {
     WEBVIEW2_USER_DATA_FOLDER: profile,
     FRAME_STUDIO_TEST_DATA_DIR: profile,
     FRAME_STUDIO_TEST_OPENAI_IMAGE_URL: cloudFixture.url,
+    FRAME_STUDIO_TEST_WAN_URL: videoFixture.url,
   },
 })
 let launchError
@@ -105,9 +108,12 @@ try {
   ).toBeVisible()
   await testMedia(page, root)
   await testCloudMedia(page, cloudFixture)
+  await testVideoMedia(page, root, videoFixture)
   for (const file of ['studio.sqlite', 'studio.sqlite-wal']) {
     const bytes = await readFile(path.join(profile, file)).catch(() => null)
     if (bytes) expect(bytes.includes(Buffer.from('fixture-key'))).toBe(false)
+    if (bytes)
+      expect(bytes.includes(Buffer.from('fixture-wan-key'))).toBe(false)
   }
   expect(errors).toEqual([])
   console.log(
@@ -116,6 +122,7 @@ try {
 } finally {
   await browser?.close()
   await cloudFixture.close()
+  await videoFixture.close()
   if (app.pid && app.exitCode === null) {
     execFileSync('taskkill', ['/PID', String(app.pid), '/T', '/F'], {
       windowsHide: true,

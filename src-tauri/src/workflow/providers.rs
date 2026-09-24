@@ -137,7 +137,7 @@ pub fn system_prompt(node: &WorkflowNode) -> String {
             r#"{"shots":[{"id":"shot-01","title":"镜头标题","description":"场景与人物动作","duration":5,"characters":["角色名称"],"dialogue":"台词，可为空","camera":"景别与运镜","imagePrompt":"用于生成该镜头首帧的提示词","videoPrompt":"动作、运镜与时间变化的提示词"}]}"#
         }
         NodeKind::Prompt => r#"{"text":"优化后的正面提示词","negativePrompt":"负面提示词"}"#,
-        NodeKind::Image => "{}",
+        NodeKind::Image | NodeKind::Video => "{}",
         NodeKind::Brief => "{}",
     };
     format!("你是专业的短视频创作助手。只输出一个 JSON 对象，不要 Markdown 代码围栏。使用中文。严格遵循此结构：{schema}\n目标总时长 {} 秒。如生成分镜，必须恰好 {} 个镜头，镜头 ID 不重复，时长总和等于目标时长。\n用户定义的任务要求：{}",node.config.duration,node.config.shot_count,node.config.instructions)

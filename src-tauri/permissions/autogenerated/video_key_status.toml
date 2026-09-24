@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-video-key-status"
+description = "Enables the video_key_status command without any pre-configured scope."
+commands.allow = ["video_key_status"]
+
+[[permission]]
+identifier = "deny-video-key-status"
+description = "Denies the video_key_status command without any pre-configured scope."
+commands.deny = ["video_key_status"]

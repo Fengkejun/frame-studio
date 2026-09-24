@@ -31,6 +31,17 @@ fn main() {
             "clear_cloud_image_key",
             "list_cloud_image_jobs",
             "start_cloud_image_job",
+            "video_key_status",
+            "save_video_key",
+            "clear_video_key",
+            "list_video_jobs",
+            "start_video_job",
+            "resume_video_job",
+            "pause_video_job",
+            "list_video_assets",
+            "video_preview",
+            "list_selected_videos",
+            "select_video",
         ]),
     ))
     .expect("failed to build Tauri application metadata");

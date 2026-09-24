@@ -22,6 +22,7 @@ pub enum NodeKind {
     Storyboard,
     Prompt,
     Image,
+    Video,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -128,6 +129,7 @@ pub fn compatible(source: &NodeKind, target: &NodeKind) -> bool {
             NodeKind::Brief | NodeKind::Story | NodeKind::Storyboard
         ),
         NodeKind::Image => *source == NodeKind::Storyboard,
+        NodeKind::Video => *source == NodeKind::Image,
     }
 }
 
@@ -275,6 +277,25 @@ pub fn validate_output(kind: &NodeKind, value: &Value) -> AppResult<()> {
                                 && frame["width"].as_u64().is_some_and(|n| n > 0 && n <= 8192)
                                 && frame["height"].as_u64().is_some_and(|n| n > 0 && n <= 8192)
                                 && ids.insert(frame["shotId"].as_str().unwrap_or_default())
+                        })
+                })
+        }
+        NodeKind::Video => {
+            required_text(value, "storyboardArtifactId")
+                && value["clips"].as_array().is_some_and(|clips| {
+                    let mut ids = HashSet::new();
+                    !clips.is_empty()
+                        && clips.len() <= 24
+                        && clips.iter().all(|clip| {
+                            required_text(clip, "shotId")
+                                && required_text(clip, "assetId")
+                                && required_text(clip, "versionId")
+                                && required_text(clip, "firstFrameVersionId")
+                                && clip["duration"]
+                                    .as_u64()
+                                    .is_some_and(|n| (2..=15).contains(&n))
+                                && matches!(clip["resolution"].as_str(), Some("720P" | "1080P"))
+                                && ids.insert(clip["shotId"].as_str().unwrap_or_default())
                         })
                 })
         }

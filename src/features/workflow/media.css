@@ -273,6 +273,50 @@
   background: var(--surface);
   box-shadow: 0 0 0 100vmax #0009;
 }
+.video-source {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.video-source img,
+.video-source .asset-placeholder {
+  width: 65px;
+  height: 72px;
+  object-fit: contain;
+}
+.video-source div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+.video-source small {
+  overflow-wrap: anywhere;
+  font-size: 10px;
+  color: var(--muted);
+}
+.video-candidates h3 {
+  margin: 0 0 12px;
+}
+.video-player {
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.video-player > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.video-player video {
+  display: block;
+  max-width: 100%;
+  max-height: 65vh;
+  margin: 10px auto 0;
+}
 .frame-selection-dialog > img {
   width: 100%;
   max-height: 280px;

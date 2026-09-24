@@ -9,7 +9,19 @@ export function useMedia(workflowId?: string) {
     jobs: api.ImageJob[]
     cloudJobs: api.CloudImageJob[]
     roleReferences: api.RoleReference[]
-  }>({ assets: [], frames: [], jobs: [], cloudJobs: [], roleReferences: [] })
+    videoJobs: api.VideoJob[]
+    videoAssets: api.VideoAsset[]
+    selectedVideos: api.SelectedVideo[]
+  }>({
+    assets: [],
+    frames: [],
+    jobs: [],
+    cloudJobs: [],
+    roleReferences: [],
+    videoJobs: [],
+    videoAssets: [],
+    selectedVideos: [],
+  })
   const [error, setError] = useState('')
   const current = useRef(workflowId)
   const generation = useRef(0)
@@ -22,17 +34,36 @@ export function useMedia(workflowId?: string) {
   const refresh = useCallback(async () => {
     if (!workflowId) return
     const revision = ++generation.current
-    const [assets, frames, jobs, cloudJobs, roleReferences] = await Promise.all(
-      [
-        api.listImageAssets(),
-        api.listFirstFrames(workflowId),
-        api.listImageJobs(workflowId),
-        api.listCloudImageJobs(workflowId),
-        api.listRoleReferences(workflowId),
-      ],
-    )
+    const [
+      assets,
+      frames,
+      jobs,
+      cloudJobs,
+      roleReferences,
+      videoJobs,
+      videoAssets,
+      selectedVideos,
+    ] = await Promise.all([
+      api.listImageAssets(),
+      api.listFirstFrames(workflowId),
+      api.listImageJobs(workflowId),
+      api.listCloudImageJobs(workflowId),
+      api.listRoleReferences(workflowId),
+      api.listVideoJobs(workflowId),
+      api.listVideoAssets(workflowId),
+      api.listSelectedVideos(workflowId),
+    ])
     if (current.current === workflowId && revision === generation.current)
-      setData({ assets, frames, jobs, cloudJobs, roleReferences })
+      setData({
+        assets,
+        frames,
+        jobs,
+        cloudJobs,
+        roleReferences,
+        videoJobs,
+        videoAssets,
+        selectedVideos,
+      })
   }, [workflowId])
   useEffect(() => {
     let alive = true
@@ -52,10 +83,14 @@ export function useMedia(workflowId?: string) {
   const cloudJobs = data.cloudJobs.filter(
     (job) => job.request.context.workflowId === workflowId,
   )
+  const videoJobs = data.videoJobs.filter(
+    (job) => job.request.context.workflowId === workflowId,
+  )
+  const videoRunning = videoJobs.some(api.isVideoRunning)
   const running =
     jobs.some(api.isImageRunning) || cloudJobs.some(api.isCloudImageRunning)
   useEffect(() => {
-    if (!running) return
+    if (!running && !videoRunning) return
     let disposed = false
     let timer: ReturnType<typeof setTimeout>
     async function poll() {
@@ -71,13 +106,17 @@ export function useMedia(workflowId?: string) {
       disposed = true
       clearTimeout(timer)
     }
-  }, [running, refresh])
+  }, [running, videoRunning, refresh])
   return {
     assets: data.assets,
     frames,
     jobs,
     cloudJobs,
     roleReferences: data.roleReferences,
+    videoJobs,
+    videoAssets: data.videoAssets,
+    selectedVideos: data.selectedVideos,
+    videoRunning,
     error,
     setError,
     refresh,

@@ -45,7 +45,9 @@ export function FlowNode({ data, selected }: NodeProps<CanvasNode>) {
           ? '手动输入 · 创作起点'
           : node.kind === 'image'
             ? '人工确认 · 首帧版本'
-            : providerName || '尚未选择模型'}
+            : node.kind === 'video'
+              ? '人工确认 · 视频版本'
+              : providerName || '尚未选择模型'}
       </div>
       <Handle
         type="source"

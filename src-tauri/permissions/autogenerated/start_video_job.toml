@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-start-video-job"
+description = "Enables the start_video_job command without any pre-configured scope."
+commands.allow = ["start_video_job"]
+
+[[permission]]
+identifier = "deny-start-video-job"
+description = "Denies the start_video_job command without any pre-configured scope."
+commands.deny = ["start_video_job"]

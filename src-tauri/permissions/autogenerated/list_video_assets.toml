@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-video-assets"
+description = "Enables the list_video_assets command without any pre-configured scope."
+commands.allow = ["list_video_assets"]
+
+[[permission]]
+identifier = "deny-list-video-assets"
+description = "Denies the list_video_assets command without any pre-configured scope."
+commands.deny = ["list_video_assets"]

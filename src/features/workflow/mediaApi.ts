@@ -69,6 +69,43 @@ export interface CloudImageJob {
   updatedAt: number
   assetIds: string[]
 }
+export interface VideoRequest {
+  context: ShotContext
+  firstFrameVersionId: string
+  region: 'singapore' | 'beijing'
+  prompt: string
+  negativePrompt: string
+  duration: number
+  resolution: '720P' | '1080P'
+}
+export interface VideoJob {
+  id: string
+  request: VideoRequest
+  taskId: string | null
+  status: string
+  message: string
+  createdAt: number
+  updatedAt: number
+  assetId: string | null
+}
+export interface VideoAsset {
+  assetId: string
+  versionId: string
+  context: ShotContext
+  firstFrameVersionId: string
+  jobId: string
+  duration: number
+  resolution: string
+  bytes: number
+  createdAt: number
+  fileName: string
+}
+export interface SelectedVideo {
+  context: ShotContext
+  versionId: string
+}
+export const isVideoRunning = (j: VideoJob) =>
+  ['submitting', 'queued', 'running', 'downloading'].includes(j.status)
 export const isImageRunning = (j: ImageJob) =>
   ['submitting', 'waiting', 'downloading'].includes(j.status)
 export const isCloudImageRunning = (j: CloudImageJob) =>
@@ -125,6 +162,38 @@ export const listCloudImageJobs = (
 export const startCloudImageJob = (
   request: CloudImageRequest,
 ): Promise<CloudImageJob> => invoke('start_cloud_image_job', { request })
+export const videoKeyStatus = (
+  region: VideoRequest['region'],
+): Promise<boolean> =>
+  isDesktop ? invoke('video_key_status', { region }) : Promise.resolve(false)
+export const saveVideoKey = (
+  region: VideoRequest['region'],
+  apiKey: string,
+): Promise<void> => invoke('save_video_key', { region, apiKey })
+export const clearVideoKey = (region: VideoRequest['region']): Promise<void> =>
+  invoke('clear_video_key', { region })
+export const listVideoJobs = (workflowId: string): Promise<VideoJob[]> =>
+  isDesktop ? invoke('list_video_jobs', { workflowId }) : Promise.resolve([])
+export const startVideoJob = (request: VideoRequest): Promise<VideoJob> =>
+  invoke('start_video_job', { request })
+export const resumeVideoJob = (id: string): Promise<void> =>
+  invoke('resume_video_job', { id })
+export const pauseVideoJob = (id: string): Promise<void> =>
+  invoke('pause_video_job', { id })
+export const listVideoAssets = (workflowId: string): Promise<VideoAsset[]> =>
+  isDesktop ? invoke('list_video_assets', { workflowId }) : Promise.resolve([])
+export const videoPreview = (versionId: string): Promise<string> =>
+  invoke('video_preview', { versionId })
+export const listSelectedVideos = (
+  workflowId: string,
+): Promise<SelectedVideo[]> =>
+  isDesktop
+    ? invoke('list_selected_videos', { workflowId })
+    : Promise.resolve([])
+export const selectVideo = (
+  context: ShotContext,
+  versionId: string,
+): Promise<void> => invoke('select_video', { context, versionId })
 export const selectFirstFrame = (
   context: ShotContext,
   versionId: string,
