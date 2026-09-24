@@ -4,7 +4,7 @@ use serde::Serialize;
 use serde_json::{json, Value};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 use std::time::Duration;
 use tauri::Emitter;
@@ -18,11 +18,11 @@ pub struct OllamaModel {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PullProgress {
-    model: String,
-    status: String,
-    completed: u64,
-    total: u64,
+pub struct PullProgress {
+    pub model: String,
+    pub status: String,
+    pub completed: u64,
+    pub total: u64,
 }
 
 fn ollama_provider(base_url: &str, model: &str) -> AppResult<Provider> {
@@ -66,6 +66,7 @@ pub async fn pull_ollama_model(
     base_url: &str,
     model: &str,
     cancel: Arc<AtomicBool>,
+    progress_state: Arc<Mutex<PullProgress>>,
 ) -> AppResult<()> {
     let model = model.trim();
     if model.is_empty() || model.len() > 200 || model.chars().any(char::is_whitespace) {
@@ -118,6 +119,7 @@ pub async fn pull_ollama_model(
                 completed: data["completed"].as_u64().unwrap_or(0),
                 total: data["total"].as_u64().unwrap_or(0),
             };
+            *progress_state.lock().map_err(|_| "模型状态锁不可用")? = progress.clone();
             let _ = app.emit("ollama-pull-progress", progress);
         }
     }

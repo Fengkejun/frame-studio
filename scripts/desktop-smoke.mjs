@@ -34,13 +34,32 @@ const port = await new Promise((resolve, reject) => {
 const endpoint = `http://127.0.0.1:${port}`
 const cloudFixture = await createCloudFixture(root)
 const videoFixture = await createVideoFixture(root)
-const textServer = createServer((request, response) => {
+const installedModels = new Set(['fixture-model:latest'])
+const textServer = createServer(async (request, response) => {
+  if (request.url === '/api/pull' && request.method === 'POST') {
+    let body = ''
+    for await (const chunk of request) body += chunk
+    const model = JSON.parse(body).model
+    response.writeHead(200, { 'Content-Type': 'application/x-ndjson' })
+    response.write(JSON.stringify({ status: 'pulling manifest' }) + '\n')
+    response.write(
+      JSON.stringify({ status: 'downloading', completed: 50, total: 100 }) +
+        '\n',
+    )
+    installedModels.add(model)
+    response.end(JSON.stringify({ status: 'success' }) + '\n')
+    return
+  }
   if (request.url !== '/api/tags') {
     response.writeHead(404).end()
     return
   }
   response.writeHead(200, { 'Content-Type': 'application/json' })
-  response.end(JSON.stringify({ models: [{ name: 'fixture-model:latest' }] }))
+  response.end(
+    JSON.stringify({
+      models: [...installedModels].map((name) => ({ name, size: 1024 })),
+    }),
+  )
 })
 await new Promise((resolve) => textServer.listen(0, '127.0.0.1', resolve))
 const textAddress = textServer.address()
@@ -133,6 +152,20 @@ try {
   await page.getByRole('button', { name: '模型连接', exact: true }).click()
   await page.getByLabel('连接名称').fill('本地文本测试')
   await page.getByLabel('API 根地址').fill(`${textUrl}/api`)
+  await page.getByRole('button', { name: '刷新已安装模型' }).click()
+  await expect(
+    page.getByRole('button', { name: /fixture-model:latest.*GB/ }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: /fixture-model:latest.*GB/ }).click()
+  await expect(page.getByLabel('模型 ID')).toHaveValue('fixture-model:latest')
+  await page.getByLabel('模型 ID').fill('fixture-new:latest')
+  await page.getByRole('button', { name: '下载当前模型 ID' }).click()
+  await expect(
+    page.getByText('模型下载完成。保存连接后即可在画布中使用。'),
+  ).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: /fixture-new:latest.*GB/ }),
+  ).toBeVisible()
   await page.getByLabel('模型 ID').fill('fixture-model')
   await page.getByRole('button', { name: '保存连接' }).click()
   await expect(page.getByText('连接已保存。', { exact: false })).toBeVisible()

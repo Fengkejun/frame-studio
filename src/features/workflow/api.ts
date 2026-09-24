@@ -58,6 +58,14 @@ export const pullOllamaModel = (
   baseUrl: string,
   model: string,
 ): Promise<void> => invoke('pull_ollama_model', { baseUrl, model })
+export interface OllamaPullProgress {
+  model: string
+  status: string
+  completed: number
+  total: number
+}
+export const getOllamaPull = (): Promise<OllamaPullProgress | null> =>
+  invoke('get_ollama_pull')
 export const cancelOllamaPull = (): Promise<void> =>
   invoke('cancel_ollama_pull')
 export const listRuns = (workflowId: string): Promise<RunRecord[]> =>

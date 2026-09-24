@@ -11,12 +11,16 @@ use std::{
     time::Duration,
 };
 use storage::Store;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 pub use types::*;
 
 pub struct ActiveRun {
     id: String,
     cancel: Arc<AtomicBool>,
+}
+struct ActiveModelPull {
+    cancel: Arc<AtomicBool>,
+    progress: Arc<Mutex<providers::PullProgress>>,
 }
 pub struct WorkflowState {
     store: Store,
@@ -24,7 +28,7 @@ pub struct WorkflowState {
     media_active: Mutex<Option<ActiveRun>>,
     video_active: Mutex<HashMap<String, media::video::ActiveVideo>>,
     export_active: Mutex<Option<ActiveRun>>,
-    model_pull: Mutex<Option<Arc<AtomicBool>>>,
+    model_pull: Mutex<Option<ActiveModelPull>>,
     directory: std::path::PathBuf,
 }
 
@@ -78,6 +82,22 @@ pub async fn list_ollama_models(base_url: String) -> AppResult<Vec<providers::Ol
 }
 
 #[tauri::command]
+pub fn get_ollama_pull(
+    state: tauri::State<WorkflowState>,
+) -> AppResult<Option<providers::PullProgress>> {
+    let active = state.model_pull.lock().map_err(|_| "模型任务锁不可用")?;
+    active
+        .as_ref()
+        .map(|pull| {
+            pull.progress
+                .lock()
+                .map(|status| status.clone())
+                .map_err(|_| "模型状态锁不可用".into())
+        })
+        .transpose()
+}
+
+#[tauri::command]
 pub async fn pull_ollama_model(
     app: tauri::AppHandle,
     state: tauri::State<'_, WorkflowState>,
@@ -85,23 +105,36 @@ pub async fn pull_ollama_model(
     model: String,
 ) -> AppResult<()> {
     let cancel = Arc::new(AtomicBool::new(false));
+    let progress = Arc::new(Mutex::new(providers::PullProgress {
+        model: model.trim().into(),
+        status: "正在连接 Ollama".into(),
+        completed: 0,
+        total: 0,
+    }));
     {
         let mut active = state.model_pull.lock().map_err(|_| "模型任务锁不可用")?;
         if active.is_some() {
             return Err("已有模型正在下载，请等待或先取消".into());
         }
-        *active = Some(cancel.clone());
+        *active = Some(ActiveModelPull {
+            cancel: cancel.clone(),
+            progress: progress.clone(),
+        });
     }
-    let result = providers::pull_ollama_model(&app, &base_url, &model, cancel).await;
+    let result = providers::pull_ollama_model(&app, &base_url, &model, cancel, progress).await;
     *state.model_pull.lock().map_err(|_| "模型任务锁不可用")? = None;
+    let _ = app.emit(
+        "ollama-pull-finished",
+        result.as_ref().map(|_| "success").unwrap_or("failed"),
+    );
     result
 }
 
 #[tauri::command]
 pub fn cancel_ollama_pull(state: tauri::State<WorkflowState>) -> AppResult<()> {
     let active = state.model_pull.lock().map_err(|_| "模型任务锁不可用")?;
-    if let Some(cancel) = active.as_ref() {
-        cancel.store(true, Ordering::Relaxed);
+    if let Some(pull) = active.as_ref() {
+        pull.cancel.store(true, Ordering::Relaxed);
     }
     Ok(())
 }

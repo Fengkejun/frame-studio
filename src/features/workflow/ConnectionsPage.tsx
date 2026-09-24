@@ -31,16 +31,51 @@ export function ConnectionsPage({
   const [deleting, setDeleting] = useState(false)
   const [models, setModels] = useState<api.OllamaModel[]>([])
   const [pulling, setPulling] = useState(false)
-  const [pullProgress, setPullProgress] = useState<{
-    status: string
-    completed: number
-    total: number
-  } | null>(null)
+  const [pullProgress, setPullProgress] =
+    useState<api.OllamaPullProgress | null>(null)
   useEffect(() => {
     api
       .listProviders()
       .then(setProviders)
       .catch((e: unknown) => setError(api.errorMessage(e)))
+  }, [])
+  useEffect(() => {
+    if (!isDesktop) return
+    let alive = true
+    const listeners: Array<() => void> = []
+    void (async () => {
+      const onProgress = await listen<api.OllamaPullProgress>(
+        'ollama-pull-progress',
+        (event) => {
+          if (alive) setPullProgress(event.payload)
+        },
+      )
+      if (!alive) return onProgress()
+      listeners.push(onProgress)
+      const onFinished = await listen<string>(
+        'ollama-pull-finished',
+        (event) => {
+          if (!alive) return
+          setPulling(false)
+          if (event.payload === 'success')
+            setMessage('模型下载完成。刷新已安装模型后即可选择。')
+          else setError('模型下载未完成。请刷新已安装模型核实状态。')
+        },
+      )
+      if (!alive) return onFinished()
+      listeners.push(onFinished)
+      const active = await api.getOllamaPull()
+      if (alive && active) {
+        setPulling(true)
+        setPullProgress(active)
+      }
+    })().catch((e: unknown) => {
+      if (alive) setError(api.errorMessage(e))
+    })
+    return () => {
+      alive = false
+      listeners.forEach((unlisten) => unlisten())
+    }
   }, [])
   const locked = !isDesktop || pending || pulling || busy
   const exists = providers.some((p) => p.id === form.id)
@@ -76,17 +111,7 @@ export function ConnectionsPage({
     setError('')
     setMessage('正在从 Ollama 下载模型；下载大小取决于所选模型。')
     setPullProgress(null)
-    let unlisten: (() => void) | undefined
     try {
-      unlisten = await listen<{
-        model: string
-        status: string
-        completed: number
-        total: number
-      }>('ollama-pull-progress', (event) => {
-        if (event.payload.model === form.model.trim())
-          setPullProgress(event.payload)
-      })
       await api.pullOllamaModel(form.baseUrl, form.model)
       const installed = await api.listOllamaModels(form.baseUrl)
       setModels(installed)
@@ -94,7 +119,6 @@ export function ConnectionsPage({
     } catch (e) {
       setError(api.errorMessage(e))
     } finally {
-      unlisten?.()
       setPulling(false)
     }
   }
@@ -190,7 +214,7 @@ export function ConnectionsPage({
               key={p.id}
               className={`connection-item ${form.id === p.id ? 'selected' : ''}`}
               onClick={() => edit(p)}
-              disabled={pending}
+              disabled={pending || pulling}
             >
               <span className="connection-icon">
                 {p.kind === 'ollama' ? '⌂' : '↗'}

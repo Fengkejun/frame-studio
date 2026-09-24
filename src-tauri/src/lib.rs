@@ -10,6 +10,7 @@ pub fn run() {
             workflow::save_workflow,
             workflow::list_providers,
             workflow::list_ollama_models,
+            workflow::get_ollama_pull,
             workflow::pull_ollama_model,
             workflow::cancel_ollama_pull,
             workflow::save_provider,
