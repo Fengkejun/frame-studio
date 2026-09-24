@@ -15,7 +15,7 @@ export interface ImageAsset {
   height: number
   bytes: number
   createdAt: number
-  source: 'import' | 'comfyui'
+  source: 'import' | 'comfyui' | 'openai'
   context: ShotContext | null
   jobId: string | null
   fileName: string
@@ -46,8 +46,27 @@ export interface ImageJob {
   updatedAt: number
   assetIds: string[]
 }
+export interface CloudImageRequest {
+  context: ShotContext
+  model: 'gpt-image-2' | 'gpt-image-2.5-flare' | 'gpt-image-2.5-sunburst'
+  positive: string
+  negative: string
+  size: '1024x1024' | '1024x1536' | '1536x1024'
+  quality: 'low' | 'medium' | 'high'
+}
+export interface CloudImageJob {
+  id: string
+  request: CloudImageRequest
+  status: string
+  message: string
+  createdAt: number
+  updatedAt: number
+  assetIds: string[]
+}
 export const isImageRunning = (j: ImageJob) =>
   ['submitting', 'waiting', 'downloading'].includes(j.status)
+export const isCloudImageRunning = (j: CloudImageJob) =>
+  ['submitting', 'saving'].includes(j.status)
 export const sameShot = (a: ShotContext | null, b: ShotContext | null) =>
   !!a &&
   !!b &&
@@ -73,6 +92,21 @@ export const resumeImageJob = (id: string): Promise<void> =>
   invoke('resume_image_job', { id })
 export const pauseImageJob = (id: string): Promise<void> =>
   invoke('pause_image_job', { id })
+export const cloudImageKeyStatus = (): Promise<boolean> =>
+  isDesktop ? invoke('cloud_image_key_status') : Promise.resolve(false)
+export const saveCloudImageKey = (apiKey: string): Promise<void> =>
+  invoke('save_cloud_image_key', { apiKey })
+export const clearCloudImageKey = (): Promise<void> =>
+  invoke('clear_cloud_image_key')
+export const listCloudImageJobs = (
+  workflowId: string,
+): Promise<CloudImageJob[]> =>
+  isDesktop
+    ? invoke('list_cloud_image_jobs', { workflowId })
+    : Promise.resolve([])
+export const startCloudImageJob = (
+  request: CloudImageRequest,
+): Promise<CloudImageJob> => invoke('start_cloud_image_job', { request })
 export const selectFirstFrame = (
   context: ShotContext,
   versionId: string,

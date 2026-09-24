@@ -7,7 +7,8 @@ export function useMedia(workflowId?: string) {
     assets: api.ImageAsset[]
     frames: api.FirstFrame[]
     jobs: api.ImageJob[]
-  }>({ assets: [], frames: [], jobs: [] })
+    cloudJobs: api.CloudImageJob[]
+  }>({ assets: [], frames: [], jobs: [], cloudJobs: [] })
   const [error, setError] = useState('')
   const current = useRef(workflowId)
   const generation = useRef(0)
@@ -20,13 +21,14 @@ export function useMedia(workflowId?: string) {
   const refresh = useCallback(async () => {
     if (!workflowId) return
     const revision = ++generation.current
-    const [assets, frames, jobs] = await Promise.all([
+    const [assets, frames, jobs, cloudJobs] = await Promise.all([
       api.listImageAssets(),
       api.listFirstFrames(workflowId),
       api.listImageJobs(workflowId),
+      api.listCloudImageJobs(workflowId),
     ])
     if (current.current === workflowId && revision === generation.current)
-      setData({ assets, frames, jobs })
+      setData({ assets, frames, jobs, cloudJobs })
   }, [workflowId])
   useEffect(() => {
     let alive = true
@@ -43,7 +45,11 @@ export function useMedia(workflowId?: string) {
   const frames = data.frames.filter(
     (frame) => frame.context.workflowId === workflowId,
   )
-  const running = jobs.some(api.isImageRunning)
+  const cloudJobs = data.cloudJobs.filter(
+    (job) => job.request.context.workflowId === workflowId,
+  )
+  const running =
+    jobs.some(api.isImageRunning) || cloudJobs.some(api.isCloudImageRunning)
   useEffect(() => {
     if (!running) return
     let disposed = false
@@ -66,6 +72,7 @@ export function useMedia(workflowId?: string) {
     assets: data.assets,
     frames,
     jobs,
+    cloudJobs,
     error,
     setError,
     refresh,

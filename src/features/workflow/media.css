@@ -59,6 +59,12 @@
 .image-form .text-button {
   margin: -4px 0 14px;
 }
+.image-generator-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 20px;
+}
 .image-number-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

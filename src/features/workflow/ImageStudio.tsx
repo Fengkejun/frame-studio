@@ -5,6 +5,7 @@ import * as api from './mediaApi'
 import type { Shot, Workflow } from './model'
 import type { useMedia } from './useMedia'
 import { AssetImage } from './AssetImage'
+import { CloudImageForm } from './CloudImageForm'
 import './media.css'
 
 export interface ShotTarget {
@@ -21,6 +22,7 @@ interface Props {
 }
 const jobLabels: Record<string, string> = {
   submitting: '提交中',
+  saving: '保存中',
   waiting: '生成中',
   downloading: '保存中',
   succeeded: '已完成',
@@ -66,6 +68,7 @@ export function ImageStudio({
   } | null>(null)
   const [working, setWorking] = useState(false)
   const [filter, setFilter] = useState<'shot' | 'all'>('shot')
+  const [generator, setGenerator] = useState<'cloud' | 'local'>('cloud')
   const [limit, setLimit] = useState(40)
   const fileInput = useRef<HTMLInputElement>(null)
   const library =
@@ -128,7 +131,7 @@ export function ImageStudio({
       </div>
       {!isDesktop && (
         <p className="preview-strip">
-          浏览器可预览首帧制作界面；连接 ComfyUI 和保存图片请使用桌面应用。
+          浏览器可预览首帧制作界面；云端或本机生图、保存图片请使用桌面应用。
         </p>
       )}
       {media.error && (
@@ -166,19 +169,63 @@ export function ImageStudio({
             </select>
           </label>
           {selected && context ? (
-            <ImageForm
-              key={`${workflow.id}/${context.artifactId}/${context.shotId}`}
-              context={context}
-              shot={selected.shot}
-              disabled={busy || working || media.running || selected.node.stale}
-              onStart={(request) =>
-                action(async () => {
-                  await save(workflow)
-                  await api.startImageJob(request)
-                })
-              }
-              onError={media.setError}
-            />
+            <>
+              <div
+                className="image-generator-switch"
+                role="group"
+                aria-label="生图方式"
+              >
+                <button
+                  type="button"
+                  className={`small-button ${generator === 'cloud' ? 'selected' : ''}`}
+                  aria-pressed={generator === 'cloud'}
+                  onClick={() => setGenerator('cloud')}
+                >
+                  云端生图
+                </button>
+                <button
+                  type="button"
+                  className={`small-button ${generator === 'local' ? 'selected' : ''}`}
+                  aria-pressed={generator === 'local'}
+                  onClick={() => setGenerator('local')}
+                >
+                  本机 ComfyUI
+                </button>
+              </div>
+              {generator === 'cloud' ? (
+                <CloudImageForm
+                  key={`${workflow.id}/${context.artifactId}/${context.shotId}`}
+                  context={context}
+                  shot={selected.shot}
+                  disabled={
+                    busy || working || media.running || selected.node.stale
+                  }
+                  onStart={(request) =>
+                    action(async () => {
+                      await save(workflow)
+                      await api.startCloudImageJob(request)
+                    })
+                  }
+                  onError={media.setError}
+                />
+              ) : (
+                <ImageForm
+                  key={`${workflow.id}/${context.artifactId}/${context.shotId}`}
+                  context={context}
+                  shot={selected.shot}
+                  disabled={
+                    busy || working || media.running || selected.node.stale
+                  }
+                  onStart={(request) =>
+                    action(async () => {
+                      await save(workflow)
+                      await api.startImageJob(request)
+                    })
+                  }
+                  onError={media.setError}
+                />
+              )}
+            </>
           ) : (
             <div className="media-empty">
               分镜就绪后，这里会自动带入镜头的生图提示词。也可以先导入图片到本地素材库。
@@ -259,7 +306,11 @@ export function ImageStudio({
                   <strong title={a.name}>{a.name}</strong>
                   <small>
                     {a.width} × {a.height} ·{' '}
-                    {a.source === 'import' ? '导入' : 'ComfyUI'}
+                    {a.source === 'import'
+                      ? '导入'
+                      : a.source === 'openai'
+                        ? 'OpenAI'
+                        : 'ComfyUI'}
                   </small>
                   <small>
                     版本 {versionLabel(a.versionId)} ·{' '}
@@ -288,7 +339,7 @@ export function ImageStudio({
               </strong>
               <p>
                 {filter === 'shot'
-                  ? '连接 ComfyUI 生成图片，或切换到素材库选用已有画面。'
+                  ? '使用云端或本机模型生成图片，或切换到素材库选用已有画面。'
                   : '导入 PNG、JPEG、WebP，原图和缩略图会保存到本机。'}
               </p>
             </div>
@@ -302,7 +353,38 @@ export function ImageStudio({
             </button>
           )}
           <details className="image-job-history" open>
-            <summary>图片任务记录 · {media.jobs.length}</summary>
+            <summary>云端图片任务记录 · {media.cloudJobs.length}</summary>
+            {!media.cloudJobs.length && (
+              <p className="field-hint">
+                云端请求的模型、状态与候选版本会保存在这里。
+              </p>
+            )}
+            {media.cloudJobs.map((job) => (
+              <article key={job.id}>
+                <div className="image-job-title">
+                  <strong>{job.request.context.shotId}</strong>
+                  <span
+                    className={`badge ${job.status === 'failed' || job.status === 'unknown' ? 'danger' : ''}`}
+                  >
+                    {jobLabels[job.status] ?? job.status}
+                  </span>
+                  <time>{new Date(job.createdAt).toLocaleString('zh-CN')}</time>
+                </div>
+                <p>{job.message}</p>
+                <details>
+                  <summary>生成参数</summary>
+                  <p>
+                    模型：{job.request.model} · {job.request.size} ·{' '}
+                    {job.request.quality}
+                  </p>
+                  <p>提示词：{job.request.positive}</p>
+                  <p>避免元素：{job.request.negative || '无'}</p>
+                </details>
+              </article>
+            ))}
+          </details>
+          <details className="image-job-history" open>
+            <summary>ComfyUI 图片任务记录 · {media.jobs.length}</summary>
             {!media.jobs.length && (
               <p className="field-hint">
                 这里会保留生成参数、任务 ID 和候选版本。

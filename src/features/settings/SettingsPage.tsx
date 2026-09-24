@@ -89,7 +89,7 @@ export function SettingsPage({
         <span className="version-badge">v{packageInfo.version}</span>
       </section>
       <p className="footnote">
-        当前版本提供桌面基础与界面设置。工作流画布、模型配置和视频生成功能将在后续接入。
+        当前版本支持工作流画布、文本模型连接和分镜首帧制作。视频生成与成片合成将在后续接入。
       </p>
     </div>
   )

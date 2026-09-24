@@ -424,7 +424,7 @@ function WorkflowEditor({
           <button className="library-node" onClick={() => setTab('images')}>
             <span className="library-mark">▧</span>
             <strong>镜头首帧</strong>
-            <small>ComfyUI 生图与本地素材</small>
+            <small>云端或本机生图与本地素材</small>
           </button>
           <p className="eyebrow">即将接入</p>
           <div className="future-node">▷ 视频生成</div>

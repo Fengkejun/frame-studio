@@ -153,7 +153,10 @@ export function ConnectionsPage({
           <div className="connection-roadmap">
             <span className="eyebrow">NEXT CHAPTER</span>
             <p>图片与视频连接</p>
-            <small>ComfyUI 与云端媒体适配器将在下一阶段接入。</small>
+            <small>
+              ComfyUI 和 OpenAI
+              图片生成请在「首帧与素材」中配置；视频连接待后续接入。
+            </small>
           </div>
         </section>
         <section className="connection-editor">
