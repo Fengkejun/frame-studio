@@ -153,6 +153,7 @@ export async function testVideoMedia(page, root, fixture) {
   await expect(page.locator('.node-inspector .output-preview')).toContainText(
     '1 个首帧版本',
   )
+  await page.locator('.react-flow__controls-fitview').click()
   await page.getByTestId('rf__node-video-fixture').locator('.node-mark').click()
   await page.getByRole('button', { name: '汇集已选片段' }).click()
   await page.getByRole('button', { name: '开始执行' }).click()

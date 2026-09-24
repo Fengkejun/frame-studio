@@ -1,15 +1,24 @@
 import type { RuntimeStatus } from '@/shared/types/desktop'
 import { Icon } from '@/shared/ui/Icon'
 import { RuntimePanel } from './RuntimePanel'
+import { SetupChecklist } from './SetupChecklist'
 
 export function WorkspacePage({
   status,
   onRetry,
   onWorkflow,
+  onModels,
+  onImages,
+  onVideos,
+  onTimeline,
 }: {
   status: RuntimeStatus
   onRetry: () => void
   onWorkflow: () => void
+  onModels: () => void
+  onImages: () => void
+  onVideos: () => void
+  onTimeline: () => void
 }) {
   return (
     <div className="workspace-page">
@@ -19,12 +28,12 @@ export function WorkspacePage({
           <h1 id="welcome-title">
             从一个想法，
             <br />
-            <span>到一段好故事。</span>
+            <span>到一部短片。</span>
           </h1>
           <p className="hero-description">
-            欢迎来到帧序。你的 AI 影像创作工作台，
+            欢迎来到帧序。从故事、分镜和首帧，
             <br className="desktop-break" />
-            从这里开始。
+            到镜头视频与成片导出。
           </p>
           <button className="button primary" onClick={onWorkflow}>
             打开工作流画布
@@ -32,7 +41,7 @@ export function WorkspacePage({
           </button>
           <div className="hero-caption">
             <span className="status-dot" />
-            故事、分镜与镜头首帧
+            故事、首帧、视频与成片
           </div>
         </div>
         <div className="frame-art" aria-hidden="true">
@@ -56,6 +65,12 @@ export function WorkspacePage({
           <span className="frame-bottom">THE NEXT FRAME IS YOURS.</span>
         </div>
       </section>
+      <SetupChecklist
+        onModels={onModels}
+        onImages={onImages}
+        onVideos={onVideos}
+        onTimeline={onTimeline}
+      />
       <div className="workspace-bottom">
         <section className="next-section" aria-labelledby="next-title">
           <div className="section-heading">

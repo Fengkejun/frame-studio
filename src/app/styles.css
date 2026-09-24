@@ -415,6 +415,91 @@ h3 {
   grid-template-columns: 1.3fr 1fr;
   gap: 32px;
 }
+.setup-guide {
+  margin-top: 29px;
+  padding: 25px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.setup-guide.collapsed {
+  padding: 17px 25px;
+}
+.setup-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.setup-intro {
+  color: var(--muted);
+  font-size: 11px;
+  margin: 9px 0 20px;
+}
+.setup-guide > .workflow-notice,
+.setup-guide > .workflow-error {
+  margin-bottom: 18px;
+}
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.setup-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 185px;
+  padding: 17px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+}
+.setup-card-head,
+.setup-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.setup-card-head {
+  font:
+    10px Consolas,
+    monospace;
+  color: var(--muted);
+}
+.setup-card-head b {
+  font: inherit;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.setup-card-head b.setup-good {
+  color: var(--accent);
+}
+.setup-card h3 {
+  margin-top: 13px;
+  font-size: 14px;
+}
+.setup-card p {
+  flex: 1;
+  margin: 8px 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+.setup-card select {
+  width: 100%;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  padding: 7px;
+}
+.setup-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
 .section-heading {
   display: flex;
   align-items: center;
@@ -759,6 +844,15 @@ h3 {
   }
   .workspace-bottom {
     grid-template-columns: 1fr;
+  }
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
+  .setup-guide {
+    padding: 18px;
+  }
+  .setup-guide.collapsed {
+    padding: 15px 18px;
   }
   .runtime-panel {
     border-left: 0;

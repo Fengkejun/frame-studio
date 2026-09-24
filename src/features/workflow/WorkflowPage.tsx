@@ -44,6 +44,7 @@ export function WorkflowPage(props: {
   controller: Controller
   onModels: () => void
   modelsRevision: number
+  initialTab?: 'shots' | 'images' | 'videos' | 'timeline'
 }) {
   return (
     <ReactFlowProvider>
@@ -55,10 +56,12 @@ function WorkflowEditor({
   controller: c,
   onModels,
   modelsRevision,
+  initialTab = 'shots',
 }: {
   controller: Controller
   onModels: () => void
   modelsRevision: number
+  initialTab?: 'shots' | 'images' | 'videos' | 'timeline'
 }) {
   const { workflow: w, busy } = c
   const [providers, setProviders] = useState<Provider[]>([])
@@ -66,7 +69,7 @@ function WorkflowEditor({
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
   const [tab, setTab] = useState<
     'shots' | 'runs' | 'images' | 'videos' | 'timeline'
-  >('shots')
+  >(initialTab)
   const [mediaTarget, setMediaTarget] = useState<ShotTarget | null>(null)
   const media = useMedia(w?.id)
   const [confirmRun, setConfirmRun] = useState<{ target?: string } | null>(null)

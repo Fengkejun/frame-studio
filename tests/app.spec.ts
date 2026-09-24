@@ -1,5 +1,40 @@
 import { expect, test } from '@playwright/test'
 
+test('first-run guide opens each media step without fabricating desktop checks', async ({
+  page,
+}) => {
+  await page.goto('/')
+  await expect(
+    page.getByRole('heading', { name: '开始制作前，检查创作工具' }),
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: '检测模型' })).toBeDisabled()
+  await expect(
+    page.getByRole('button', { name: '检测 ComfyUI' }),
+  ).toBeDisabled()
+  await expect(page.getByText('浏览器预览展示配置步骤')).toBeVisible()
+  await page.screenshot({
+    path: 'artifacts/onboarding-browser.png',
+    fullPage: true,
+  })
+  await page.getByRole('button', { name: '收起引导' }).click()
+  await expect(page.locator('.setup-card')).toHaveCount(0)
+  await page.reload()
+  await page.getByRole('button', { name: '展开引导' }).click()
+  await expect(page.locator('.setup-card')).toHaveCount(4)
+  await page.getByRole('button', { name: '打开首帧设置' }).click()
+  await expect(
+    page.getByRole('heading', { name: '让分镜成为画面' }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: '工作台', exact: true }).click()
+  await page.getByRole('button', { name: '配置视频服务' }).click()
+  await expect(
+    page.getByRole('heading', { name: '从首帧生成镜头片段' }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: '工作台', exact: true }).click()
+  await page.getByRole('button', { name: '打开时间线' }).click()
+  await expect(page.getByRole('heading', { name: '成片合成' })).toBeVisible()
+})
+
 test('browser preview opens the editable workflow canvas without fabricating native execution', async ({
   page,
 }) => {

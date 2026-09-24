@@ -50,6 +50,7 @@ fn main() {
             "start_export",
             "list_export_jobs",
             "cancel_export",
+            "check_export_tools",
         ]),
     ))
     .expect("failed to build Tauri application metadata");

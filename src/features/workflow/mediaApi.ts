@@ -142,6 +142,15 @@ export interface ExportJob {
   createdAt: number
   updatedAt: number
 }
+export interface ExportToolsStatus {
+  ffmpeg: boolean
+  ffprobe: boolean
+  h264: boolean
+  aac: boolean
+  subtitles: boolean
+  ready: boolean
+  message: string
+}
 export const isVideoRunning = (j: VideoJob) =>
   ['submitting', 'queued', 'running', 'downloading'].includes(j.status)
 export const isImageRunning = (j: ImageJob) =>
@@ -250,6 +259,8 @@ export const startExport = (
 ): Promise<ExportJob> => invoke('start_export', { draft, outputPath })
 export const cancelExport = (id: string): Promise<void> =>
   invoke('cancel_export', { id })
+export const checkExportTools = (): Promise<ExportToolsStatus> =>
+  invoke('check_export_tools')
 export async function importAudio(
   workflowId: string,
   file: File,

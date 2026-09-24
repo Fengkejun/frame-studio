@@ -1,6 +1,7 @@
 import { spawn, execFileSync } from 'node:child_process'
 import { access, mkdir, mkdtemp, readFile } from 'node:fs/promises'
 import net from 'node:net'
+import { createServer } from 'node:http'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -33,6 +34,17 @@ const port = await new Promise((resolve, reject) => {
 const endpoint = `http://127.0.0.1:${port}`
 const cloudFixture = await createCloudFixture(root)
 const videoFixture = await createVideoFixture(root)
+const textServer = createServer((request, response) => {
+  if (request.url !== '/api/tags') {
+    response.writeHead(404).end()
+    return
+  }
+  response.writeHead(200, { 'Content-Type': 'application/json' })
+  response.end(JSON.stringify({ models: [{ name: 'fixture-model:latest' }] }))
+})
+await new Promise((resolve) => textServer.listen(0, '127.0.0.1', resolve))
+const textAddress = textServer.address()
+const textUrl = `http://127.0.0.1:${textAddress.port}`
 const app = spawn(executable, [], {
   windowsHide: true,
   stdio: ['ignore', 'ignore', 'pipe'],
@@ -90,6 +102,12 @@ try {
   await expect(page.getByRole('status')).toHaveText('桌面连接正常', {
     timeout: 15000,
   })
+  await expect(
+    page.getByRole('heading', { name: '开始制作前，检查创作工具' }),
+  ).toBeVisible()
+  await expect(
+    page.locator('.setup-card').filter({ hasText: '本机 MP4 合成' }),
+  ).toContainText('本机合成工具可用', { timeout: 15000 })
   await expect(page.locator('.details-list')).toContainText('windows / x86_64')
   await expect(page.locator('.details-list')).toContainText('0.1.0')
   await page.getByRole('button', { name: '重新检查连接' }).click()
@@ -112,6 +130,19 @@ try {
   await testCloudMedia(page, cloudFixture)
   await testVideoMedia(page, root, videoFixture)
   await testTimelineMedia(page, root, profile)
+  await page.getByRole('button', { name: '模型连接', exact: true }).click()
+  await page.getByLabel('连接名称').fill('本地文本测试')
+  await page.getByLabel('API 根地址').fill(`${textUrl}/api`)
+  await page.getByLabel('模型 ID').fill('fixture-model')
+  await page.getByRole('button', { name: '保存连接' }).click()
+  await expect(page.getByText('连接已保存。', { exact: false })).toBeVisible()
+  await page.getByRole('button', { name: '工作台', exact: true }).click()
+  const textStep = page.locator('.setup-card').filter({ hasText: '故事与分镜' })
+  await expect(textStep).toContainText('已保存 1 个文本连接')
+  await textStep.getByRole('button', { name: '检测模型' }).click()
+  await expect(textStep).toContainText('连接正常，已找到配置的模型', {
+    timeout: 15000,
+  })
   for (const file of ['studio.sqlite', 'studio.sqlite-wal']) {
     const bytes = await readFile(path.join(profile, file)).catch(() => null)
     if (bytes) expect(bytes.includes(Buffer.from('fixture-key'))).toBe(false)
@@ -126,6 +157,7 @@ try {
   await browser?.close()
   await cloudFixture.close()
   await videoFixture.close()
+  await new Promise((resolve) => textServer.close(resolve))
   if (app.pid && app.exitCode === null) {
     execFileSync('taskkill', ['/PID', String(app.pid), '/T', '/F'], {
       windowsHide: true,

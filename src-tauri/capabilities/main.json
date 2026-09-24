@@ -52,6 +52,7 @@
     "allow-choose-export-path",
     "allow-start-export",
     "allow-list-export-jobs",
-    "allow-cancel-export"
+    "allow-cancel-export",
+    "allow-check-export-tools"
   ]
 }

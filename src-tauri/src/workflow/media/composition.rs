@@ -80,6 +80,80 @@ fn binary(name: &str) -> PathBuf {
     PathBuf::from(filename)
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportToolsStatus {
+    ffmpeg: bool,
+    ffprobe: bool,
+    h264: bool,
+    aac: bool,
+    subtitles: bool,
+    ready: bool,
+    message: String,
+}
+
+async fn tool_output(name: &str, arguments: &[&str]) -> Option<String> {
+    let mut command = tokio::process::Command::new(binary(name));
+    command.args(arguments).kill_on_drop(true);
+    let output = tokio::time::timeout(Duration::from_secs(8), command.output())
+        .await
+        .ok()?
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+fn has_capability(list: &str, name: &str) -> bool {
+    list.lines()
+        .any(|line| line.split_whitespace().nth(1) == Some(name))
+}
+
+#[tauri::command]
+pub async fn check_export_tools() -> ExportToolsStatus {
+    let (ffmpeg_version, ffprobe_version) = tokio::join!(
+        tool_output("ffmpeg", &["-version"]),
+        tool_output("ffprobe", &["-version"])
+    );
+    let ffmpeg = ffmpeg_version.is_some();
+    let ffprobe = ffprobe_version.is_some();
+    let (encoders, filters) = if ffmpeg {
+        tokio::join!(
+            tool_output("ffmpeg", &["-hide_banner", "-encoders"]),
+            tool_output("ffmpeg", &["-hide_banner", "-filters"])
+        )
+    } else {
+        (None, None)
+    };
+    let h264 = encoders
+        .as_deref()
+        .is_some_and(|list| has_capability(list, "libx264"));
+    let aac = encoders
+        .as_deref()
+        .is_some_and(|list| has_capability(list, "aac"));
+    let subtitles = filters
+        .as_deref()
+        .is_some_and(|list| has_capability(list, "subtitles"));
+    let ready = ffmpeg && ffprobe && h264 && aac && subtitles;
+    let message = if !ffmpeg || !ffprobe {
+        "未找到 FFmpeg 或 FFprobe；请安装工具或使用包含它们的安装包"
+    } else if !ready {
+        "FFmpeg 缺少 H.264、AAC 编码器或字幕滤镜"
+    } else {
+        "本机合成工具可用，支持 H.264、AAC 和字幕烧录"
+    };
+    ExportToolsStatus {
+        ffmpeg,
+        ffprobe,
+        h264,
+        aac,
+        subtitles,
+        ready,
+        message: message.into(),
+    }
+}
+
 fn workflow_exists(state: &WorkflowState, id: &str) -> AppResult<()> {
     let exists: bool = state
         .store

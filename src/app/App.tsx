@@ -11,13 +11,19 @@ import packageInfo from '../../package.json'
 import './styles.css'
 
 type Page = 'workspace' | 'workflow' | 'connections' | 'settings'
+type WorkflowTab = 'shots' | 'images' | 'videos' | 'timeline'
 
 export function App() {
   const [page, setPage] = useState<Page>('workspace')
+  const [workflowTab, setWorkflowTab] = useState<WorkflowTab>('shots')
   const { theme, changeTheme, storageError } = useTheme()
   const { status, retry } = useRuntime()
   const workflow = useWorkflow()
   const [modelsRevision, setModelsRevision] = useState(0)
+  function openWorkflow(tab: WorkflowTab) {
+    setWorkflowTab(tab)
+    setPage('workflow')
+  }
 
   return (
     <div className="app-shell">
@@ -47,7 +53,7 @@ export function App() {
             className={`nav-item ${page === 'workflow' ? 'active' : ''}`}
             aria-label="工作流"
             aria-current={page === 'workflow' ? 'page' : undefined}
-            onClick={() => setPage('workflow')}
+            onClick={() => openWorkflow('shots')}
           >
             <Icon name="workflow" />
             <span>工作流</span>
@@ -105,13 +111,18 @@ export function App() {
             <WorkspacePage
               status={status}
               onRetry={retry}
-              onWorkflow={() => setPage('workflow')}
+              onWorkflow={() => openWorkflow('shots')}
+              onModels={() => setPage('connections')}
+              onImages={() => openWorkflow('images')}
+              onVideos={() => openWorkflow('videos')}
+              onTimeline={() => openWorkflow('timeline')}
             />
           ) : page === 'workflow' ? (
             <WorkflowPage
               controller={workflow}
               onModels={() => setPage('connections')}
               modelsRevision={modelsRevision}
+              initialTab={workflowTab}
             />
           ) : page === 'connections' ? (
             <ConnectionsPage

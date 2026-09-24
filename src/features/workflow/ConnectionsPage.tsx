@@ -151,11 +151,11 @@ export function ConnectionsPage({
             </button>
           ))}
           <div className="connection-roadmap">
-            <span className="eyebrow">NEXT CHAPTER</span>
-            <p>图片与视频连接</p>
+            <span className="eyebrow">MEDIA CONNECTIONS</span>
+            <p>图片与视频服务</p>
             <small>
-              ComfyUI 和 OpenAI
-              图片生成请在「首帧与素材」中配置；视频连接待后续接入。
+              ComfyUI 和 OpenAI 图片生成在「首帧与素材」中配置；Wan
+              镜头视频在「镜头视频」中配置。
             </small>
           </div>
         </section>

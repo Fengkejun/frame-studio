@@ -53,7 +53,8 @@ pub fn run() {
             workflow::media::composition::choose_export_path,
             workflow::media::composition::start_export,
             workflow::media::composition::list_export_jobs,
-            workflow::media::composition::cancel_export
+            workflow::media::composition::cancel_export,
+            workflow::media::composition::check_export_tools
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Frame Studio");
