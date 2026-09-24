@@ -19,6 +19,7 @@ interface Props {
   media: ReturnType<typeof useMedia>
   busy: boolean
   save: (workflow: Workflow) => Promise<void>
+  onFrameSelected: (context: api.ShotContext, versionId: string) => void
 }
 const jobLabels: Record<string, string> = {
   submitting: '提交中',
@@ -39,6 +40,7 @@ export function ImageStudio({
   media,
   busy,
   save,
+  onFrameSelected,
 }: Props) {
   const shots = workflow.nodes.flatMap((n) =>
     n.kind === 'storyboard' && n.output && 'shots' in n.output.value
@@ -473,6 +475,7 @@ export function ImageStudio({
                     pending.context,
                     pending.asset.versionId,
                   )
+                  onFrameSelected(pending.context, pending.asset.versionId)
                   setPending(null)
                 })
               }

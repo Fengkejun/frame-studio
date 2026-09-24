@@ -1,6 +1,12 @@
 import { z } from 'zod'
 
-export const kinds = ['brief', 'story', 'storyboard', 'prompt'] as const
+export const kinds = [
+  'brief',
+  'story',
+  'storyboard',
+  'prompt',
+  'image',
+] as const
 export type NodeKind = (typeof kinds)[number]
 export const catalog: Record<
   NodeKind,
@@ -14,6 +20,7 @@ export const catalog: Record<
     mark: '03',
   },
   prompt: { title: '提示词助手', subtitle: '优化正面与负面提示词', mark: '✦' },
+  image: { title: '图片节点', subtitle: '汇集已确认的镜头首帧', mark: '▧' },
 }
 const text = z.string().max(250_000)
 const required = text.min(1).refine((s) => s.trim().length > 0, '请填写内容')
@@ -49,6 +56,25 @@ export const outputSchemas = {
   story: storySchema,
   storyboard: storyboardSchema,
   prompt: z.object({ text: required, negativePrompt: text }),
+  image: z.object({
+    storyboardArtifactId: required,
+    frames: z
+      .array(
+        z.object({
+          shotId: required,
+          assetId: required,
+          versionId: required,
+          width: z.number().int().positive().max(8192),
+          height: z.number().int().positive().max(8192),
+        }),
+      )
+      .min(1)
+      .max(24)
+      .refine(
+        (frames) => new Set(frames.map((f) => f.shotId)).size === frames.length,
+        '镜头 ID 不能重复',
+      ),
+  }),
 }
 export type Shot = z.infer<typeof shotSchema>
 export const artifactSchema = z.object({
@@ -59,9 +85,10 @@ export const artifactSchema = z.object({
     storyboardSchema,
     outputSchemas.prompt,
     outputSchemas.brief,
+    outputSchemas.image,
   ]),
   createdAt: z.number(),
-  source: z.enum(['model', 'manual']),
+  source: z.enum(['model', 'manual', 'selection']),
 })
 export type Artifact = z.infer<typeof artifactSchema>
 const nodeSchema = z
@@ -147,6 +174,7 @@ export const statusLabels: Record<string, string> = {
   interrupted: '执行中断',
   unknown: '结果待核实',
   skipped: '未执行',
+  needs_input: '等待首帧',
 }
 export function makeNode(kind: NodeKind, x = 80, y = 120): WorkflowNode {
   return {
@@ -192,8 +220,10 @@ export function compatible(source: NodeKind, target: NodeKind) {
     : target === 'storyboard'
       ? source === 'story'
       : target === 'prompt'
-        ? source !== 'prompt'
-        : false
+        ? source === 'brief' || source === 'story' || source === 'storyboard'
+        : target === 'image'
+          ? source === 'storyboard'
+          : false
 }
 export function graphError(w: Workflow): string | null {
   const ids = new Set(w.nodes.map((n) => n.id))
@@ -270,10 +300,14 @@ export function outputSummary(node: WorkflowNode): string {
   if (!v)
     return node.kind === 'brief'
       ? node.config.text || '写下你想讲述的故事…'
-      : '连接模型后，等待你的第一次创作'
+      : node.kind === 'image'
+        ? '连接分镜并确认每个镜头首帧'
+        : '连接模型后，等待你的第一次创作'
   return 'shots' in v
     ? `${v.shots.length} 个镜头 · ${v.shots.reduce((a, s) => a + s.duration, 0)} 秒`
     : 'title' in v
       ? v.title
-      : v.text
+      : 'frames' in v
+        ? `${v.frames.length} 个首帧版本已就绪`
+        : v.text
 }

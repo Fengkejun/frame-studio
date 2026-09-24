@@ -43,7 +43,9 @@ export function FlowNode({ data, selected }: NodeProps<CanvasNode>) {
         <span className="status-dot" />
         {node.kind === 'brief'
           ? '手动输入 · 创作起点'
-          : providerName || '尚未选择模型'}
+          : node.kind === 'image'
+            ? '人工确认 · 首帧版本'
+            : providerName || '尚未选择模型'}
       </div>
       <Handle
         type="source"

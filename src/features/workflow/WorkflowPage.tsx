@@ -98,7 +98,10 @@ function WorkflowEditor({
           node: n,
           providerName:
             providers.find((p) => p.id === n.config.providerId)?.name ?? '',
-          status: c.activeRun?.nodes.find((r) => r.nodeId === n.id)?.status,
+          status:
+            c.activeRun?.status === 'running'
+              ? c.activeRun.nodes.find((r) => r.nodeId === n.id)?.status
+              : undefined,
         },
       })),
     [w?.nodes, selected, providers, c.activeRun],
@@ -266,6 +269,26 @@ function WorkflowEditor({
   const storyboards = w.nodes.filter(
     (n) => n.kind === 'storyboard' && n.output && 'shots' in n.output.value,
   )
+  const imageSource =
+    focused?.kind === 'image'
+      ? w.nodes.find((node) =>
+          w.edges.some(
+            (edge) => edge.target === focused.id && edge.source === node.id,
+          ),
+        )
+      : undefined
+  const imageShots =
+    imageSource?.output?.value && 'shots' in imageSource.output.value
+      ? imageSource.output.value.shots
+      : []
+  const imageReady = imageShots.filter((shot) =>
+    media.frames.some(
+      (frame) =>
+        frame.context.nodeId === imageSource?.id &&
+        frame.context.artifactId === imageSource?.output?.id &&
+        frame.context.shotId === shot.id,
+    ),
+  ).length
   return (
     <div
       className="workflow-page"
@@ -561,6 +584,25 @@ function WorkflowEditor({
               })
             }}
             onRun={() => setConfirmRun({ target: focused.id })}
+            imageProgress={{ ready: imageReady, total: imageShots.length }}
+            onImages={() => {
+              if (imageSource && imageShots.length) {
+                const missing = imageShots.find(
+                  (shot) =>
+                    !media.frames.some(
+                      (frame) =>
+                        frame.context.nodeId === imageSource.id &&
+                        frame.context.artifactId === imageSource.output?.id &&
+                        frame.context.shotId === shot.id,
+                    ),
+                )
+                setMediaTarget({
+                  nodeId: imageSource.id,
+                  shotId: (missing ?? imageShots[0])!.id,
+                })
+              }
+              setTab('images')
+            }}
           />
         )}
       </div>
@@ -666,6 +708,27 @@ function WorkflowEditor({
             media={media}
             busy={busy}
             save={c.save}
+            onFrameSelected={(context, versionId) => {
+              if (
+                media.frames.some(
+                  (frame) =>
+                    frame.context.nodeId === context.nodeId &&
+                    frame.context.artifactId === context.artifactId &&
+                    frame.context.shotId === context.shotId &&
+                    frame.versionId === versionId,
+                )
+              )
+                return
+              const images = w.edges
+                .filter((edge) => edge.source === context.nodeId)
+                .map((edge) => edge.target)
+              if (
+                images.some((id) =>
+                  w.nodes.some((node) => node.id === id && node.output),
+                )
+              )
+                c.change(invalidate(w, images))
+            }}
           />
         ) : (
           <div className="run-history">
@@ -737,10 +800,13 @@ function WorkflowEditor({
             <p>
               {confirmRun.target
                 ? '将使用上游已确认的结果，执行这个节点。'
-                : '按连接顺序重新执行全部节点。若要保留已编辑结果，请使用「运行当前节点」。'}
+                : '按连接顺序重新执行全部节点。新分镜生成后，图片节点会等待你为每个镜头确认首帧。若要保留已编辑结果，请使用「运行当前节点」。'}
             </p>
             <p className="field-hint">
-              云端请求可能产生费用。失败不会自动重试；本次结果会保存为独立运行记录。
+              {confirmRun.target &&
+              w.nodes.find((n) => n.id === confirmRun.target)?.kind === 'image'
+                ? '图片节点只汇集已选择的本地首帧版本，不会发起云端生图请求。'
+                : '云端请求可能产生费用。失败不会自动重试；本次结果会保存为独立运行记录。'}
             </p>
             <div className="form-actions">
               <button

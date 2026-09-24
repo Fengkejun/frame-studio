@@ -146,6 +146,9 @@ pub fn cancel_run(state: tauri::State<WorkflowState>, id: String) -> AppResult<(
 }
 #[tauri::command]
 pub fn validate_artifact(kind: NodeKind, value: serde_json::Value) -> AppResult<Artifact> {
+    if kind == NodeKind::Image {
+        return Err("图片节点结果只能由已确认的首帧版本生成".into());
+    }
     validate_output(&kind, &value)?;
     Ok(Artifact {
         id: uid(),
@@ -195,11 +198,9 @@ pub fn start_run(
     };
     let all_providers = state.store.providers()?;
     let mut used = vec![];
-    for n in workflow
-        .nodes
-        .iter()
-        .filter(|n| selected.contains(&n.id) && n.kind != NodeKind::Brief)
-    {
+    for n in workflow.nodes.iter().filter(|n| {
+        selected.contains(&n.id) && !matches!(n.kind, NodeKind::Brief | NodeKind::Image)
+    }) {
         let provider = all_providers
             .iter()
             .find(|p| p.id == n.config.provider_id)
@@ -288,6 +289,13 @@ async fn execute(
             }
         })
         .collect();
+    let mut artifacts: HashMap<String, Artifact> = run
+        .snapshot
+        .nodes
+        .iter()
+        .filter(|n| !n.stale)
+        .filter_map(|n| n.output.clone().map(|a| (n.id.clone(), a)))
+        .collect();
     for index in 0..run.nodes.len() {
         if cancel.load(Ordering::SeqCst) {
             run.status = "cancelled".into();
@@ -302,8 +310,8 @@ async fn execute(
             .clone();
         run.nodes[index].status = "running".into();
         state.store.save_run(run)?;
-        let value = if node.kind == NodeKind::Brief {
-            serde_json::json!({"text":node.config.text})
+        let (value, source) = if node.kind == NodeKind::Brief {
+            (serde_json::json!({"text":node.config.text}), "manual")
         } else {
             let edge = run
                 .snapshot
@@ -311,29 +319,57 @@ async fn execute(
                 .iter()
                 .find(|e| e.target == node.id)
                 .ok_or("缺少输入")?;
-            let input = values.get(&edge.source).ok_or("上游结果不可用")?;
-            let provider = run
-                .providers
-                .iter()
-                .find(|p| p.id == node.config.provider_id)
-                .ok_or("模型配置不存在")?;
-            tokio::select! {
-                result=providers::generate(provider,&node,input)=>result?,
-                ()=cancelled(cancel.clone())=> {
-                    run.nodes[index].status="cancelled".into();
-                    run.nodes[index].message="已停止等待与后续调度；服务端可能仍在生成或计费".into();
-                    run.status="cancelled".into();return Ok(());
+            if node.kind == NodeKind::Image {
+                let storyboard = artifacts.get(&edge.source).ok_or("上游分镜结果不可用")?;
+                match media::collect_first_frames(
+                    state,
+                    &run.workflow_id,
+                    &edge.source,
+                    storyboard,
+                )? {
+                    media::FrameCollection::Complete(value) => {
+                        validate_output(&NodeKind::Image, &value)?;
+                        (value, "selection")
+                    }
+                    media::FrameCollection::Missing(shots) => {
+                        run.nodes[index].status = "needs_input".into();
+                        run.nodes[index].message = format!(
+                            "请为 {} 选择当前分镜版本的首帧，再运行图片节点",
+                            shots.join("、")
+                        );
+                        run.status = "needs_input".into();
+                        state.store.save_run(run)?;
+                        return Ok(());
+                    }
                 }
+            } else {
+                let input = values.get(&edge.source).ok_or("上游结果不可用")?;
+                let provider = run
+                    .providers
+                    .iter()
+                    .find(|p| p.id == node.config.provider_id)
+                    .ok_or("模型配置不存在")?;
+                let value = tokio::select! {
+                    result=providers::generate(provider,&node,input)=>result?,
+                    ()=cancelled(cancel.clone())=> {
+                        run.nodes[index].status="cancelled".into();
+                        run.nodes[index].message="已停止等待与后续调度；服务端可能仍在生成或计费".into();
+                        run.status="cancelled".into();return Ok(());
+                    }
+                };
+                (value, "model")
             }
         };
         values.insert(node.id.clone(), value.clone());
-        run.nodes[index].output = Some(Artifact {
+        let output = Artifact {
             id: uid(),
             kind: node.kind,
             value,
             created_at: now(),
-            source: "model".into(),
-        });
+            source: source.into(),
+        };
+        artifacts.insert(node.id.clone(), output.clone());
+        run.nodes[index].output = Some(output);
         run.nodes[index].status = "succeeded".into();
         state.store.save_run(run)?;
     }

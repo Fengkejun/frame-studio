@@ -40,6 +40,71 @@ pub struct FirstFrame {
     pub version_id: String,
 }
 
+pub enum FrameCollection {
+    Complete(serde_json::Value),
+    Missing(Vec<String>),
+}
+
+/// Resolve selections against the exact storyboard artifact used by this run.
+pub fn collect_first_frames(
+    state: &WorkflowState,
+    workflow_id: &str,
+    node_id: &str,
+    artifact: &Artifact,
+) -> AppResult<FrameCollection> {
+    if artifact.kind != NodeKind::Storyboard {
+        return Err("图片节点需要分镜结果".into());
+    }
+    validate_output(&NodeKind::Storyboard, &artifact.value)?;
+    let shots = artifact.value["shots"].as_array().ok_or("分镜结果无效")?;
+    let mut frames = Vec::with_capacity(shots.len());
+    let mut missing = Vec::new();
+    for shot in shots {
+        let shot_id = shot["id"].as_str().ok_or("镜头 ID 无效")?;
+        let selected: Option<String> = {
+            let db = state.store.db()?;
+            db.query_row(
+                    "SELECT version_id FROM first_frames WHERE workflow_id=?1 AND node_id=?2 AND artifact_id=?3 AND shot_id=?4",
+                    params![workflow_id, node_id, artifact.id, shot_id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|e| e.to_string())?
+        };
+        if let Some(version_id) = selected {
+            if let Ok(entry) = asset(state, &version_id) {
+                if state
+                    .directory
+                    .join("assets")
+                    .join(&entry.file_name)
+                    .is_file()
+                {
+                    frames.push(serde_json::json!({
+                        "shotId": shot_id,
+                        "assetId": entry.asset_id,
+                        "versionId": entry.version_id,
+                        "width": entry.width,
+                        "height": entry.height,
+                    }));
+                } else {
+                    missing.push(shot_id.to_string());
+                }
+            } else {
+                missing.push(shot_id.to_string());
+            }
+        } else {
+            missing.push(shot_id.to_string());
+        }
+    }
+    if !missing.is_empty() {
+        return Ok(FrameCollection::Missing(missing));
+    }
+    Ok(FrameCollection::Complete(serde_json::json!({
+        "storyboardArtifactId": artifact.id,
+        "frames": frames,
+    })))
+}
+
 pub fn validate_context(state: &WorkflowState, context: &ShotContext) -> AppResult<()> {
     let workflow = state
         .store

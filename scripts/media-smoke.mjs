@@ -105,7 +105,13 @@ export async function testMedia(page, root) {
     name: '首帧闭环测试',
     viewport: { x: 0, y: 0, zoom: 1 },
     updatedAt: Date.now(),
-    edges: [],
+    edges: [
+      {
+        id: 'storyboard-to-image',
+        source: 'storyboard-fixture',
+        target: 'image-fixture',
+      },
+    ],
     nodes: [
       {
         id: 'storyboard-fixture',
@@ -127,6 +133,22 @@ export async function testMedia(page, root) {
           source: 'manual',
           createdAt: Date.now(),
         },
+        stale: false,
+      },
+      {
+        id: 'image-fixture',
+        kind: 'image',
+        label: '图片节点',
+        position: { x: 420, y: 80 },
+        config: {
+          text: '',
+          providerId: '',
+          instructions: '',
+          temperature: 0.7,
+          shotCount: 1,
+          duration: 5,
+        },
+        output: null,
         stale: false,
       },
     ],
@@ -154,6 +176,18 @@ export async function testMedia(page, root) {
   async function generate() {
     await page.getByRole('button', { name: /生成 \d 张候选图/ }).click()
   }
+  async function selectImageNode() {
+    await page
+      .locator('.canvas-area')
+      .evaluate((element) =>
+        element.scrollIntoView({ block: 'start', behavior: 'instant' }),
+      )
+    await page
+      .locator('.react-flow__node')
+      .filter({ hasText: '图片节点' })
+      .locator('.node-mark')
+      .click()
+  }
   const jobs = page.locator('.image-job-history article')
   try {
     await page.getByRole('button', { name: '工作流', exact: true }).click()
@@ -166,6 +200,14 @@ export async function testMedia(page, root) {
       '首帧闭环测试（导入）',
     )
     await confirmStoryboard(storyboard)
+    await selectImageNode()
+    await expect(page.getByText('已确认首帧 0 / 1')).toBeVisible()
+    await page.getByRole('button', { name: '汇集已选首帧' }).click()
+    await page.getByRole('button', { name: '开始执行' }).click()
+    await expect(page.locator('.run-history > details').first()).toContainText(
+      '等待首帧',
+    )
+    await page.getByRole('button', { name: '分镜故事板' }).click()
     await page.getByRole('button', { name: '制作首帧', exact: true }).click()
     await page.getByRole('button', { name: '本机 ComfyUI' }).click()
     await expect(
@@ -193,6 +235,21 @@ export async function testMedia(page, root) {
       '已选定镜头首帧',
     )
     const firstFrame = await page.locator('.first-frame-target').textContent()
+    await selectImageNode()
+    await expect(page.getByText('已确认首帧 1 / 1')).toBeVisible()
+    await page.getByRole('button', { name: '汇集已选首帧' }).click()
+    await page.getByRole('button', { name: '开始执行' }).click()
+    await expect(page.locator('.node-inspector .output-preview')).toContainText(
+      '1 个首帧版本',
+    )
+    await expect(page.locator('.node-inspector .output-preview')).toContainText(
+      'shot-01',
+    )
+    await expect(
+      page.locator('.node-inspector .output-preview img'),
+    ).toBeVisible()
+    await openStudio()
+    await page.getByRole('button', { name: '本机 ComfyUI' }).click()
 
     // Pause and resume: one POST only, even after a WebView reload.
     hold = true
@@ -286,6 +343,12 @@ export async function testMedia(page, root) {
     await expect(page.locator('.asset-card.is-selected')).toContainText(
       '导入参考图.png',
     )
+    await expect(
+      page
+        .locator('.react-flow__node')
+        .filter({ hasText: '图片节点' })
+        .getByText('待更新'),
+    ).toBeVisible()
     await page.getByLabel('导入本地图片').setInputFiles({
       name: 'bad.png',
       mimeType: 'image/png',
@@ -309,6 +372,14 @@ export async function testMedia(page, root) {
     await expect(page.locator('.first-frame-target')).toContainText(
       '等待选择首帧',
     )
+    await selectImageNode()
+    await expect(page.getByText('已确认首帧 0 / 1')).toBeVisible()
+    await page.getByRole('button', { name: '汇集已选首帧' }).click()
+    await page.getByRole('button', { name: '开始执行' }).click()
+    await expect(page.locator('.run-history > details').first()).toContainText(
+      '等待首帧',
+    )
+    await openStudio()
     await page.getByRole('button', { name: '本地素材库', exact: true }).click()
     await expect(page.locator('.asset-card')).toHaveCount(7)
     console.log(

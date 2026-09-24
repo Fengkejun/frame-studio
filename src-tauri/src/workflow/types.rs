@@ -21,6 +21,7 @@ pub enum NodeKind {
     Story,
     Storyboard,
     Prompt,
+    Image,
 }
 
 #[derive(Clone, Serialize, Deserialize, Debug)]
@@ -126,6 +127,7 @@ pub fn compatible(source: &NodeKind, target: &NodeKind) -> bool {
             source,
             NodeKind::Brief | NodeKind::Story | NodeKind::Storyboard
         ),
+        NodeKind::Image => *source == NodeKind::Storyboard,
     }
 }
 
@@ -260,6 +262,22 @@ pub fn validate_output(kind: &NodeKind, value: &Value) -> AppResult<()> {
                         && ids.insert(s["id"].as_str().unwrap_or_default())
                 })
         }),
+        NodeKind::Image => {
+            required_text(value, "storyboardArtifactId")
+                && value["frames"].as_array().is_some_and(|frames| {
+                    let mut ids = HashSet::new();
+                    !frames.is_empty()
+                        && frames.len() <= 24
+                        && frames.iter().all(|frame| {
+                            required_text(frame, "shotId")
+                                && required_text(frame, "assetId")
+                                && required_text(frame, "versionId")
+                                && frame["width"].as_u64().is_some_and(|n| n > 0 && n <= 8192)
+                                && frame["height"].as_u64().is_some_and(|n| n > 0 && n <= 8192)
+                                && ids.insert(frame["shotId"].as_str().unwrap_or_default())
+                        })
+                })
+        }
     };
     if valid {
         Ok(())

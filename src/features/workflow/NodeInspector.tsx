@@ -7,6 +7,7 @@ import {
   type WorkflowNode,
 } from './model'
 import { errorMessage, manualArtifact } from './api'
+import { AssetImage } from './AssetImage'
 
 export function NodeInspector({
   node,
@@ -16,6 +17,8 @@ export function NodeInspector({
   onOutput,
   onRun,
   onModels,
+  imageProgress,
+  onImages,
 }: {
   node: WorkflowNode
   providers: Provider[]
@@ -24,6 +27,8 @@ export function NodeInspector({
   onOutput: (output: Artifact) => void
   onRun: () => void
   onModels: () => void
+  imageProgress?: { ready: number; total: number }
+  onImages: () => void
 }) {
   const [outputText, setOutputText] = useState(() =>
     node.output ? JSON.stringify(node.output.value, null, 2) : '',
@@ -72,6 +77,19 @@ export function NodeInspector({
               onChange={(e) => patch({ text: e.target.value })}
             />
           </label>
+        ) : node.kind === 'image' ? (
+          <div className="field">
+            <strong>
+              已确认首帧 {imageProgress?.ready ?? 0} /{' '}
+              {imageProgress?.total ?? 0}
+            </strong>
+            <p className="field-hint">
+              连接分镜节点，在每个镜头中选择一张首帧。图片节点只汇集所选版本，不会发起生图请求。
+            </p>
+            <button className="small-button" onClick={onImages}>
+              打开首帧与素材
+            </button>
+          </div>
         ) : (
           <>
             <label className="field">
@@ -164,10 +182,12 @@ export function NodeInspector({
           disabled={!isDesktop}
           onClick={onRun}
         >
-          运行当前节点
+          {node.kind === 'image' ? '汇集已选首帧' : '运行当前节点'}
         </button>
         <p className="field-hint">
-          使用上游已确认结果。改动参数会将当前及下游结果标记为待更新。
+          {node.kind === 'image'
+            ? '首帧选择按分镜结果版本保存。更换分镜后需要重新选择并汇集。'
+            : '使用上游已确认结果。改动参数会将当前及下游结果标记为待更新。'}
         </p>
       </fieldset>
       <section className="inspector-output">
@@ -179,13 +199,17 @@ export function NodeInspector({
                 ? '待更新'
                 : node.output.source === 'manual'
                   ? '已编辑'
-                  : '已生成'}
+                  : node.output.source === 'selection'
+                    ? '已汇集'
+                    : '已生成'}
             </span>
           )}
         </div>
         {!value && !editing && (
           <p className="empty-copy">
-            运行后，结果会出现在这里。你也可以录入已有内容，再继续后续节点。
+            {node.kind === 'image'
+              ? '确认每个镜头的首帧后，运行图片节点以记录所选版本。'
+              : '运行后，结果会出现在这里。你也可以录入已有内容，再继续后续节点。'}
           </p>
         )}
         {value && !editing && (
@@ -211,88 +235,113 @@ export function NodeInspector({
                   </div>
                 ))}
               </>
+            ) : 'frames' in value ? (
+              <>
+                <strong>{value.frames.length} 个首帧版本</strong>
+                {value.frames.map((frame) => (
+                  <div className="shot-preview" key={frame.shotId}>
+                    <span>{frame.shotId}</span>
+                    <div className="shot-frame-preview">
+                      <AssetImage
+                        versionId={frame.versionId}
+                        alt={`${frame.shotId} 已选首帧`}
+                      />
+                    </div>
+                    <p>版本 {frame.versionId}</p>
+                    <small>
+                      {frame.width} × {frame.height}
+                    </small>
+                  </div>
+                ))}
+              </>
             ) : (
               <p className="preserve-lines">{value.text}</p>
             )}
           </div>
         )}
-        {!editing ? (
-          <button
-            className="text-button"
-            disabled={busy || node.kind === 'brief'}
-            onClick={() => {
-              setOutputText(
-                node.output
-                  ? JSON.stringify(node.output.value, null, 2)
-                  : node.kind === 'story'
-                    ? JSON.stringify(
-                        { title: '', logline: '', content: '', characters: [] },
-                        null,
-                        2,
-                      )
-                    : node.kind === 'prompt'
+        {node.kind !== 'image' &&
+          (!editing ? (
+            <button
+              className="text-button"
+              disabled={busy || node.kind === 'brief'}
+              onClick={() => {
+                setOutputText(
+                  node.output
+                    ? JSON.stringify(node.output.value, null, 2)
+                    : node.kind === 'story'
                       ? JSON.stringify(
-                          { text: '', negativePrompt: '' },
-                          null,
-                          2,
-                        )
-                      : JSON.stringify(
                           {
-                            shots: [
-                              {
-                                id: 'shot-01',
-                                title: '',
-                                description: '',
-                                duration: 5,
-                                characters: [],
-                                dialogue: '',
-                                camera: '',
-                                imagePrompt: '',
-                                videoPrompt: '',
-                              },
-                            ],
+                            title: '',
+                            logline: '',
+                            content: '',
+                            characters: [],
                           },
                           null,
                           2,
-                        ),
-              )
-              setEditing(true)
-            }}
-          >
-            编辑结构化结果
-          </button>
-        ) : (
-          <>
-            <label className="field">
-              结果 JSON
-              <textarea
-                className="code-input"
-                rows={14}
-                value={outputText}
-                onChange={(e) => setOutputText(e.target.value)}
-                disabled={busy || saving}
-              />
-            </label>
-            <div className="form-actions">
-              <button
-                className="small-button"
-                disabled={busy || saving}
-                onClick={() => void applyOutput()}
-              >
-                校验并保存结果
-              </button>
-              <button
-                className="text-button"
-                onClick={() => {
-                  setEditing(false)
-                  setError('')
-                }}
-              >
-                取消编辑
-              </button>
-            </div>
-          </>
-        )}
+                        )
+                      : node.kind === 'prompt'
+                        ? JSON.stringify(
+                            { text: '', negativePrompt: '' },
+                            null,
+                            2,
+                          )
+                        : JSON.stringify(
+                            {
+                              shots: [
+                                {
+                                  id: 'shot-01',
+                                  title: '',
+                                  description: '',
+                                  duration: 5,
+                                  characters: [],
+                                  dialogue: '',
+                                  camera: '',
+                                  imagePrompt: '',
+                                  videoPrompt: '',
+                                },
+                              ],
+                            },
+                            null,
+                            2,
+                          ),
+                )
+                setEditing(true)
+              }}
+            >
+              编辑结构化结果
+            </button>
+          ) : (
+            <>
+              <label className="field">
+                结果 JSON
+                <textarea
+                  className="code-input"
+                  rows={14}
+                  value={outputText}
+                  onChange={(e) => setOutputText(e.target.value)}
+                  disabled={busy || saving}
+                />
+              </label>
+              <div className="form-actions">
+                <button
+                  className="small-button"
+                  disabled={busy || saving}
+                  onClick={() => void applyOutput()}
+                >
+                  校验并保存结果
+                </button>
+                <button
+                  className="text-button"
+                  onClick={() => {
+                    setEditing(false)
+                    setError('')
+                  }}
+                >
+                  取消编辑
+                </button>
+              </div>
+            </>
+          ))}
         {error && (
           <p className="workflow-error" role="alert">
             {error}

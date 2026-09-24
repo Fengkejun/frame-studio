@@ -82,12 +82,23 @@ test('browser canvas persists graph edits and rejects native execution honestly'
   await page.getByRole('textbox', { name: '工作流名称' }).fill('雨夜书店分镜')
   await page.getByRole('button', { name: '提示词助手' }).click()
   await expect(page.getByRole('heading', { name: '提示词助手' })).toBeVisible()
+  await page.getByRole('button', { name: '图片节点' }).click()
+  await expect(
+    page.locator('.react-flow__node').filter({ hasText: '图片节点' }),
+  ).toHaveCount(1)
+  await expect(page.getByText('已确认首帧 0 / 0')).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: '汇集已选首帧' }),
+  ).toBeDisabled()
   await expect(page.getByText('已保存到本机')).toBeVisible()
   await page.reload()
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await expect(page.getByRole('textbox', { name: '工作流名称' })).toHaveValue(
     '雨夜书店分镜',
   )
+  await expect(
+    page.locator('.react-flow__node').filter({ hasText: '图片节点' }),
+  ).toHaveCount(1)
   await expect(
     page.getByRole('button', { name: '▶ 运行工作流' }),
   ).toBeDisabled()
