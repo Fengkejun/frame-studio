@@ -527,7 +527,8 @@ function WorkflowEditor({
             <Background gap={22} size={1} color="var(--border)" />
             <Controls showInteractive={false} />
             <MiniMap
-              nodeColor="var(--accent-soft)"
+              position="top-right"
+              nodeColor="var(--accent)"
               maskColor="transparent"
               pannable
               zoomable

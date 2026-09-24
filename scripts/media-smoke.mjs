@@ -248,6 +248,9 @@ export async function testMedia(page, root) {
     await expect(
       page.locator('.node-inspector .output-preview img'),
     ).toBeVisible()
+    await page.screenshot({
+      path: path.join(root, 'artifacts/desktop-image-node.png'),
+    })
     await openStudio()
     await page.getByRole('button', { name: '本机 ComfyUI' }).click()
 

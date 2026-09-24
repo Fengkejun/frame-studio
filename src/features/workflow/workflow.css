@@ -242,6 +242,8 @@
   fill: var(--muted);
 }
 .react-flow__minimap {
+  width: 140px;
+  height: 100px;
   background: var(--surface);
   border: 1px solid var(--border);
 }
