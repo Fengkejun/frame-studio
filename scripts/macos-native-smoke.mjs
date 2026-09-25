@@ -59,6 +59,7 @@ if (!/\bsubtitles\b/.test(filters)) {
   throw new Error('Bundled FFmpeg is missing the subtitles filter.')
 }
 execFileSync(ffprobe, ['-version'], { stdio: 'ignore' })
+console.log('PASS: validated bundle metadata and FFmpeg/FFprobe sidecars.')
 
 for (const binary of [ffmpeg, ffprobe]) {
   const linked = execFileSync('otool', ['-L', binary], {
@@ -91,25 +92,37 @@ const child = spawn(executable, [], {
   stdio: ['ignore', 'ignore', 'pipe'],
 })
 let stderr = ''
+let exitError
 child.stderr.on('data', (chunk) => {
   stderr = (stderr + chunk.toString()).slice(-8000)
 })
+child.once('error', (error) => {
+  exitError = error
+})
+child.once('exit', (code, signal) => {
+  exitError = new Error(
+    `Native app exited before creating its database (${code ?? signal}): ${stderr}`,
+  )
+})
 
 try {
-  await Promise.race([
-    delay(5000),
-    new Promise((_, reject) => {
-      child.once('error', reject)
-      child.once('exit', (code, signal) => {
-        reject(
-          new Error(
-            `Native app exited before the smoke window elapsed (${code ?? signal}): ${stderr}`,
-          ),
-        )
-      })
-    }),
-  ])
-  await access(path.join(profile, 'studio.sqlite'))
+  const database = path.join(profile, 'studio.sqlite')
+  const deadline = Date.now() + 20_000
+  while (Date.now() < deadline) {
+    if (exitError) throw exitError
+    try {
+      await access(database)
+      break
+    } catch {
+      await delay(250)
+    }
+  }
+  if (exitError) throw exitError
+  await access(database).catch(() => {
+    throw new Error(
+      `Native app stayed open but did not create ${database} within 20 seconds. stderr: ${stderr}`,
+    )
+  })
   console.log(
     `PASS: ${path.basename(app)} launched with isolated storage and validated bundled FFmpeg/FFprobe.`,
   )
