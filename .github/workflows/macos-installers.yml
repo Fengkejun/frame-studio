@@ -37,7 +37,13 @@ jobs:
           trap 'hdiutil detach "$mount_dir" -quiet' EXIT
           app=$(find "$mount_dir" -maxdepth 1 -name '*.app' -print -quit)
           test -n "$app"
-          npm run test:macos -- "$app"
+          if ! smoke_output=$(npm run test:macos -- "$app" 2>&1); then
+            echo "$smoke_output"
+            annotation=$(printf '%s' "$smoke_output" | tail -n 20 | tr '\n' ' ')
+            echo "::error title=macOS native smoke failed::$annotation"
+            exit 1
+          fi
+          echo "$smoke_output"
       - uses: actions/upload-artifact@v4
         with:
           name: frame-studio-macos-${{ matrix.architecture }}
