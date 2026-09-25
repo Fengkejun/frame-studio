@@ -20,5 +20,7 @@ export default defineConfig({
     command: 'npm run dev -- --port 15321',
     url: 'http://127.0.0.1:15321',
     reuseExistingServer: false,
+    env:
+      process.platform === 'darwin' ? { CHOKIDAR_USEPOLLING: '1' } : undefined,
   },
 })
