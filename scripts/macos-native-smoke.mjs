@@ -8,8 +8,11 @@ if (process.platform !== 'darwin') {
   throw new Error('This native smoke test requires macOS.')
 }
 
+const args = process.argv.slice(2)
+const skipStorageCheck = args.includes('--skip-storage-check')
+const appArgument = args.find((argument) => !argument.startsWith('--'))
 const app = path.resolve(
-  process.argv[2] ?? 'src-tauri/target/debug/bundle/macos/Frame Studio.app',
+  appArgument ?? 'src-tauri/target/debug/bundle/macos/Frame Studio.app',
 )
 const contents = path.join(app, 'Contents')
 const plist = path.join(contents, 'Info.plist')
@@ -106,26 +109,34 @@ child.once('exit', (code, signal) => {
 })
 
 try {
-  const database = path.join(profile, 'studio.sqlite')
-  const deadline = Date.now() + 20_000
-  while (Date.now() < deadline) {
+  if (skipStorageCheck) {
+    await delay(5000)
     if (exitError) throw exitError
-    try {
-      await access(database)
-      break
-    } catch {
-      await delay(250)
-    }
-  }
-  if (exitError) throw exitError
-  await access(database).catch(() => {
-    throw new Error(
-      `Native app stayed open but did not create ${database} within 20 seconds. stderr: ${stderr}`,
+    console.log(
+      `PASS: ${path.basename(app)} remained running during the headless launch window.`,
     )
-  })
-  console.log(
-    `PASS: ${path.basename(app)} launched with isolated storage and validated bundled FFmpeg/FFprobe.`,
-  )
+  } else {
+    const database = path.join(profile, 'studio.sqlite')
+    const deadline = Date.now() + 20_000
+    while (Date.now() < deadline) {
+      if (exitError) throw exitError
+      try {
+        await access(database)
+        break
+      } catch {
+        await delay(250)
+      }
+    }
+    if (exitError) throw exitError
+    await access(database).catch(() => {
+      throw new Error(
+        `Native app stayed open but did not create ${database} within 20 seconds. stderr: ${stderr}`,
+      )
+    })
+    console.log(
+      `PASS: ${path.basename(app)} launched with isolated storage and validated bundled FFmpeg/FFprobe.`,
+    )
+  }
 } finally {
   if (child.exitCode === null && child.signalCode === null) {
     child.kill('SIGTERM')

@@ -37,7 +37,7 @@ jobs:
           trap 'hdiutil detach "$mount_dir" -quiet' EXIT
           app=$(find "$mount_dir" -maxdepth 1 -name '*.app' -print -quit)
           test -n "$app"
-          if ! smoke_output=$(npm run test:macos -- "$app" 2>&1); then
+          if ! smoke_output=$(npm run test:macos -- "$app" --skip-storage-check 2>&1); then
             echo "$smoke_output"
             annotation=$(printf '%s' "$smoke_output" | tail -n 20 | tr '\n' ' ')
             echo "::error title=macOS native smoke failed::$annotation"

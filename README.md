@@ -58,7 +58,7 @@ Windows 调试程序：`src-tauri/target/debug/frame-studio.exe`。
 发布程序与安装包：`src-tauri/target/release/` 和其中的 `bundle/`。
 Windows 构建生成 NSIS `.exe`，macOS 构建生成 Apple Silicon 或 Intel `.dmg`。Mac 构建流程见 [成片时间线与打包](docs/timeline-workflow.md)；当前尚未配置 Apple Developer ID 签名、公证、自动更新或发布渠道。
 
-`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；图片测试使用固定 PNG 与本机假服务，不执行真实模型推理，也不调用真实 OpenAI API。`test:macos` 验证 `.app` 结构、隔离数据目录启动、FFmpeg/FFprobe 能力及动态库封装。macOS 安装包由 GitHub Actions 的两个原生 Mac runner 分别构建并启动检查。
+`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；图片测试使用固定 PNG 与本机假服务，不执行真实模型推理，也不调用真实 OpenAI API。`test:macos` 验证 `.app` 结构、隔离数据目录启动、FFmpeg/FFprobe 能力及动态库封装。macOS 安装包由 GitHub Actions 的两个原生 Mac runner 分别构建并进行无界面启动检查；托管 runner 没有交互式 WebView，因此 SQLite 首次创建仍由本机测试验证。
 
 ## 目录
 
