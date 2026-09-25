@@ -22,10 +22,12 @@
 
 桌面开发运行时优先使用应用程序旁的 `ffmpeg`、`ffprobe`，其次使用系统 PATH 中的安装。`npm run desktop:build` 在 Windows 生成 NSIS `.exe` 安装包，在 macOS 生成 `.dmg` 安装包。构建脚本从 `FRAME_STUDIO_FFMPEG_DIR` 指定的目录或 PATH 查找两个可执行文件，按 Rust target triple 放入忽略版本控制的 `src-tauri/binaries/`，再通过 Tauri `externalBin` 打包。脚本同时拷贝所选 FFmpeg 发布包中的 LICENSE 与 README；自定义发布包可通过 `FRAME_STUDIO_FFMPEG_LICENSE` 和 `FRAME_STUDIO_FFMPEG_README` 指定对应文件。每个目标系统与架构需要对应的 FFmpeg/FFprobe 二进制。所选 FFmpeg 构建须支持 `libx264`、`subtitles` 滤镜和 AAC 编码；macOS 构建还会拒绝依赖包外第三方动态库的二进制。
 
-`.github/workflows/macos-installers.yml` 在原生 Apple Silicon 与 Intel runner 上分别构建 DMG，使用固定版本且校验 SHA256 的 FFmpeg 发布包，并在上传前运行应用内的 FFmpeg/FFprobe。两种 DMG 当前未配置 Apple Developer ID 签名或公证；面向普通用户发布前需配置签名与公证，并核对 FFmpeg 构建及其依赖许可。Windows 开发机所用 FFmpeg 也自报 GPL 授权。
+`.github/workflows/macos-installers.yml` 在原生 Apple Silicon 与 Intel runner 上分别构建 DMG，使用固定版本且校验 SHA256 的 FFmpeg 发布包，并在上传前执行 `npm run test:macos -- <app>`，验证应用结构、隔离数据目录启动、应用内 FFmpeg/FFprobe 能力和动态库封装。两种 DMG 当前未配置 Apple Developer ID 签名或公证；面向普通用户发布前需配置签名与公证，并核对 FFmpeg 构建及其依赖许可。Windows 开发机所用 FFmpeg 也自报 GPL 授权。
 
 ## 验证范围
 
 `npm run test:desktop` 使用隔离项目与本地固定 H.264 视频、WAV 音频执行真实 Tauri IPC 和 FFmpeg 合成。测试核查时间线持久化、字幕滤镜、配音与背景音乐混合、输出视频和音频流、画幅尺寸、时长、封面及成片节点。该测试不调用云端生成服务；实际云端生成仍需有效服务商密钥。已在 Windows/WebView2 环境验证，其他系统需要分别构建与运行验收。
+
+macOS 的 WKWebView 不提供 Windows WebView2 测试所用的 CDP 接口，因此 `test:macos` 聚焦原生应用包启动与 sidecar 完整性；页面交互由跨平台 Playwright 浏览器测试覆盖，真实 IPC 的完整媒体交互仍由 Windows 原生冒烟测试覆盖。
 
 接口依据：[FFmpeg 滤镜文档](https://ffmpeg.org/ffmpeg-filters.html)、[Tauri 外部二进制打包](https://v2.tauri.app/develop/sidecar/)。

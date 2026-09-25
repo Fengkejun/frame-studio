@@ -2,7 +2,7 @@ name: macOS installers
 
 on:
   push:
-    branches: [codex/macos-packaging-and-model-setup]
+    branches: [main, 'codex/**']
   workflow_dispatch:
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
         run: bash scripts/prepare-macos-ffmpeg.sh
       - name: Build DMG
         run: npm run desktop:build
-      - name: Inspect bundled app
+      - name: Inspect and launch bundled app
         run: |
           dmg=$(find src-tauri/target/release/bundle/dmg -maxdepth 1 -name '*.dmg' -print -quit)
           test -n "$dmg"
@@ -37,11 +37,7 @@ jobs:
           trap 'hdiutil detach "$mount_dir" -quiet' EXIT
           app=$(find "$mount_dir" -maxdepth 1 -name '*.app' -print -quit)
           test -n "$app"
-          test -x "$app/Contents/MacOS/ffmpeg"
-          test -x "$app/Contents/MacOS/ffprobe"
-          "$app/Contents/MacOS/ffmpeg" -hide_banner -encoders | grep libx264
-          "$app/Contents/MacOS/ffmpeg" -hide_banner -filters | grep subtitles
-          "$app/Contents/MacOS/ffprobe" -version
+          npm run test:macos -- "$app"
       - uses: actions/upload-artifact@v4
         with:
           name: frame-studio-macos-${{ matrix.architecture }}

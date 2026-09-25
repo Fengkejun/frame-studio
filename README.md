@@ -48,6 +48,7 @@ npm run desktop:lint          # Rust Clippy，警告视为错误
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 npm run tauri -- build --debug --no-bundle  # 本地调试可执行文件
 npm run test:desktop           # Windows 原生冒烟测试，需要先构建上面的程序
+npm run test:macos             # macOS .app 启动和内嵌 FFmpeg 冒烟测试
 npm run desktop:build         # 发布构建和当前平台安装包
 ```
 
@@ -57,7 +58,7 @@ Windows 调试程序：`src-tauri/target/debug/frame-studio.exe`。
 发布程序与安装包：`src-tauri/target/release/` 和其中的 `bundle/`。
 Windows 构建生成 NSIS `.exe`，macOS 构建生成 Apple Silicon 或 Intel `.dmg`。Mac 构建流程见 [成片时间线与打包](docs/timeline-workflow.md)；当前尚未配置 Apple Developer ID 签名、公证、自动更新或发布渠道。
 
-`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；图片测试使用固定 PNG 与本机假服务，不执行真实模型推理，也不调用真实 OpenAI API。macOS 安装包由 GitHub Actions 的两个原生 Mac runner 分别构建。
+`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；图片测试使用固定 PNG 与本机假服务，不执行真实模型推理，也不调用真实 OpenAI API。`test:macos` 验证 `.app` 结构、隔离数据目录启动、FFmpeg/FFprobe 能力及动态库封装。macOS 安装包由 GitHub Actions 的两个原生 Mac runner 分别构建并启动检查。
 
 ## 目录
 
