@@ -8,7 +8,25 @@ export async function createCloudFixture(root) {
   const png = await readFile(path.join(root, 'src-tauri/icons/128x128.png'))
   const requests = []
   let mode = 'success'
+  let catalogMode = 'success'
+  const catalogRequests = []
   const server = http.createServer(async (req, res) => {
+    if (req.method === 'GET' && req.url === '/v1/models') {
+      catalogRequests.push({ authorization: req.headers.authorization })
+      res.setHeader('Content-Type', 'application/json')
+      if (catalogMode === 'reject') {
+        res.writeHead(401).end(JSON.stringify({ error: 'invalid_api_key' }))
+      } else if (catalogMode === 'rate_limited') {
+        res.writeHead(429).end(JSON.stringify({ error: 'rate_limit' }))
+      } else {
+        res.end(
+          JSON.stringify({
+            data: catalogMode === 'missing' ? [] : [{ id: 'gpt-image-2' }],
+          }),
+        )
+      }
+      return
+    }
     const chunks = []
     for await (const chunk of req) chunks.push(chunk)
     const body = Buffer.concat(chunks)
@@ -43,6 +61,10 @@ export async function createCloudFixture(root) {
     url: `http://127.0.0.1:${server.address().port}/v1/images/generations`,
     screenshotPath: path.join(root, 'artifacts/desktop-cloud-image-studio.png'),
     requests,
+    catalogRequests,
+    setCatalogMode: (next) => {
+      catalogMode = next
+    },
     setMode: (next) => {
       mode = next
     },
@@ -59,6 +81,29 @@ export async function testCloudMedia(page, fixture) {
   await page.getByLabel('OpenAI 图片 API Key').fill('fixture-key')
   await page.getByRole('button', { name: '保存密钥' }).click()
   await expect(page.getByText('密钥已保存在系统凭据库')).toBeVisible()
+  await page.getByRole('button', { name: '检查连接' }).click()
+  await expect(
+    page.getByText(/密钥认证通过，当前模型出现在目录中/),
+  ).toBeVisible()
+  expect(fixture.catalogRequests).toEqual([
+    { authorization: 'Bearer fixture-key' },
+  ])
+  expect(fixture.requests).toHaveLength(0)
+  fixture.setCatalogMode('missing')
+  await page.getByRole('button', { name: '检查连接' }).click()
+  await expect(page.getByText(/当前模型未出现在目录中/)).toBeVisible()
+  fixture.setCatalogMode('reject')
+  await page.getByRole('button', { name: '检查连接' }).click()
+  await expect(page.getByText(/认证或地区不匹配/)).toBeVisible()
+  fixture.setCatalogMode('rate_limited')
+  await page.getByRole('button', { name: '检查连接' }).click()
+  await expect(page.getByText(/限流或配额错误/)).toBeVisible()
+  expect(fixture.requests).toHaveLength(0)
+  fixture.setCatalogMode('success')
+  await page.getByRole('button', { name: '检查连接' }).click()
+  await expect(
+    page.getByText(/密钥认证通过，当前模型出现在目录中/),
+  ).toBeVisible()
   await page.getByRole('button', { name: '生成 1 张云端候选图' }).click()
   const jobs = page.locator('.image-job-history').first().locator('article')
   await expect(jobs.first().getByText('已完成', { exact: true })).toBeVisible({

@@ -2,6 +2,7 @@
 pub mod cloud;
 pub mod comfy;
 pub mod composition;
+pub mod connection;
 pub mod video;
 use super::{types::*, WorkflowState};
 use base64::{engine::general_purpose::STANDARD, Engine};

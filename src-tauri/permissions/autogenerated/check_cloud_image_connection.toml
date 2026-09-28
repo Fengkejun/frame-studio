@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-check-cloud-image-connection"
+description = "Enables the check_cloud_image_connection command without any pre-configured scope."
+commands.allow = ["check_cloud_image_connection"]
+
+[[permission]]
+identifier = "deny-check-cloud-image-connection"
+description = "Denies the check_cloud_image_connection command without any pre-configured scope."
+commands.deny = ["check_cloud_image_connection"]

@@ -7,11 +7,34 @@ import { expect } from '@playwright/test'
 export async function createVideoFixture(root) {
   const mp4 = await readFile(path.join(root, 'tests/fixtures/clip.mp4'))
   const requests = []
+  const catalogRequests = []
   const polls = new Map()
   let mode = 'success'
+  let catalogMode = 'success'
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost')
-    if (
+    if (req.method === 'GET' && url.pathname === '/api/v1/models') {
+      catalogRequests.push({
+        authorization: req.headers.authorization,
+        model: url.searchParams.get('model'),
+      })
+      res.setHeader('Content-Type', 'application/json')
+      if (catalogMode === 'reject') {
+        res.writeHead(401).end(JSON.stringify({ code: 'InvalidApiKey' }))
+      } else {
+        res.end(
+          JSON.stringify({
+            success: true,
+            output: {
+              models:
+                catalogMode === 'missing'
+                  ? []
+                  : [{ model: 'wan2.7-i2v-2026-04-25' }],
+            },
+          }),
+        )
+      }
+    } else if (
       req.method === 'POST' &&
       url.pathname === '/api/v1/services/aigc/video-generation/video-synthesis'
     ) {
@@ -72,9 +95,13 @@ export async function createVideoFixture(root) {
   return {
     url: `http://127.0.0.1:${server.address().port}/api/v1/services/aigc/video-generation/video-synthesis`,
     requests,
+    catalogRequests,
     polls,
     setMode: (value) => {
       mode = value
+    },
+    setCatalogMode: (value) => {
+      catalogMode = value
     },
     close: () => new Promise((resolve) => server.close(resolve)),
   }
@@ -101,6 +128,29 @@ export async function testVideoMedia(page, root, fixture) {
   await page.getByLabel('万相 API Key').fill('fixture-wan-key')
   await page.getByRole('button', { name: '保存密钥' }).click()
   await expect(page.getByText('当前地区密钥已保存在系统凭据库。')).toBeVisible()
+  await page.getByRole('button', { name: '检查连接' }).click()
+  await expect(
+    page.getByText(/密钥认证通过，当前模型出现在目录中/),
+  ).toBeVisible()
+  expect(fixture.catalogRequests).toEqual([
+    {
+      authorization: 'Bearer fixture-wan-key',
+      model: 'wan2.7-i2v-2026-04-25',
+    },
+  ])
+  expect(fixture.requests).toHaveLength(0)
+  fixture.setCatalogMode('missing')
+  await page.getByRole('button', { name: '检查连接' }).click()
+  await expect(page.getByText(/当前模型未出现在目录中/)).toBeVisible()
+  fixture.setCatalogMode('reject')
+  await page.getByRole('button', { name: '检查连接' }).click()
+  await expect(page.getByText(/认证或地区不匹配/)).toBeVisible()
+  expect(fixture.requests).toHaveLength(0)
+  fixture.setCatalogMode('success')
+  await page.getByRole('button', { name: '检查连接' }).click()
+  await expect(
+    page.getByText(/密钥认证通过，当前模型出现在目录中/),
+  ).toBeVisible()
   await page.getByRole('button', { name: '提交图生视频任务' }).click()
   const jobs = page.locator('.video-studio .image-job-history article')
   await expect(jobs).toHaveCount(1)

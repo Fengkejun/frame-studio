@@ -1,5 +1,6 @@
 //! OpenAI Images API adapter. Cloud requests have no resumable task ID, so an
 //! uncertain response is recorded and never submitted again automatically.
+use super::connection::{check_catalog, ConnectionCheck};
 use super::*;
 use crate::workflow::ActiveRun;
 use reqwest::{Client, Url};
@@ -96,6 +97,23 @@ pub fn clear_cloud_image_key() -> AppResult<()> {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(_) => Err("系统凭据库删除失败".into()),
     }
+}
+
+#[tauri::command]
+pub async fn check_cloud_image_connection(model: String) -> AppResult<ConnectionCheck> {
+    if ![
+        "gpt-image-2",
+        "gpt-image-2.5-flare",
+        "gpt-image-2.5-sunburst",
+    ]
+    .contains(&model.as_str())
+    {
+        return Err("云端图片模型无效".into());
+    }
+    let key = get_key()?.ok_or("请先保存 OpenAI 图片 API Key")?;
+    let mut url = endpoint(false)?;
+    url.set_path("/v1/models");
+    check_catalog(url, &key, &model, "openai").await
 }
 
 fn save(state: &WorkflowState, job: &CloudImageJob) -> AppResult<()> {

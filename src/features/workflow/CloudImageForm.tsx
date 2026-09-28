@@ -33,6 +33,8 @@ export function CloudImageForm({
   const [hasKey, setHasKey] = useState(false)
   const [checking, setChecking] = useState(true)
   const [savingKey, setSavingKey] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [connection, setConnection] = useState<api.ConnectionCheck | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -58,6 +60,7 @@ export function CloudImageForm({
       await api.saveCloudImageKey(key)
       setKey('')
       setHasKey(true)
+      setConnection(null)
     } catch (e) {
       onError(errorMessage(e))
     } finally {
@@ -70,10 +73,23 @@ export function CloudImageForm({
     try {
       await api.clearCloudImageKey()
       setHasKey(false)
+      setConnection(null)
     } catch (e) {
       onError(errorMessage(e))
     } finally {
       setSavingKey(false)
+    }
+  }
+
+  async function checkConnection() {
+    setTesting(true)
+    setConnection(null)
+    try {
+      setConnection(await api.checkCloudImageConnection(request.model))
+    } catch (e) {
+      onError(errorMessage(e))
+    } finally {
+      setTesting(false)
     }
   }
 
@@ -85,7 +101,9 @@ export function CloudImageForm({
         void onStart(request)
       }}
     >
-      <fieldset disabled={!isDesktop || checking || disabled || savingKey}>
+      <fieldset
+        disabled={!isDesktop || checking || disabled || savingKey || testing}
+      >
         <p className="field-hint">
           通过 OpenAI Images API 生成，无需安装 ComfyUI。需要可用的 API Key
           和网络连接；每次提交会产生云端费用。
@@ -100,7 +118,10 @@ export function CloudImageForm({
             placeholder={
               hasKey ? '已保存在系统凭据库' : '填写后保存到系统凭据库'
             }
-            onChange={(e) => setKey(e.target.value)}
+            onChange={(e) => {
+              setConnection(null)
+              setKey(e.target.value)
+            }}
           />
         </label>
         <div className="form-actions">
@@ -121,12 +142,33 @@ export function CloudImageForm({
               移除密钥
             </button>
           )}
+          <button
+            type="button"
+            className="small-button"
+            disabled={!hasKey || !!key.trim()}
+            onClick={() => void checkConnection()}
+          >
+            {testing ? '检查中…' : '检查连接'}
+          </button>
         </div>
         <p className="field-hint" role="status">
           {hasKey
             ? '密钥已保存在系统凭据库，不写入项目或任务记录。'
             : '请先保存密钥。'}
         </p>
+        {connection && (
+          <p
+            className={
+              connection.status === 'connected' ||
+              connection.status === 'model_not_listed'
+                ? 'field-hint'
+                : 'workflow-error'
+            }
+            role="status"
+          >
+            {connection.message}
+          </p>
+        )}
         <label className="field-label">
           生图方式
           <select
@@ -161,12 +203,13 @@ export function CloudImageForm({
           <select
             aria-label="云端图片模型"
             value={request.model}
-            onChange={(e) =>
+            onChange={(e) => {
+              setConnection(null)
               setRequest((r) => ({
                 ...r,
                 model: e.target.value as api.CloudImageRequest['model'],
               }))
-            }
+            }}
           >
             <option value="gpt-image-2">GPT Image 2 · 经济</option>
             <option value="gpt-image-2.5-flare">

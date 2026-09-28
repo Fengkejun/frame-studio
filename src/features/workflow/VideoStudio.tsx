@@ -368,6 +368,8 @@ function VideoForm({
   const [hasKey, setHasKey] = useState(false)
   const [checking, setChecking] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [connection, setConnection] = useState<api.ConnectionCheck | null>(null)
   useEffect(() => {
     let alive = true
     api
@@ -393,7 +395,9 @@ function VideoForm({
         void onStart(request)
       }}
     >
-      <fieldset disabled={!isDesktop || checking || disabled || saving}>
+      <fieldset
+        disabled={!isDesktop || checking || disabled || saving || testing}
+      >
         <p className="field-hint">
           万相 Wan 2.7 图生视频。任务按秒计费，提交前请核对地区、时长与分辨率。
         </p>
@@ -405,6 +409,8 @@ function VideoForm({
             onChange={(event) => {
               setChecking(true)
               setHasKey(false)
+              setConnection(null)
+              setKey('')
               setRequest((value) => ({
                 ...value,
                 region: event.target.value as api.VideoRequest['region'],
@@ -425,7 +431,10 @@ function VideoForm({
             placeholder={
               hasKey ? '已保存在系统凭据库' : '输入当前地区的 API Key'
             }
-            onChange={(event) => setKey(event.target.value)}
+            onChange={(event) => {
+              setConnection(null)
+              setKey(event.target.value)
+            }}
           />
         </label>
         <div className="form-actions">
@@ -440,6 +449,7 @@ function VideoForm({
                 .then(() => {
                   setKey('')
                   setHasKey(true)
+                  setConnection(null)
                 })
                 .catch((error) => onError(errorMessage(error)))
                 .finally(() => setSaving(false))
@@ -455,7 +465,10 @@ function VideoForm({
                 setSaving(true)
                 void api
                   .clearVideoKey(request.region)
-                  .then(() => setHasKey(false))
+                  .then(() => {
+                    setHasKey(false)
+                    setConnection(null)
+                  })
                   .catch((error) => onError(errorMessage(error)))
                   .finally(() => setSaving(false))
               }}
@@ -463,12 +476,41 @@ function VideoForm({
               移除密钥
             </button>
           )}
+          <button
+            type="button"
+            className="small-button"
+            disabled={!hasKey || !!key.trim()}
+            onClick={() => {
+              setTesting(true)
+              setConnection(null)
+              void api
+                .checkVideoConnection(request.region)
+                .then(setConnection)
+                .catch((error) => onError(errorMessage(error)))
+                .finally(() => setTesting(false))
+            }}
+          >
+            {testing ? '检查中…' : '检查连接'}
+          </button>
         </div>
         <p className="field-hint" role="status">
           {hasKey
             ? '当前地区密钥已保存在系统凭据库。'
             : '请先保存当前地区的 API Key。'}
         </p>
+        {connection && (
+          <p
+            className={
+              connection.status === 'connected' ||
+              connection.status === 'model_not_listed'
+                ? 'field-hint'
+                : 'workflow-error'
+            }
+            role="status"
+          >
+            {connection.message}
+          </p>
+        )}
         <label className="field-label">
           视频提示词
           <textarea

@@ -1,5 +1,6 @@
 //! Wan first-frame video jobs. Persist the remote task ID before polling; never
 //! repeat a possibly billable submit after an uncertain response.
+use super::connection::{check_catalog, ConnectionCheck};
 use super::*;
 use crate::workflow::WorkflowState;
 use image::{codecs::jpeg::JpegEncoder, GenericImageView};
@@ -169,6 +170,18 @@ pub fn clear_video_key(region: String) -> AppResult<()> {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(_) => Err("系统凭据库删除失败".into()),
     }
+}
+
+#[tauri::command]
+pub async fn check_video_connection(region: String) -> AppResult<ConnectionCheck> {
+    let key = get_key(&region)?.ok_or("请先保存对应地区的万相 API Key")?;
+    let mut url = api_url(&region, None)?;
+    url.set_path("/api/v1/models");
+    url.query_pairs_mut()
+        .append_pair("model", MODEL)
+        .append_pair("page_no", "1")
+        .append_pair("page_size", "1");
+    check_catalog(url, &key, MODEL, "wan").await
 }
 fn validate_request(state: &WorkflowState, request: &VideoRequest) -> AppResult<ImageAsset> {
     valid_region(&request.region)?;

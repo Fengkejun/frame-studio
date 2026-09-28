@@ -69,6 +69,17 @@ export interface CloudImageJob {
   updatedAt: number
   assetIds: string[]
 }
+export interface ConnectionCheck {
+  status:
+    | 'connected'
+    | 'model_not_listed'
+    | 'auth_failed'
+    | 'rate_limited'
+    | 'unavailable'
+    | 'invalid_response'
+  message: string
+  modelListed: boolean | null
+}
 export interface VideoRequest {
   context: ShotContext
   firstFrameVersionId: string
@@ -200,6 +211,9 @@ export const saveCloudImageKey = (apiKey: string): Promise<void> =>
   invoke('save_cloud_image_key', { apiKey })
 export const clearCloudImageKey = (): Promise<void> =>
   invoke('clear_cloud_image_key')
+export const checkCloudImageConnection = (
+  model: CloudImageRequest['model'],
+): Promise<ConnectionCheck> => invoke('check_cloud_image_connection', { model })
 export const listCloudImageJobs = (
   workflowId: string,
 ): Promise<CloudImageJob[]> =>
@@ -219,6 +233,9 @@ export const saveVideoKey = (
 ): Promise<void> => invoke('save_video_key', { region, apiKey })
 export const clearVideoKey = (region: VideoRequest['region']): Promise<void> =>
   invoke('clear_video_key', { region })
+export const checkVideoConnection = (
+  region: VideoRequest['region'],
+): Promise<ConnectionCheck> => invoke('check_video_connection', { region })
 export const listVideoJobs = (workflowId: string): Promise<VideoJob[]> =>
   isDesktop ? invoke('list_video_jobs', { workflowId }) : Promise.resolve([])
 export const startVideoJob = (request: VideoRequest): Promise<VideoJob> =>
