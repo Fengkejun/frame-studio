@@ -58,7 +58,7 @@ Windows 调试程序：`src-tauri/target/debug/frame-studio.exe`。
 发布程序与安装包：`src-tauri/target/release/` 和其中的 `bundle/`。
 Windows 构建生成 NSIS `.exe`，macOS 构建生成 Apple Silicon 或 Intel `.dmg`。Mac 构建流程见 [成片时间线与打包](docs/timeline-workflow.md)；当前尚未配置 Apple Developer ID 签名、公证、自动更新或发布渠道。
 
-`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；图片测试使用固定 PNG 与本机假服务，不执行真实模型推理，也不调用真实 OpenAI API。`test:macos` 验证 `.app` 结构、隔离数据目录启动、FFmpeg/FFprobe 能力及动态库封装。macOS 安装包由 GitHub Actions 的两个原生 Mac runner 分别构建并进行无界面启动检查；托管 runner 没有交互式 WebView，因此 SQLite 首次创建仍由本机测试验证。
+`test:desktop` 使用隔离的 WebView2 测试目录和 `FRAME_STUDIO_TEST_DATA_DIR`，截图与临时测试数据放在被 Git 忽略的 `artifacts/`；默认图片测试使用固定 PNG 与本机假服务，不执行真实模型推理。显式设置 `FRAME_STUDIO_LIVE_IMAGE_BASE_URL` 和 `FRAME_STUDIO_LIVE_IMAGE_KEY` 时追加一次真实文生图；额外设置 `FRAME_STUDIO_LIVE_IMAGE_EDIT=1` 时再执行一次参考图编辑。设置 `FRAME_STUDIO_LIVE_WORKFLOW=1` 时还会通过真实 Rust IPC 调用本机 Ollama；同时设置 `FRAME_STUDIO_LIVE_TEXT_BASE_URL` 和 `FRAME_STUDIO_LIVE_TEXT_KEY` 时追加云端文本工作流。这些真实请求可能产生费用。`test:macos` 验证 `.app` 结构、隔离数据目录启动、FFmpeg/FFprobe 能力及动态库封装。macOS 安装包由 GitHub Actions 的两个原生 Mac runner 分别构建并进行无界面启动检查；托管 runner 没有交互式 WebView，因此 SQLite 首次创建仍由本机测试验证。
 
 ## 目录
 
@@ -96,7 +96,7 @@ docs/architecture.md         # 当前边界与后续扩展约定
 - 模型连接：Ollama 本地服务和 OpenAI Chat Completions 兼容服务；可列出本机 Ollama 模型、选择模型 ID、按 ID 手动下载并查看进度；API Key 只写入系统凭据库，工作流文件只保存连接 ID。
 - 后台运行：按 DAG 顺序执行并保存每个节点的结果、运行快照和失败/中断状态；浏览器预览不会伪造原生调用成功。
 
-分镜卡片的「制作首帧」可选择云端 OpenAI Images API（无需安装 ComfyUI，需 API Key，会产生云端费用）、本机 ComfyUI 或导入本地图片。候选图存入本地素材库，明确选择首帧后按分镜结果版本保存。ComfyUI 任务支持停止等待和按原任务 ID 恢复查询；云端图片请求无法远程取消，结果未知时不会自动重发。详见 [首帧工作流使用说明](docs/image-workflow.md)。
+分镜卡片的「制作首帧」可选择云端 OpenAI 兼容 Images API（可配置 HTTPS 根地址；无需安装 ComfyUI，需 API Key，会产生云端费用）、本机 ComfyUI 或导入本地图片。候选图存入本地素材库，明确选择首帧后按分镜结果版本保存。ComfyUI 任务支持停止等待和按原任务 ID 恢复查询；云端图片请求无法远程取消，结果未知时不会自动重发。详见 [首帧工作流使用说明](docs/image-workflow.md)。
 
 侧栏中的“模型连接”管理文本模型。图片服务在「首帧与素材」中配置，其密钥与文本连接分开保存。镜头视频和成片时间线分别在专属页面配置。画布 JSON 导出保存资产引用，不打包大文件。
 

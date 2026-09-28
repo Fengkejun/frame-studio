@@ -8,6 +8,8 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { chromium, expect } from '@playwright/test'
 import { testMedia } from './media-smoke.mjs'
 import { createCloudFixture, testCloudMedia } from './cloud-media-smoke.mjs'
+import { testLiveCloud } from './live-cloud-smoke.mjs'
+import { testLiveWorkflow } from './live-workflow-smoke.mjs'
 import { createVideoFixture, testVideoMedia } from './video-media-smoke.mjs'
 import { testTimelineMedia } from './timeline-media-smoke.mjs'
 
@@ -72,7 +74,6 @@ const app = spawn(executable, [], {
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
     WEBVIEW2_USER_DATA_FOLDER: profile,
     FRAME_STUDIO_TEST_DATA_DIR: profile,
-    FRAME_STUDIO_TEST_OPENAI_IMAGE_URL: cloudFixture.url,
     FRAME_STUDIO_TEST_WAN_URL: videoFixture.url,
     FRAME_STUDIO_TEST_EXPORT_PATH: path.join(profile, 'finished.mp4'),
   },
@@ -147,6 +148,7 @@ try {
   ).toBeVisible()
   await testMedia(page, root)
   await testCloudMedia(page, cloudFixture)
+  await testLiveCloud(page, root)
   await testVideoMedia(page, root, videoFixture)
   await testTimelineMedia(page, root, profile)
   await page.getByRole('button', { name: '模型连接', exact: true }).click()
@@ -176,6 +178,7 @@ try {
   await expect(textStep).toContainText('连接正常，已找到配置的模型', {
     timeout: 15000,
   })
+  await testLiveWorkflow(page)
   for (const file of ['studio.sqlite', 'studio.sqlite-wal']) {
     const bytes = await readFile(path.join(profile, file)).catch(() => null)
     if (bytes) expect(bytes.includes(Buffer.from('fixture-key'))).toBe(false)
@@ -186,6 +189,11 @@ try {
   console.log(
     'PASS: native Windows app, embedded assets, real Rust IPC, retry and persistent theme.',
   )
+} catch (error) {
+  console.error(
+    `Native app exit=${app.exitCode}; stderr=${stderr || '(empty)'}`,
+  )
+  throw error
 } finally {
   await browser?.close()
   await cloudFixture.close()
