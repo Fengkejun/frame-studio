@@ -1,4 +1,5 @@
 //! Immutable local image versions and explicit, version-scoped shot selections.
+pub mod budget;
 pub mod cloud;
 pub mod comfy;
 pub mod composition;

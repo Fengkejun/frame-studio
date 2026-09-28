@@ -34,6 +34,8 @@ fn main() {
             "save_cloud_image_key",
             "clear_cloud_image_key",
             "check_cloud_image_connection",
+            "get_media_budget",
+            "set_media_budget",
             "list_cloud_image_jobs",
             "start_cloud_image_job",
             "video_key_status",

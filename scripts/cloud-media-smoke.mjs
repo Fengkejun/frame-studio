@@ -104,6 +104,14 @@ export async function testCloudMedia(page, fixture) {
   await expect(
     page.getByText(/密钥认证通过，当前模型出现在目录中/),
   ).toBeVisible()
+  await page.getByLabel('项目云端媒体预算上限').fill('0.10')
+  await page.getByRole('button', { name: '保存预算' }).click()
+  await expect(page.getByText(/已预留 \$0.00 \/ \$0.10/)).toBeVisible()
+  await page.getByRole('button', { name: '生成 1 张云端候选图' }).click()
+  await expect(page.getByText(/超过项目预算上限/)).toBeVisible()
+  expect(fixture.requests).toHaveLength(0)
+  await page.getByLabel('项目云端媒体预算上限').fill('10')
+  await page.getByRole('button', { name: '保存预算' }).click()
   await page.getByRole('button', { name: '生成 1 张云端候选图' }).click()
   const jobs = page.locator('.image-job-history').first().locator('article')
   await expect(jobs.first().getByText('已完成', { exact: true })).toBeVisible({
@@ -162,6 +170,7 @@ export async function testCloudMedia(page, fixture) {
     timeout: 20000,
   })
   expect(fixture.requests).toHaveLength(4)
+  await expect(page.getByText(/已预留 \$1.00 \/ \$10.00/)).toBeVisible()
   await page.reload()
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '首帧与素材', exact: true }).click()

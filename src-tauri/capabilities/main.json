@@ -37,6 +37,8 @@
     "allow-save-cloud-image-key",
     "allow-clear-cloud-image-key",
     "allow-check-cloud-image-connection",
+    "allow-get-media-budget",
+    "allow-set-media-budget",
     "allow-list-cloud-image-jobs",
     "allow-start-cloud-image-job",
     "allow-video-key-status",

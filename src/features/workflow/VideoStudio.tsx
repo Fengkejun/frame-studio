@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { isDesktop } from '@/shared/lib/desktop'
 import { errorMessage } from './api'
 import * as api from './mediaApi'
+import { MediaBudgetPanel } from './MediaBudgetPanel'
 import type { Shot, Workflow } from './model'
 import type { useMedia } from './useMedia'
 import { AssetImage } from './AssetImage'
@@ -299,6 +300,11 @@ export function VideoStudio({
                   <time>{new Date(job.createdAt).toLocaleString('zh-CN')}</time>
                 </div>
                 <p>{job.message}</p>
+                {job.estimatedCostMicroUsd > 0 && (
+                  <small>
+                    提交时标价预估：{api.formatUsd(job.estimatedCostMicroUsd)}
+                  </small>
+                )}
                 <small>
                   远程任务 ID：{job.taskId ?? '未取得'} · 首帧版本：
                   {job.request.firstFrameVersionId.slice(0, 8)}
@@ -370,6 +376,7 @@ function VideoForm({
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
   const [connection, setConnection] = useState<api.ConnectionCheck | null>(null)
+  const [budgetRevision, setBudgetRevision] = useState(0)
   useEffect(() => {
     let alive = true
     api
@@ -392,7 +399,10 @@ function VideoForm({
       className="image-form"
       onSubmit={(event) => {
         event.preventDefault()
-        void onStart(request)
+        void onStart(request).then(
+          () => setBudgetRevision((value) => value + 1),
+          () => setBudgetRevision((value) => value + 1),
+        )
       }}
     >
       <fieldset
@@ -585,6 +595,23 @@ function VideoForm({
             </select>
           </label>
         </div>
+        <p className="field-hint" role="status">
+          本次视频标价预估：
+          {api.formatUsd(
+            api.videoEstimateMicroUsd(
+              request.region,
+              request.resolution,
+              request.duration,
+            ),
+          )}
+          （{request.region === 'beijing' ? '北京' : '新加坡'} ·{' '}
+          {request.resolution} · {request.duration}{' '}
+          秒）。优惠和实际扣费以服务商账单为准。
+        </p>
+        <MediaBudgetPanel
+          workflowId={context.workflowId}
+          refreshSignal={budgetRevision}
+        />
         <button
           type="submit"
           className="button primary generate-image-button"

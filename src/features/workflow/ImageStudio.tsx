@@ -437,6 +437,11 @@ export function ImageStudio({
                   <time>{new Date(job.createdAt).toLocaleString('zh-CN')}</time>
                 </div>
                 <p>{job.message}</p>
+                {job.estimatedCostMicroUsd > 0 && (
+                  <small>
+                    本地预算预留：{api.formatUsd(job.estimatedCostMicroUsd)}
+                  </small>
+                )}
                 <details>
                   <summary>生成参数</summary>
                   <p>

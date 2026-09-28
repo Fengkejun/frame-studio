@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { isDesktop } from '@/shared/lib/desktop'
 import { errorMessage } from './api'
+import { MediaBudgetPanel } from './MediaBudgetPanel'
 import * as api from './mediaApi'
 import type { Shot } from './model'
 
@@ -28,7 +29,10 @@ export function CloudImageForm({
     negative: '',
     size: '1024x1536',
     quality: 'low',
+    budgetReservationMicroUsd: 250_000,
   })
+  const [reservationText, setReservationText] = useState('0.25')
+  const [budgetRevision, setBudgetRevision] = useState(0)
   const [key, setKey] = useState('')
   const [hasKey, setHasKey] = useState(false)
   const [checking, setChecking] = useState(true)
@@ -98,7 +102,10 @@ export function CloudImageForm({
       className="image-form"
       onSubmit={(e) => {
         e.preventDefault()
-        void onStart(request)
+        void onStart(request).then(
+          () => setBudgetRevision((value) => value + 1),
+          () => setBudgetRevision((value) => value + 1),
+        )
       }}
     >
       <fieldset
@@ -293,6 +300,36 @@ export function CloudImageForm({
             </select>
           </label>
         </div>
+        <label className="field-label">
+          本次预算预留 / USD
+          <input
+            aria-label="本次图片预算预留"
+            type="number"
+            min="0.01"
+            max="1000"
+            step="0.01"
+            required
+            value={reservationText}
+            onChange={(event) => {
+              setReservationText(event.target.value)
+              setRequest((value) => ({
+                ...value,
+                budgetReservationMicroUsd: Math.round(
+                  Number(event.target.value) * 1_000_000,
+                ),
+              }))
+            }}
+          />
+        </label>
+        <p className="field-hint">
+          图片按实际输入、输出 token
+          计费；这里填写的是你愿意为本次请求预留的预算，不代表最终费用。当前预留：
+          {api.formatUsd(request.budgetReservationMicroUsd)}。
+        </p>
+        <MediaBudgetPanel
+          workflowId={context.workflowId}
+          refreshSignal={budgetRevision}
+        />
         <button
           className="button primary generate-image-button"
           type="submit"

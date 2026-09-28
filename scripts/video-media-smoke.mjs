@@ -151,6 +151,14 @@ export async function testVideoMedia(page, root, fixture) {
   await expect(
     page.getByText(/密钥认证通过，当前模型出现在目录中/),
   ).toBeVisible()
+  await expect(page.getByText(/本次视频标价预估：\$0.50/)).toBeVisible()
+  await page.getByLabel('项目云端媒体预算上限').fill('1.20')
+  await page.getByRole('button', { name: '保存预算' }).click()
+  await page.getByRole('button', { name: '提交图生视频任务' }).click()
+  await expect(page.getByText(/超过项目预算上限/)).toBeVisible()
+  expect(fixture.requests).toHaveLength(0)
+  await page.getByLabel('项目云端媒体预算上限').fill('10')
+  await page.getByRole('button', { name: '保存预算' }).click()
   await page.getByRole('button', { name: '提交图生视频任务' }).click()
   const jobs = page.locator('.video-studio .image-job-history article')
   await expect(jobs).toHaveCount(1)

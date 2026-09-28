@@ -1,5 +1,6 @@
 //! OpenAI Images API adapter. Cloud requests have no resumable task ID, so an
 //! uncertain response is recorded and never submitted again automatically.
+use super::budget::{reserve_job, BillableJob};
 use super::connection::{check_catalog, ConnectionCheck};
 use super::*;
 use crate::workflow::ActiveRun;
@@ -25,6 +26,8 @@ pub struct CloudImageRequest {
     pub size: String,
     pub quality: String,
     #[serde(default)]
+    pub budget_reservation_micro_usd: u64,
+    #[serde(default)]
     pub reference_version_id: Option<String>,
 }
 
@@ -38,6 +41,8 @@ pub struct CloudImageJob {
     pub created_at: u64,
     pub updated_at: u64,
     pub asset_ids: Vec<String>,
+    #[serde(default)]
+    pub estimated_cost_micro_usd: u64,
 }
 
 fn validate(request: &CloudImageRequest) -> AppResult<()> {
@@ -54,6 +59,11 @@ fn validate(request: &CloudImageRequest) -> AppResult<()> {
         || request.negative.len() > 4_000
     {
         return Err("请检查云端模型、提示词、画幅和画质".into());
+    }
+    if request.budget_reservation_micro_usd < 10_000
+        || request.budget_reservation_micro_usd > 1_000_000_000
+    {
+        return Err("本次图片预算预留金额须在 0.01–1000 美元之间".into());
     }
     Ok(())
 }
@@ -214,6 +224,7 @@ pub fn start_cloud_image_job(
     if active.is_some() {
         return Err("已有图片任务正在执行，请等待完成".into());
     }
+    let estimate = request.budget_reservation_micro_usd;
     let job = CloudImageJob {
         id: uid(),
         request,
@@ -222,8 +233,17 @@ pub fn start_cloud_image_job(
         created_at: now(),
         updated_at: now(),
         asset_ids: vec![],
+        estimated_cost_micro_usd: estimate,
     };
-    save(&state, &job)?;
+    reserve_job(
+        &state,
+        BillableJob::CloudImage,
+        &job.request.context.workflow_id,
+        &job.id,
+        job.created_at,
+        job.estimated_cost_micro_usd,
+        &job,
+    )?;
     *active = Some(ActiveRun {
         id: job.id.clone(),
         cancel: Arc::new(AtomicBool::new(false)),
@@ -443,6 +463,7 @@ mod tests {
             negative: "blur".into(),
             size: "1024x1024".into(),
             quality: "low".into(),
+            budget_reservation_micro_usd: 250_000,
             reference_version_id: None,
         };
         assert!(validate(&request).is_ok());

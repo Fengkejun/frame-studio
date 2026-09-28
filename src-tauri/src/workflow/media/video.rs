@@ -1,5 +1,6 @@
 //! Wan first-frame video jobs. Persist the remote task ID before polling; never
 //! repeat a possibly billable submit after an uncertain response.
+use super::budget::{reserve_job, video_estimate_micro_usd, BillableJob};
 use super::connection::{check_catalog, ConnectionCheck};
 use super::*;
 use crate::workflow::WorkflowState;
@@ -49,6 +50,8 @@ pub struct VideoJob {
     pub created_at: u64,
     pub updated_at: u64,
     pub asset_id: Option<String>,
+    #[serde(default)]
+    pub estimated_cost_micro_usd: u64,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -475,6 +478,8 @@ pub fn start_video_job(
 ) -> AppResult<VideoJob> {
     validate_request(&state, &request)?;
     let key = get_key(&request.region)?.ok_or("请先保存对应地区的万相 API Key")?;
+    let estimate =
+        video_estimate_micro_usd(&request.region, request.duration, &request.resolution)?;
     let mut job = VideoJob {
         id: uid(),
         request,
@@ -484,9 +489,18 @@ pub fn start_video_job(
         created_at: now(),
         updated_at: now(),
         asset_id: None,
+        estimated_cost_micro_usd: estimate,
     };
     let cancel = reserve(&state, &job)?;
-    if let Err(error) = save_job(&state, &job) {
+    if let Err(error) = reserve_job(
+        &state,
+        BillableJob::Video,
+        &job.request.context.workflow_id,
+        &job.id,
+        job.created_at,
+        estimate,
+        &job,
+    ) {
         state
             .video_active
             .lock()
@@ -920,6 +934,7 @@ mod tests {
             created_at: now(),
             updated_at: now(),
             asset_id: None,
+            estimated_cost_micro_usd: 0,
         };
         let uncertain = VideoJob {
             id: "uncertain".into(),
@@ -930,6 +945,7 @@ mod tests {
             created_at: now(),
             updated_at: now(),
             asset_id: None,
+            estimated_cost_micro_usd: 0,
         };
         // Reservation must exclude the same shot even before its row is saved.
         reserve(&state, &known).unwrap();

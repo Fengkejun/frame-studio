@@ -38,6 +38,8 @@ pub fn run() {
             workflow::media::cloud::save_cloud_image_key,
             workflow::media::cloud::clear_cloud_image_key,
             workflow::media::cloud::check_cloud_image_connection,
+            workflow::media::budget::get_media_budget,
+            workflow::media::budget::set_media_budget,
             workflow::media::cloud::list_cloud_image_jobs,
             workflow::media::cloud::start_cloud_image_job,
             workflow::media::video::video_key_status,

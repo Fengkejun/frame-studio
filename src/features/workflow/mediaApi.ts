@@ -58,6 +58,7 @@ export interface CloudImageRequest {
   negative: string
   size: '1024x1024' | '1024x1536' | '1536x1024'
   quality: 'low' | 'medium' | 'high'
+  budgetReservationMicroUsd: number
   referenceVersionId?: string | null
 }
 export interface CloudImageJob {
@@ -68,6 +69,11 @@ export interface CloudImageJob {
   createdAt: number
   updatedAt: number
   assetIds: string[]
+  estimatedCostMicroUsd: number
+}
+export interface MediaBudget {
+  limitMicroUsd: number | null
+  reservedMicroUsd: number
 }
 export interface ConnectionCheck {
   status:
@@ -98,6 +104,7 @@ export interface VideoJob {
   createdAt: number
   updatedAt: number
   assetId: string | null
+  estimatedCostMicroUsd: number
 }
 export interface VideoAsset {
   assetId: string
@@ -214,6 +221,30 @@ export const clearCloudImageKey = (): Promise<void> =>
 export const checkCloudImageConnection = (
   model: CloudImageRequest['model'],
 ): Promise<ConnectionCheck> => invoke('check_cloud_image_connection', { model })
+export const getMediaBudget = (workflowId: string): Promise<MediaBudget> =>
+  isDesktop
+    ? invoke('get_media_budget', { workflowId })
+    : Promise.resolve({ limitMicroUsd: null, reservedMicroUsd: 0 })
+export const setMediaBudget = (
+  workflowId: string,
+  limitMicroUsd: number | null,
+): Promise<MediaBudget> =>
+  invoke('set_media_budget', { workflowId, limitMicroUsd })
+export function formatUsd(microUsd: number): string {
+  return `$${(microUsd / 1_000_000).toFixed(6).replace(/(\.\d{2}\d*?)0+$/, '$1')}`
+}
+export function videoEstimateMicroUsd(
+  region: VideoRequest['region'],
+  resolution: VideoRequest['resolution'],
+  duration: number,
+): number {
+  // Preview of the Rust budget tariff, checked against Model Studio on 2026-09-28.
+  const rates = {
+    beijing: { '720P': 86_012, '1080P': 143_353 },
+    singapore: { '720P': 100_000, '1080P': 150_000 },
+  }
+  return rates[region][resolution] * duration
+}
 export const listCloudImageJobs = (
   workflowId: string,
 ): Promise<CloudImageJob[]> =>
