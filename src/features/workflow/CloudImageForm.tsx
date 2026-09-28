@@ -24,6 +24,7 @@ export function CloudImageForm({
 }) {
   const [request, setRequest] = useState<api.CloudImageRequest>({
     context,
+    baseUrl: api.savedCloudImageBaseUrl(),
     model: 'gpt-image-2',
     positive: shot.imagePrompt,
     negative: '',
@@ -42,26 +43,38 @@ export function CloudImageForm({
 
   useEffect(() => {
     let alive = true
-    api
-      .cloudImageKeyStatus()
-      .then((saved) => {
-        if (alive) setHasKey(saved)
-      })
-      .catch((e) => {
-        if (alive) onError(errorMessage(e))
-      })
-      .finally(() => {
-        if (alive) setChecking(false)
-      })
+    const timer = window.setTimeout(() => {
+      void api
+        .cloudImageKeyStatus(request.baseUrl)
+        .then((saved) => {
+          if (!alive) return
+          setHasKey(saved)
+          try {
+            localStorage.setItem(
+              api.cloudImageBaseUrlStorageKey,
+              request.baseUrl,
+            )
+          } catch {
+            // A blocked preference store should not block the current session.
+          }
+        })
+        .catch((e) => {
+          if (alive) onError(errorMessage(e))
+        })
+        .finally(() => {
+          if (alive) setChecking(false)
+        })
+    }, 300)
     return () => {
       alive = false
+      window.clearTimeout(timer)
     }
-  }, [onError])
+  }, [onError, request.baseUrl])
 
   async function saveKey() {
     setSavingKey(true)
     try {
-      await api.saveCloudImageKey(key)
+      await api.saveCloudImageKey(key, request.baseUrl)
       setKey('')
       setHasKey(true)
       setConnection(null)
@@ -75,7 +88,7 @@ export function CloudImageForm({
   async function clearKey() {
     setSavingKey(true)
     try {
-      await api.clearCloudImageKey()
+      await api.clearCloudImageKey(request.baseUrl)
       setHasKey(false)
       setConnection(null)
     } catch (e) {
@@ -89,7 +102,9 @@ export function CloudImageForm({
     setTesting(true)
     setConnection(null)
     try {
-      setConnection(await api.checkCloudImageConnection(request.model))
+      setConnection(
+        await api.checkCloudImageConnection(request.model, request.baseUrl),
+      )
     } catch (e) {
       onError(errorMessage(e))
     } finally {
@@ -108,17 +123,33 @@ export function CloudImageForm({
         )
       }}
     >
-      <fieldset
-        disabled={!isDesktop || checking || disabled || savingKey || testing}
-      >
+      <fieldset disabled={!isDesktop || disabled || savingKey || testing}>
         <p className="field-hint">
-          通过 OpenAI Images API 生成，无需安装 ComfyUI。需要可用的 API Key
-          和网络连接；每次提交会产生云端费用。
+          通过 OpenAI 兼容的 Images API 生成，无需安装 ComfyUI。需要可用的 API
+          Key 和网络连接；每次提交会产生云端费用。
         </p>
         <label className="field-label">
-          OpenAI 图片 API Key
+          云端图片 API 根地址
           <input
-            aria-label="OpenAI 图片 API Key"
+            aria-label="云端图片 API 根地址"
+            type="url"
+            value={request.baseUrl}
+            onChange={(e) => {
+              setKey('')
+              setChecking(true)
+              setHasKey(false)
+              setConnection(null)
+              setRequest((value) => ({ ...value, baseUrl: e.target.value }))
+            }}
+          />
+        </label>
+        <p className="field-hint">
+          地址路径为 /v1。每个地址的密钥分别保存在系统凭据库。
+        </p>
+        <label className="field-label">
+          云端图片 API Key
+          <input
+            aria-label="云端图片 API Key"
             type="password"
             autoComplete="off"
             value={key}
@@ -135,7 +166,7 @@ export function CloudImageForm({
           <button
             type="button"
             className="small-button"
-            disabled={!key.trim()}
+            disabled={!key.trim() || checking}
             onClick={() => void saveKey()}
           >
             保存密钥
@@ -144,6 +175,7 @@ export function CloudImageForm({
             <button
               type="button"
               className="text-button"
+              disabled={checking}
               onClick={() => void clearKey()}
             >
               移除密钥
@@ -152,7 +184,7 @@ export function CloudImageForm({
           <button
             type="button"
             className="small-button"
-            disabled={!hasKey || !!key.trim()}
+            disabled={!hasKey || !!key.trim() || checking}
             onClick={() => void checkConnection()}
           >
             {testing ? '检查中…' : '检查连接'}
@@ -333,7 +365,7 @@ export function CloudImageForm({
         <button
           className="button primary generate-image-button"
           type="submit"
-          disabled={!hasKey}
+          disabled={!hasKey || checking}
         >
           {request.referenceVersionId
             ? '参考图生成 1 张候选图'

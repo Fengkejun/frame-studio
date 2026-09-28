@@ -36,7 +36,7 @@ async function readSnapshot(): Promise<Snapshot> {
   const results = await Promise.allSettled([
     listProviders(),
     media.imageSettings(),
-    media.cloudImageKeyStatus(),
+    media.cloudImageKeyStatus(media.savedCloudImageBaseUrl()),
     media.videoKeyStatus('singapore'),
     media.videoKeyStatus('beijing'),
     media.checkExportTools(),

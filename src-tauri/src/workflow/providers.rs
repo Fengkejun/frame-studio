@@ -268,13 +268,61 @@ pub fn system_prompt(node: &WorkflowNode) -> String {
     };
     format!("你是专业的短视频创作助手。只输出一个 JSON 对象，不要 Markdown 代码围栏。使用中文。严格遵循此结构：{schema}\n目标总时长 {} 秒。如生成分镜，必须恰好 {} 个镜头，镜头 ID 不重复，时长总和等于目标时长。\n用户定义的任务要求：{}",node.config.duration,node.config.shot_count,node.config.instructions)
 }
+
+fn ollama_output_schema(node: &WorkflowNode) -> Value {
+    let text = json!({"type": "string", "minLength": 1});
+    let strings = json!({"type": "array", "items": {"type": "string"}});
+    match node.kind {
+        NodeKind::Story => json!({
+            "type": "object",
+            "properties": {
+                "title": text, "logline": text, "content": text,
+                "characters": strings
+            },
+            "required": ["title", "logline", "content", "characters"]
+        }),
+        NodeKind::Storyboard => {
+            let duration = if node.config.shot_count == 1 {
+                json!({"type": "number", "const": node.config.duration})
+            } else {
+                json!({"type": "number", "exclusiveMinimum": 0, "maximum": 600})
+            };
+            json!({
+                "type": "object",
+                "properties": {"shots": {
+                    "type": "array",
+                    "minItems": node.config.shot_count,
+                    "maxItems": node.config.shot_count,
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": text, "title": text, "description": text,
+                            "duration": duration, "characters": strings,
+                            "dialogue": {"type": "string"}, "camera": text,
+                            "imagePrompt": text, "videoPrompt": text
+                        },
+                        "required": ["id", "title", "description", "duration", "characters", "dialogue", "camera", "imagePrompt", "videoPrompt"]
+                    }
+                }},
+                "required": ["shots"]
+            })
+        }
+        NodeKind::Prompt => json!({
+            "type": "object",
+            "properties": {"text": text, "negativePrompt": {"type": "string"}},
+            "required": ["text", "negativePrompt"]
+        }),
+        _ => json!("json"),
+    }
+}
+
 pub async fn generate(p: &Provider, node: &WorkflowNode, input: &Value) -> AppResult<Value> {
     validate_provider(p)?;
     let messages = json!([{"role":"system","content":system_prompt(node)},{"role":"user","content":serde_json::to_string(input).map_err(|_|"输入无法序列化")?}]);
     let (suffix, body) = if p.kind == "ollama" {
         (
             "chat",
-            json!({"model":p.model,"messages":messages,"stream":false,"format":"json","options":{"temperature":node.config.temperature}}),
+            json!({"model":p.model,"messages":messages,"stream":false,"format":ollama_output_schema(node),"options":{"temperature":node.config.temperature}}),
         )
     } else {
         (
@@ -325,6 +373,30 @@ pub async fn generate(p: &Provider, node: &WorkflowNode, input: &Value) -> AppRe
 mod tests {
     use super::*;
     use std::io::{Read, Write};
+
+    #[test]
+    fn ollama_schema_constrains_requested_storyboard_count() {
+        let node: WorkflowNode = serde_json::from_value(json!({
+            "id": "storyboard", "kind": "storyboard", "label": "分镜导演",
+            "position": {"x": 0.0, "y": 0.0},
+            "config": {"text": "", "providerId": "ollama", "instructions": "",
+                "temperature": 0.3, "shotCount": 1, "duration": 5},
+            "output": null, "stale": false
+        }))
+        .unwrap();
+        let schema = ollama_output_schema(&node);
+        assert_eq!(schema["properties"]["shots"]["minItems"], 1);
+        assert_eq!(schema["properties"]["shots"]["maxItems"], 1);
+        assert_eq!(
+            schema["properties"]["shots"]["items"]["properties"]["duration"]["const"],
+            5
+        );
+        assert!(schema["properties"]["shots"]["items"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|field| field == "imagePrompt"));
+    }
 
     #[tokio::test]
     async fn discovers_ollama_model_ids_from_tags() {

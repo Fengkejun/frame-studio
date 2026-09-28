@@ -12,14 +12,19 @@ use std::{
 };
 use tauri::Manager;
 
-const API_URL: &str = "https://api.openai.com/v1/images/generations";
-const EDIT_URL: &str = "https://api.openai.com/v1/images/edits";
+const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 const RESPONSE_LIMIT: usize = 32 * 1024 * 1024;
+
+fn default_base_url() -> String {
+    DEFAULT_BASE_URL.into()
+}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CloudImageRequest {
     pub context: ShotContext,
+    #[serde(default = "default_base_url")]
+    pub base_url: String,
     pub model: String,
     pub positive: String,
     pub negative: String,
@@ -46,6 +51,7 @@ pub struct CloudImageJob {
 }
 
 fn validate(request: &CloudImageRequest) -> AppResult<()> {
+    api_base(&request.base_url)?;
     if ![
         "gpt-image-2",
         "gpt-image-2.5-flare",
@@ -68,18 +74,42 @@ fn validate(request: &CloudImageRequest) -> AppResult<()> {
     Ok(())
 }
 
-fn key_entry() -> AppResult<keyring::Entry> {
+fn api_base(base_url: &str) -> AppResult<Url> {
+    if base_url.len() > 512 || base_url.trim() != base_url {
+        return Err("图片 API 根地址无效".into());
+    }
+    let url = Url::parse(base_url).map_err(|_| "图片 API 根地址无效")?;
+    let local = matches!(url.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
+    if url.path().trim_end_matches('/') != "/v1"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !(url.scheme() == "https" || (url.scheme() == "http" && local))
+    {
+        return Err("图片 API 根地址路径须为 /v1；云端使用 HTTPS，本机可使用 HTTP".into());
+    }
+    Ok(url)
+}
+
+fn key_entry(base_url: &str) -> AppResult<keyring::Entry> {
+    let canonical = api_base(base_url)?.to_string();
+    let account = if canonical.trim_end_matches('/') == DEFAULT_BASE_URL {
+        "openai".into()
+    } else {
+        format!("openai:{}", canonical.trim_end_matches('/'))
+    };
     let service =
         if cfg!(debug_assertions) && std::env::var_os("FRAME_STUDIO_TEST_DATA_DIR").is_some() {
             "com.frame-studio.desktop.images.test"
         } else {
             "com.frame-studio.desktop.images"
         };
-    keyring::Entry::new(service, "openai").map_err(|_| "无法访问系统凭据库".into())
+    keyring::Entry::new(service, &account).map_err(|_| "无法访问系统凭据库".into())
 }
 
-fn get_key() -> AppResult<Option<String>> {
-    match key_entry()?.get_password() {
+fn get_key(base_url: &str) -> AppResult<Option<String>> {
+    match key_entry(base_url)?.get_password() {
         Ok(key) => Ok(Some(key)),
         Err(keyring::Error::NoEntry) => Ok(None),
         Err(_) => Err("无法读取云端图片 API Key".into()),
@@ -87,30 +117,33 @@ fn get_key() -> AppResult<Option<String>> {
 }
 
 #[tauri::command]
-pub fn cloud_image_key_status() -> AppResult<bool> {
-    Ok(get_key()?.is_some())
+pub fn cloud_image_key_status(base_url: Option<String>) -> AppResult<bool> {
+    Ok(get_key(base_url.as_deref().unwrap_or(DEFAULT_BASE_URL))?.is_some())
 }
 
 #[tauri::command]
-pub fn save_cloud_image_key(api_key: String) -> AppResult<()> {
+pub fn save_cloud_image_key(api_key: String, base_url: Option<String>) -> AppResult<()> {
     if api_key.trim().is_empty() || api_key.len() > 4096 || api_key.contains(['\r', '\n']) {
         return Err("API Key 无效".into());
     }
-    key_entry()?
+    key_entry(base_url.as_deref().unwrap_or(DEFAULT_BASE_URL))?
         .set_password(api_key.trim())
         .map_err(|_| "系统凭据库保存失败，密钥未写入项目文件".into())
 }
 
 #[tauri::command]
-pub fn clear_cloud_image_key() -> AppResult<()> {
-    match key_entry()?.delete_credential() {
+pub fn clear_cloud_image_key(base_url: Option<String>) -> AppResult<()> {
+    match key_entry(base_url.as_deref().unwrap_or(DEFAULT_BASE_URL))?.delete_credential() {
         Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
         Err(_) => Err("系统凭据库删除失败".into()),
     }
 }
 
 #[tauri::command]
-pub async fn check_cloud_image_connection(model: String) -> AppResult<ConnectionCheck> {
+pub async fn check_cloud_image_connection(
+    model: String,
+    base_url: Option<String>,
+) -> AppResult<ConnectionCheck> {
     if ![
         "gpt-image-2",
         "gpt-image-2.5-flare",
@@ -120,9 +153,9 @@ pub async fn check_cloud_image_connection(model: String) -> AppResult<Connection
     {
         return Err("云端图片模型无效".into());
     }
-    let key = get_key()?.ok_or("请先保存 OpenAI 图片 API Key")?;
-    let mut url = endpoint(false)?;
-    url.set_path("/v1/models");
+    let base_url = base_url.as_deref().unwrap_or(DEFAULT_BASE_URL);
+    let key = get_key(base_url)?.ok_or("请先保存当前图片服务的 API Key")?;
+    let url = endpoint(base_url, "models")?;
     check_catalog(url, &key, &model, "openai").await
 }
 
@@ -219,7 +252,7 @@ pub fn start_cloud_image_job(
             return Err("角色参考图原文件已丢失".into());
         }
     }
-    let key = get_key()?.ok_or("请先保存 OpenAI 图片 API Key")?;
+    let key = get_key(&request.base_url)?.ok_or("请先保存当前图片服务的 API Key")?;
     let mut active = state.media_active.lock().map_err(|_| "图片任务锁不可用")?;
     if active.is_some() {
         return Err("已有图片任务正在执行，请等待完成".into());
@@ -291,28 +324,10 @@ fn request_body(request: &CloudImageRequest) -> Value {
     })
 }
 
-fn endpoint(edit: bool) -> AppResult<Url> {
-    if cfg!(debug_assertions) && std::env::var_os("FRAME_STUDIO_TEST_DATA_DIR").is_some() {
-        if let Ok(override_url) = std::env::var("FRAME_STUDIO_TEST_OPENAI_IMAGE_URL") {
-            let url = Url::parse(&override_url).map_err(|_| "测试图片接口地址无效")?;
-            if url.scheme() == "http"
-                && matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]"))
-                && url.path() == "/v1/images/generations"
-                && url.username().is_empty()
-                && url.password().is_none()
-                && url.query().is_none()
-                && url.fragment().is_none()
-            {
-                let mut url = url;
-                if edit {
-                    url.set_path("/v1/images/edits");
-                }
-                return Ok(url);
-            }
-            return Err("测试图片接口仅允许本机固定路径".into());
-        }
-    }
-    Url::parse(if edit { EDIT_URL } else { API_URL }).map_err(|_| "云端图片接口地址无效".into())
+fn endpoint(base_url: &str, suffix: &str) -> AppResult<Url> {
+    let mut url = api_base(base_url)?;
+    url.set_path(&format!("/v1/{suffix}"));
+    Ok(url)
 }
 
 async fn response_bytes(mut response: reqwest::Response) -> AppResult<Vec<u8>> {
@@ -349,7 +364,14 @@ async fn execute(
         .build()
         .map_err(|_| "无法初始化云端图片连接")?;
     let edit = job.request.reference_version_id.is_some();
-    let mut submit = client.post(endpoint(edit)?).bearer_auth(key);
+    let path = if edit {
+        "images/edits"
+    } else {
+        "images/generations"
+    };
+    let mut submit = client
+        .post(endpoint(&job.request.base_url, path)?)
+        .bearer_auth(key);
     if let Some(version_id) = &job.request.reference_version_id {
         let entry = asset(state, version_id)?;
         let image = std::fs::read(state.directory.join("assets").join(&entry.file_name))
@@ -458,6 +480,7 @@ mod tests {
                 artifact_id: "v".into(),
                 shot_id: "s".into(),
             },
+            base_url: DEFAULT_BASE_URL.into(),
             model: "gpt-image-2".into(),
             positive: "a cat".into(),
             negative: "blur".into(),
@@ -471,5 +494,18 @@ mod tests {
         assert_eq!(body["n"], 1);
         assert_eq!(body["prompt"], "a cat\n\nAvoid these visual elements: blur");
         assert!(body.get("api_key").is_none());
+    }
+
+    #[test]
+    fn custom_image_base_is_validated_and_paths_are_stable() {
+        assert_eq!(
+            endpoint("https://matrix.example/v1", "images/edits")
+                .unwrap()
+                .as_str(),
+            "https://matrix.example/v1/images/edits"
+        );
+        assert!(api_base("http://matrix.example/v1").is_err());
+        assert!(api_base("https://matrix.example/v1?token=secret").is_err());
+        assert!(api_base("https://user:secret@matrix.example/v1").is_err());
     }
 }

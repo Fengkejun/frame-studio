@@ -59,6 +59,7 @@ export async function createCloudFixture(root) {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   return {
     url: `http://127.0.0.1:${server.address().port}/v1/images/generations`,
+    baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
     screenshotPath: path.join(root, 'artifacts/desktop-cloud-image-studio.png'),
     requests,
     catalogRequests,
@@ -78,7 +79,8 @@ export async function testCloudMedia(page, fixture) {
   await expect(page.getByLabel('云端生图提示词')).toHaveValue(
     'New storyboard version',
   )
-  await page.getByLabel('OpenAI 图片 API Key').fill('fixture-key')
+  await page.getByLabel('云端图片 API 根地址').fill(fixture.baseUrl)
+  await page.getByLabel('云端图片 API Key').fill('fixture-key')
   await page.getByRole('button', { name: '保存密钥' }).click()
   await expect(page.getByText('密钥已保存在系统凭据库')).toBeVisible()
   await page.getByRole('button', { name: '检查连接' }).click()

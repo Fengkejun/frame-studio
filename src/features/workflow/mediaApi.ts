@@ -53,6 +53,7 @@ export interface ImageJob {
 }
 export interface CloudImageRequest {
   context: ShotContext
+  baseUrl: string
   model: 'gpt-image-2' | 'gpt-image-2.5-flare' | 'gpt-image-2.5-sunburst'
   positive: string
   negative: string
@@ -212,15 +213,33 @@ export const resumeImageJob = (id: string): Promise<void> =>
   invoke('resume_image_job', { id })
 export const pauseImageJob = (id: string): Promise<void> =>
   invoke('pause_image_job', { id })
-export const cloudImageKeyStatus = (): Promise<boolean> =>
-  isDesktop ? invoke('cloud_image_key_status') : Promise.resolve(false)
-export const saveCloudImageKey = (apiKey: string): Promise<void> =>
-  invoke('save_cloud_image_key', { apiKey })
-export const clearCloudImageKey = (): Promise<void> =>
-  invoke('clear_cloud_image_key')
+export const DEFAULT_CLOUD_IMAGE_BASE_URL = 'https://api.openai.com/v1'
+export const cloudImageBaseUrlStorageKey = 'frame-studio.cloud-image-base-url'
+export function savedCloudImageBaseUrl(): string {
+  try {
+    return (
+      localStorage.getItem(cloudImageBaseUrlStorageKey) ||
+      DEFAULT_CLOUD_IMAGE_BASE_URL
+    )
+  } catch {
+    return DEFAULT_CLOUD_IMAGE_BASE_URL
+  }
+}
+export const cloudImageKeyStatus = (baseUrl?: string): Promise<boolean> =>
+  isDesktop
+    ? invoke('cloud_image_key_status', { baseUrl })
+    : Promise.resolve(false)
+export const saveCloudImageKey = (
+  apiKey: string,
+  baseUrl: string,
+): Promise<void> => invoke('save_cloud_image_key', { apiKey, baseUrl })
+export const clearCloudImageKey = (baseUrl: string): Promise<void> =>
+  invoke('clear_cloud_image_key', { baseUrl })
 export const checkCloudImageConnection = (
   model: CloudImageRequest['model'],
-): Promise<ConnectionCheck> => invoke('check_cloud_image_connection', { model })
+  baseUrl: string,
+): Promise<ConnectionCheck> =>
+  invoke('check_cloud_image_connection', { model, baseUrl })
 export const getMediaBudget = (workflowId: string): Promise<MediaBudget> =>
   isDesktop
     ? invoke('get_media_budget', { workflowId })
