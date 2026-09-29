@@ -51,7 +51,11 @@ fn available_space(path: &Path) -> AppResult<u64> {
         return Err(std::io::Error::last_os_error().to_string());
     }
     let stats = unsafe { stats.assume_init() };
-    Ok(u64::from(stats.f_bavail).saturating_mul(u64::from(stats.f_frsize)))
+    #[cfg(target_os = "macos")]
+    let available_blocks = u64::from(stats.f_bavail);
+    #[cfg(not(target_os = "macos"))]
+    let available_blocks = stats.f_bavail;
+    Ok(available_blocks.saturating_mul(stats.f_frsize))
 }
 
 struct ModelSpec {
