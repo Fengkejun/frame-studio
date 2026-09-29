@@ -9,6 +9,8 @@
     "allow-get-app-info",
     "allow-list-workflows",
     "allow-save-workflow",
+    "allow-export-project-bundle",
+    "allow-import-project-bundle",
     "allow-list-providers",
     "allow-list-ollama-models",
     "allow-get-ollama-pull",

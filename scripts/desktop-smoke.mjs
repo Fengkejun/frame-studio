@@ -80,6 +80,10 @@ const app = spawn(executable, [], {
     FRAME_STUDIO_TEST_COMFY_MODELS_DIR: comfyModelsDir,
     FRAME_STUDIO_TEST_WAN_URL: videoFixture.url,
     FRAME_STUDIO_TEST_EXPORT_PATH: path.join(profile, 'finished.mp4'),
+    FRAME_STUDIO_TEST_PROJECT_BUNDLE_PATH: path.join(
+      profile,
+      'project.framepack',
+    ),
   },
 })
 let launchError
@@ -156,6 +160,31 @@ try {
   await testLiveCloud(page, root)
   await testVideoMedia(page, root, videoFixture)
   await testTimelineMedia(page, root, profile)
+  await page.getByRole('button', { name: '工作流', exact: true }).click()
+  await page.getByRole('button', { name: '导出项目包' }).click()
+  await expect
+    .poll(
+      async () => {
+        const notice = await page.locator('.save-state').textContent()
+        const error = await page.locator('.workflow-error').allTextContents()
+        return error.join('；') || notice
+      },
+      { timeout: 30000 },
+    )
+    .toContain('项目包已保存：')
+  const projectBundle = path.join(profile, 'project.framepack')
+  expect((await readFile(projectBundle)).subarray(0, 4).toString('hex')).toBe(
+    '504b0304',
+  )
+  const duplicateImport = await page.evaluate(async () => {
+    try {
+      await globalThis.__TAURI_INTERNALS__.invoke('import_project_bundle')
+      return ''
+    } catch (error) {
+      return String(error)
+    }
+  })
+  expect(duplicateImport).toContain('已存在')
   await page.getByRole('button', { name: '模型连接', exact: true }).click()
   await page.getByLabel('连接名称').fill('本地文本测试')
   await page.getByLabel('API 根地址').fill(`${textUrl}/api`)

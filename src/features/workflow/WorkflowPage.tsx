@@ -28,7 +28,12 @@ import {
   type NodeKind,
   type Provider,
 } from './model'
-import { errorMessage, listProviders } from './api'
+import {
+  errorMessage,
+  exportProjectBundle,
+  importProjectBundle,
+  listProviders,
+} from './api'
 import type { useWorkflow } from './useWorkflow'
 import { useMedia } from './useMedia'
 import * as api from './mediaApi'
@@ -74,6 +79,8 @@ function WorkflowEditor({
   const media = useMedia(w?.id)
   const [confirmRun, setConfirmRun] = useState<{ target?: string } | null>(null)
   const importInput = useRef<HTMLInputElement>(null)
+  const [bundleBusy, setBundleBusy] = useState(false)
+  const [bundleNotice, setBundleNotice] = useState('')
   const { screenToFlowPosition, fitView } = useReactFlow<CanvasNode>()
   const bottomPanel = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -274,6 +281,39 @@ function WorkflowEditor({
     a.click()
     setTimeout(() => URL.revokeObjectURL(url), 2000)
   }
+  async function exportBundle() {
+    if (!w || busy || bundleBusy) return
+    setBundleBusy(true)
+    setBundleNotice('')
+    try {
+      await c.save(w)
+      const path = await exportProjectBundle(w.id)
+      if (path) setBundleNotice(`项目包已保存：${path}`)
+    } catch (error) {
+      c.setError(errorMessage(error))
+    } finally {
+      setBundleBusy(false)
+    }
+  }
+  async function importBundle() {
+    if (busy || bundleBusy) return
+    setBundleBusy(true)
+    setBundleNotice('')
+    try {
+      // Persist edits before the restored project becomes the active canvas.
+      if (w) await c.save(w)
+      const imported = await importProjectBundle()
+      if (imported) {
+        await c.selectProject(imported)
+        setSelected([])
+        setBundleNotice(`已恢复项目：${imported.name}`)
+      }
+    } catch (error) {
+      c.setError(errorMessage(error))
+    } finally {
+      setBundleBusy(false)
+    }
+  }
   const storyboards = w.nodes.filter(
     (n) => n.kind === 'storyboard' && n.output && 'shots' in n.output.value,
   )
@@ -397,7 +437,9 @@ function WorkflowEditor({
           disabled={busy}
           onChange={(e) => c.change({ ...w, name: e.target.value })}
         />
-        <span className="save-state">{c.saveState}</span>
+        <span className="save-state" title={bundleNotice}>
+          {bundleNotice || c.saveState}
+        </span>
         <div className="toolbar-spacer" />
         <button
           className="small-button"
@@ -423,6 +465,24 @@ function WorkflowEditor({
         <button className="small-button" onClick={exportFile}>
           导出
         </button>
+        {isDesktop && (
+          <>
+            <button
+              className="small-button"
+              disabled={busy || bundleBusy}
+              onClick={() => void importBundle()}
+            >
+              导入项目包
+            </button>
+            <button
+              className="small-button"
+              disabled={busy || bundleBusy}
+              onClick={() => void exportBundle()}
+            >
+              {bundleBusy ? '处理中…' : '导出项目包'}
+            </button>
+          </>
+        )}
         <input
           ref={importInput}
           type="file"

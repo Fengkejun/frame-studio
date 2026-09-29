@@ -59,6 +59,12 @@
   color: var(--muted);
   font-size: 11px;
 }
+.save-state {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .toolbar-spacer {
   flex: 1;
 }

@@ -1,4 +1,5 @@
 pub mod media;
+pub mod package;
 mod providers;
 mod storage;
 mod types;

@@ -36,6 +36,15 @@ export async function saveWorkflow(workflow: Workflow): Promise<void> {
     JSON.stringify([clean, ...previous.filter((w) => w.id !== clean.id)]),
   )
 }
+
+export const exportProjectBundle = (
+  workflowId: string,
+): Promise<string | null> => invoke('export_project_bundle', { workflowId })
+
+export async function importProjectBundle(): Promise<Workflow | null> {
+  const workflow = await invoke<Workflow | null>('import_project_bundle')
+  return workflow ? parseWorkflow(JSON.stringify(workflow)) : null
+}
 export const listProviders = (): Promise<Provider[]> =>
   isDesktop ? invoke('list_providers') : Promise.resolve([])
 export const saveProvider = (

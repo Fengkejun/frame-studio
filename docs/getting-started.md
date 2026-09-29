@@ -13,4 +13,4 @@
 
 连接检测不会提交图片或视频生成任务。云端模型目录通过只说明当前密钥可访问目录；模型列表不保证生成权限、余额和实际生成质量。本机 Ollama 创作节点会向聊天接口传入 JSON Schema 约束必填字段与分镜数量，并在收到结果后复核结构、镜头 ID 和总时长；文本列表检查本身不保证生成结果合规。ComfyUI 的 checkpoint 列表检查不保证当前模板与模型架构兼容。本机工具检查不代替一次实际 MP4 导出。浏览器预览只展示引导，不运行原生检测。
 
-相关操作：[首帧工作流](image-workflow.md)、[镜头视频](video-workflow.md)、[成片时间线](timeline-workflow.md)。
+相关操作：[首帧工作流](image-workflow.md)、[镜头视频](video-workflow.md)、[成片时间线](timeline-workflow.md)、[项目包与跨设备恢复](project-bundles.md)。

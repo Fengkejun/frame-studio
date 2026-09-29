@@ -4,6 +4,8 @@ fn main() {
             "get_app_info",
             "list_workflows",
             "save_workflow",
+            "export_project_bundle",
+            "import_project_bundle",
             "list_providers",
             "list_ollama_models",
             "get_ollama_pull",

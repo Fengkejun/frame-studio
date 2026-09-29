@@ -8,6 +8,8 @@ pub fn run() {
             commands::get_app_info,
             workflow::list_workflows,
             workflow::save_workflow,
+            workflow::package::export_project_bundle,
+            workflow::package::import_project_bundle,
             workflow::list_providers,
             workflow::list_ollama_models,
             workflow::get_ollama_pull,
