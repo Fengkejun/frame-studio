@@ -30,6 +30,8 @@
 
 `workflow/mediaApi.ts`、`useMedia.ts` 和 `ImageStudio.tsx` 提供分镜对应的生图、素材选择和任务记录。Rust `workflow/media.rs` 负责不可变图片版本与首帧绑定，`media/comfy.rs` 负责本机 ComfyUI 的提交、轮询及恢复，`media/cloud.rs` 负责 OpenAI Images API。图片写入应用数据目录；SQLite 记录元数据，不把 base64 媒体放进图结构。
 
+`media/model_manager.rs` 为本机 ComfyUI 提供可选的模型目录选择、FLUX/LoRA 固定目录下载、断点续传和 SHA-256 校验；只在用户确认后写入选定的 `models` 目录。模型文件、ComfyUI 运行时与 GPU 驱动不进入应用安装包。
+
 首帧绑定包括项目、节点、分镜产物版本和镜头 ID。文本产物更新后，旧图片继续保留但不自动继承选择。图片节点接入文本 DAG，但只读取明确选中的版本并校验原图仍存在；缺少首帧时运行状态为“等待首帧”，用户选择后可单独重跑图片节点。整图重新生成分镜时，图片节点会等待新版本的首帧选择，不会自动启动生图或产生额外生图费用。云端图片 API Key 仅保存在系统凭据库，提交结果无法确认时标记未知且不自动重发。具体恢复和数据备份约定见 [首帧工作流](image-workflow.md)。
 
 ## 镜头视频阶段（已实现）

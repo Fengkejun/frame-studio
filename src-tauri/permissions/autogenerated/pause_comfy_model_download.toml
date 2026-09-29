@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-pause-comfy-model-download"
+description = "Enables the pause_comfy_model_download command without any pre-configured scope."
+commands.allow = ["pause_comfy_model_download"]
+
+[[permission]]
+identifier = "deny-pause-comfy-model-download"
+description = "Denies the pause_comfy_model_download command without any pre-configured scope."
+commands.deny = ["pause_comfy_model_download"]

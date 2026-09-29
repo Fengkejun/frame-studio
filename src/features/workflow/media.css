@@ -81,6 +81,41 @@
   gap: 8px;
   margin-top: 20px;
 }
+.comfy-model-manager {
+  margin: 16px 0 20px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.comfy-model-manager summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.comfy-model-manager .field-hint {
+  overflow-wrap: anywhere;
+}
+.comfy-model-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.comfy-model-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.image-settings .comfy-model-consent input {
+  width: auto;
+  margin-top: 2px;
+}
+.comfy-model-manager progress {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+}
 .image-number-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

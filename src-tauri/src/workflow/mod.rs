@@ -29,6 +29,7 @@ pub struct WorkflowState {
     video_active: Mutex<HashMap<String, media::video::ActiveVideo>>,
     export_active: Mutex<Option<ActiveRun>>,
     model_pull: Mutex<Option<ActiveModelPull>>,
+    comfy_download: Mutex<Option<media::model_manager::ActiveDownload>>,
     directory: std::path::PathBuf,
 }
 
@@ -48,6 +49,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         video_active: Mutex::new(HashMap::new()),
         export_active: Mutex::new(None),
         model_pull: Mutex::new(None),
+        comfy_download: Mutex::new(None),
         directory,
     });
     media::comfy::recover(&app.state::<WorkflowState>())?;

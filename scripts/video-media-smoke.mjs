@@ -221,6 +221,7 @@ export async function testVideoMedia(page, root, fixture) {
   await page.getByRole('button', { name: '镜头视频', exact: true }).click()
   await cards.first().getByRole('button', { name: '选为镜头片段' }).click()
   await expect(page.locator('.video-candidates')).toContainText('已选片段版本')
+  await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByTestId('rf__node-video-fixture').locator('.node-mark').click()
   await page.getByRole('button', { name: '汇集已选片段' }).click()
   await page.getByRole('button', { name: '开始执行' }).click()

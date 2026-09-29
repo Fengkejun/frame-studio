@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-comfy-model-catalog"
+description = "Enables the get_comfy_model_catalog command without any pre-configured scope."
+commands.allow = ["get_comfy_model_catalog"]
+
+[[permission]]
+identifier = "deny-get-comfy-model-catalog"
+description = "Denies the get_comfy_model_catalog command without any pre-configured scope."
+commands.deny = ["get_comfy_model_catalog"]

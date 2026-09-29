@@ -1181,15 +1181,18 @@ dependencies = [
  "base64 0.22.1",
  "image",
  "keyring",
+ "libc",
  "reqwest 0.12.28",
  "rfd",
  "rusqlite",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tokio",
  "uuid",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

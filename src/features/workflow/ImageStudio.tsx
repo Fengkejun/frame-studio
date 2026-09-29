@@ -6,6 +6,7 @@ import type { Shot, Workflow } from './model'
 import type { useMedia } from './useMedia'
 import { AssetImage } from './AssetImage'
 import { CloudImageForm } from './CloudImageForm'
+import { ComfyModelManager } from './ComfyModelManager'
 import './media.css'
 
 export interface ShotTarget {
@@ -766,6 +767,9 @@ function ImageForm({
         <p className="field-hint" role="status">
           {connection}
         </p>
+      </fieldset>
+      <ComfyModelManager />
+      <fieldset disabled={!loaded || disabled || testing || !isDesktop}>
         <label className="field-label">
           ComfyUI 工作流模式
           <select

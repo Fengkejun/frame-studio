@@ -25,7 +25,7 @@
 
 ## 本机 ComfyUI 使用
 
-1. 启动已安装的 ComfyUI，将兼容 SD 1.5 或 SDXL 的完整 checkpoint 放在它的模型目录中。只使用本机生图时需要这一步；Frame Studio 不自动安装 ComfyUI、模型或 GPU 驱动。
+1. 启动已安装的 ComfyUI，将兼容 SD 1.5 或 SDXL 的完整 checkpoint 放在它的模型目录中。只使用本机生图时需要这一步；Frame Studio 不安装 ComfyUI 或 GPU 驱动。应用可在用户明确选择后下载下述两个 FLUX 文件。
 2. 在桌面应用中生成分镜，或在分镜节点的「编辑结构化结果」中录入已有分镜。分镜必须确认且未过期。
 3. 点击镜头卡片的「制作首帧」，进入「首帧与素材」，选择「本机 ComfyUI」。填本机根地址（默认 `http://127.0.0.1:8188`），检测连接并选择 checkpoint。
 4. 镜头的 `imagePrompt` 自动带入正面提示词；可编辑正面/负面词。设置尺寸、步数、种子和候选数后生成。初始 512 × 768、20 步、1 张；按模型要求调整，SDXL 常需更高尺寸及更多显存。
@@ -35,6 +35,12 @@
 8. 可导入 PNG、JPEG、WebP（最多 20 MiB、最长边 8192、最多 16,777,216 像素），并明确绑定到镜头或角色。导入图片可作为云端或本机图生图参考输入。
 
 内置模式仍使用 `CheckpointLoaderSimple → CLIPTextEncode → EmptyLatentImage → KSampler → VAEDecode → SaveImage`。自定义模式执行导入的 API JSON，最多 256 KB、512 个节点，要求指定 SaveImage 输出节点，返回图片数量应与表单中的候选数一致。ComfyUI 自身仍需安装工作流使用的节点和模型。UI 的连接检测仅验证服务及 Checkpoint 列表，不保证自定义工作流的节点、模型或显存可用。
+
+### 可选 FLUX 模型下载
+
+在「本机 ComfyUI」的「可选下载 FLUX / LoRA 模型」中选择现有 ComfyUI 的 `models` 文件夹。应用显示当前磁盘剩余空间、目标文件和未完成的 `.part` 文件。选择模型并确认许可与体积后才会下载。可选 [FLUX.1-dev FP8 checkpoint](https://huggingface.co/Comfy-Org/flux1-dev/blob/main/flux1-dev-fp8.safetensors)（17,246,524,772 字节）和 [FLUX.1 Depth LoRA](https://huggingface.co/Comfy-Org/flux1-dev/blob/a6518765851ffa45c55e2bb9ca5ad208fd5d8023/split_files/loras/flux1-depth-dev-lora.safetensors)（1,244,440,512 字节）；两者均受 FLUX.1-dev 非商业许可约束。Depth LoRA 还需要兼容的 FLUX.1-dev 基础模型及 Depth 工作流。
+
+下载器只接受内置模型目录中的文件，写入 `models/checkpoints` 或 `models/loras`。如模型仓库要求认证，先在 Hugging Face 网页接受许可，再输入有读取权限的 Token；Token 仅用于本次请求，不保存到项目或系统凭据库。HTTP Range 用于续传；下载结束核对固定 SHA-256，成功后才发布最终文件名。暂停或退出应用会保留 `.part`，下次点击「继续下载」即可恢复。已有最终文件不会被覆盖，界面仅报告其存在及大小，不声称已校验。校验失败会清理损坏的 `.part`。下载完成后重启 ComfyUI，再导入对应 FLUX API 格式工作流；内置 SD 工作流不兼容 FLUX。Windows 和 macOS 安装包均不附带这些模型。仅使用云端生图时无需下载。
 
 ## 任务与版本行为
 
@@ -58,7 +64,7 @@
 
 ## 验证范围
 
-`npm run test:desktop` 在隔离 WebView2 配置和数据库内执行真实 Rust IPC，使用 localhost 协议测试服务返回固定 PNG。覆盖候选入库、选择、角色版本绑定、文生图与图生图 multipart 请求、自定义 ComfyUI 工作流参数替换与参考图上传、暂停恢复、下载失败后恢复、执行错误、HTTP 拒绝、导入校验、页面重载持久化、分镜版本隔离，以及图片节点的等待、汇集和版本变更后待更新状态。默认使用假 API Key 和本机假服务；设置 `FRAME_STUDIO_LIVE_IMAGE_BASE_URL` 与 `FRAME_STUDIO_LIVE_IMAGE_KEY` 时追加真实文生图，另设置 `FRAME_STUDIO_LIVE_IMAGE_EDIT=1` 时追加真实图生图，可能产生费用。Rust 单元测试覆盖模板校验、重启恢复及 v1/v2/v3 数据库迁移。
+`npm run test:desktop` 在隔离 WebView2 配置和数据库内执行真实 Rust IPC，使用 localhost 协议测试服务返回固定 PNG。覆盖候选入库、选择、角色版本绑定、文生图与图生图 multipart 请求、自定义 ComfyUI 工作流参数替换与参考图上传、可选模型目录和许可确认、暂停恢复、下载失败后恢复、执行错误、HTTP 拒绝、导入校验、页面重载持久化、分镜版本隔离，以及图片节点的等待、汇集和版本变更后待更新状态。默认使用假 API Key 和本机假服务；设置 `FRAME_STUDIO_LIVE_IMAGE_BASE_URL` 与 `FRAME_STUDIO_LIVE_IMAGE_KEY` 时追加真实文生图，另设置 `FRAME_STUDIO_LIVE_IMAGE_EDIT=1` 时追加真实图生图，可能产生费用。Rust 单元测试覆盖模型续传、校验、无覆盖发布、模板校验、重启恢复及 v1/v2/v3 数据库迁移。
 
 协议测试不执行 AI 推理，不评估模型权限、模型兼容性、显存占用和图片质量。设置 `FRAME_STUDIO_LIVE_COMFY_URL` 可在桌面测试中对运行中的本机 ComfyUI 执行无需模型的 EmptyImage 工作流，以及上传现有角色参考图的 LoadImage 工作流；这两条真实服务测试覆盖队列、历史、图片下载和素材入库。自定义工作流的真实推理验收仍需启动装有对应节点和模型的本机 ComfyUI，并运行一条镜头。
 

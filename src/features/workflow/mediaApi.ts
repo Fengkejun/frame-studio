@@ -54,6 +54,30 @@ export interface ImageJob {
   updatedAt: number
   assetIds: string[]
 }
+export interface ComfyModelProgress {
+  modelId: string
+  status: string
+  completed: number
+  total: number
+}
+export interface ComfyModelEntry {
+  id: string
+  name: string
+  kind: string
+  fileName: string
+  bytes: number
+  pageUrl: string
+  license: string
+  note: string
+  installedBytes: number | null
+  partialBytes: number
+}
+export interface ComfyModelCatalog {
+  directory: string | null
+  availableBytes: number | null
+  models: ComfyModelEntry[]
+  active: ComfyModelProgress | null
+}
 export interface CloudImageRequest {
   context: ShotContext
   baseUrl: string
@@ -210,6 +234,16 @@ export const imagePreview = (versionId: string): Promise<string> =>
   invoke('image_preview', { versionId })
 export const testComfy = (baseUrl: string): Promise<string[]> =>
   invoke('test_comfy', { baseUrl })
+export const getComfyModelCatalog = (): Promise<ComfyModelCatalog> =>
+  invoke('get_comfy_model_catalog')
+export const chooseComfyModelsDirectory = (): Promise<string | null> =>
+  invoke('choose_comfy_models_directory')
+export const downloadComfyModel = (
+  modelId: string,
+  hfToken: string,
+): Promise<void> => invoke('download_comfy_model', { modelId, hfToken })
+export const pauseComfyModelDownload = (): Promise<void> =>
+  invoke('pause_comfy_model_download')
 export const startImageJob = (request: ImageRequest): Promise<ImageJob> =>
   invoke('start_image_job', { request })
 export const resumeImageJob = (id: string): Promise<void> =>

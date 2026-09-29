@@ -98,6 +98,8 @@ docs/architecture.md         # 当前边界与后续扩展约定
 
 分镜卡片的「制作首帧」可选择云端 OpenAI 兼容 Images API（可配置 HTTPS 根地址；无需安装 ComfyUI，需 API Key，会产生云端费用）、本机 ComfyUI 或导入本地图片。候选图存入本地素材库，明确选择首帧后按分镜结果版本保存。ComfyUI 任务支持停止等待和按原任务 ID 恢复查询；云端图片请求无法远程取消，结果未知时不会自动重发。详见 [首帧工作流使用说明](docs/image-workflow.md)。
 
+本机模式支持在安装后自选 ComfyUI `models` 目录，按需下载 FLUX.1-dev FP8 或 Depth LoRA，并显示体积、许可、磁盘空间、续传与 SHA-256 校验状态；安装包不内嵌模型或 ComfyUI。详见 [可选模型下载](docs/image-workflow.md#可选-flux-模型下载)。
+
 侧栏中的“模型连接”管理文本模型。图片服务在「首帧与素材」中配置，其密钥与文本连接分开保存。镜头视频和成片时间线分别在专属页面配置。画布 JSON 导出保存资产引用，不打包大文件。
 
 ## 官方参考

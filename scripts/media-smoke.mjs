@@ -260,6 +260,30 @@ export async function testMedia(page, root) {
     await page.getByRole('button', { name: '分镜故事板' }).click()
     await page.getByRole('button', { name: '制作首帧', exact: true }).click()
     await page.getByRole('button', { name: '本机 ComfyUI' }).click()
+    const modelManager = page.locator('.comfy-model-manager')
+    await modelManager.locator('summary').click()
+    await expect(modelManager).toContainText('FLUX.1-dev FP8')
+    await expect(modelManager).toContainText('comfy-models')
+    await expect(
+      modelManager.getByRole('button', { name: '开始下载' }),
+    ).toBeDisabled()
+    await modelManager
+      .getByLabel('可选 ComfyUI 模型')
+      .selectOption('flux1-depth-dev-lora')
+    await expect(modelManager).toContainText('1.24 GB')
+    await expect(modelManager).toContainText('FLUX.1-dev 非商业许可')
+    await expect(
+      modelManager.getByRole('button', { name: '开始下载' }),
+    ).toBeDisabled()
+    await modelManager
+      .getByLabel('我已查看模型页面，并确认适用该模型的许可和下载体积')
+      .check()
+    await expect(
+      modelManager.getByRole('button', { name: '开始下载' }),
+    ).toBeEnabled()
+    await page.screenshot({
+      path: path.join(root, 'artifacts/desktop-comfy-model-manager.png'),
+    })
     await expect(
       page.getByRole('textbox', { name: '生图正面提示词' }),
     ).toHaveValue(shot.imagePrompt)

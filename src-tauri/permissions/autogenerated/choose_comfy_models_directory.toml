@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-choose-comfy-models-directory"
+description = "Enables the choose_comfy_models_directory command without any pre-configured scope."
+commands.allow = ["choose_comfy_models_directory"]
+
+[[permission]]
+identifier = "deny-choose-comfy-models-directory"
+description = "Denies the choose_comfy_models_directory command without any pre-configured scope."
+commands.deny = ["choose_comfy_models_directory"]

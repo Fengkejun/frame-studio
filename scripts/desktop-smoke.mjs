@@ -26,6 +26,8 @@ await access(executable).catch(() => {
 const artifacts = path.join(root, 'artifacts')
 await mkdir(artifacts, { recursive: true })
 const profile = await mkdtemp(path.join(artifacts, 'webview-test-'))
+const comfyModelsDir = path.join(profile, 'comfy-models')
+await mkdir(comfyModelsDir)
 const port = await new Promise((resolve, reject) => {
   const server = net.createServer()
   server.on('error', reject)
@@ -75,6 +77,7 @@ const app = spawn(executable, [], {
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}`,
     WEBVIEW2_USER_DATA_FOLDER: profile,
     FRAME_STUDIO_TEST_DATA_DIR: profile,
+    FRAME_STUDIO_TEST_COMFY_MODELS_DIR: comfyModelsDir,
     FRAME_STUDIO_TEST_WAN_URL: videoFixture.url,
     FRAME_STUDIO_TEST_EXPORT_PATH: path.join(profile, 'finished.mp4'),
   },
