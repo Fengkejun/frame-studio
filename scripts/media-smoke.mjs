@@ -7,6 +7,7 @@ import { expect } from '@playwright/test'
 export async function testMedia(page, root) {
   const png = await readFile(path.join(root, 'src-tauri/icons/128x128.png'))
   const submissions = []
+  const uploads = []
   let hold = false
   let fail = false
   let reject = false
@@ -23,6 +24,11 @@ export async function testMedia(page, root) {
           },
         }),
       )
+    } else if (url.pathname === '/upload/image') {
+      const chunks = []
+      for await (const chunk of req) chunks.push(chunk)
+      uploads.push(Buffer.concat(chunks))
+      res.end(JSON.stringify({ name: 'uploaded-reference.png', subfolder: '' }))
     } else if (url.pathname === '/prompt') {
       let body = ''
       for await (const chunk of req) body += chunk
@@ -52,6 +58,9 @@ export async function testMedia(page, root) {
       const id = url.pathname.split('/').at(-1)
       const n = Number(id.split('-').at(-1)) - 1
       const count = submissions[n].prompt['5'].inputs.batch_size
+      const outputId = Object.entries(submissions[n].prompt).find(
+        ([, node]) => node.class_type === 'SaveImage',
+      )?.[0]
       res.end(
         JSON.stringify({
           [id]: {
@@ -60,7 +69,7 @@ export async function testMedia(page, root) {
               completed: !fail,
             },
             outputs: {
-              9: {
+              [outputId]: {
                 images: Array.from({ length: count }, (_, index) => ({
                   filename: `fixture-${index}.png`,
                   subfolder: 'test',
@@ -423,8 +432,62 @@ export async function testMedia(page, root) {
     await openStudio()
     await page.getByRole('button', { name: '本地素材库', exact: true }).click()
     await expect(page.locator('.asset-card')).toHaveCount(7)
+    await page.getByLabel('角色名称').fill('小猫')
+    await page
+      .locator('.asset-card')
+      .filter({ hasText: '导入参考图.png' })
+      .getByRole('button', { name: '绑定为角色参考图' })
+      .click()
+    await expect(page.locator('.role-reference-list')).toContainText('小猫')
+    await page.getByRole('button', { name: '本机 ComfyUI' }).click()
+    await page.getByLabel('ComfyUI 工作流模式').selectOption('custom')
+    const customGraph = {
+      5: {
+        class_type: 'EmptyLatentImage',
+        inputs: { batch_size: '{{count}}' },
+      },
+      6: { class_type: 'CLIPTextEncode', inputs: { text: '{{positive}}' } },
+      20: {
+        class_type: 'SaveImage',
+        inputs: { images: ['8', 0], filename_prefix: '{{output_prefix}}' },
+      },
+      10: { class_type: 'LoadImage', inputs: { image: '{{reference_image}}' } },
+    }
+    await page.getByLabel('导入 ComfyUI API 工作流 JSON').setInputFiles({
+      name: 'custom-api.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(customGraph)),
+    })
+    await expect(page.getByLabel('SaveImage 输出节点 ID')).toHaveValue('20')
+    await page.getByLabel('ComfyUI 角色参考图').selectOption({ index: 1 })
+    await page.getByRole('spinbutton', { name: '候选数量' }).fill('1')
+    await generate()
+    await expect(jobs).toHaveCount(7)
+    await expect(jobs.first().getByText('已完成', { exact: true })).toBeVisible(
+      { timeout: 15000 },
+    )
+    expect(uploads).toHaveLength(1)
+    expect(uploads[0].includes(png)).toBe(true)
+    expect(submissions).toHaveLength(6)
+    expect(submissions[5].prompt['10'].inputs.image).toBe(
+      'uploaded-reference.png',
+    )
+    expect(submissions[5].prompt['6'].inputs.text).toBe(
+      'New storyboard version',
+    )
+    expect(submissions[5].prompt['5'].inputs.batch_size).toBe(1)
+    await expect(page.locator('.asset-card')).toHaveCount(8)
+    await page
+      .getByLabel('ComfyUI 工作流模式')
+      .evaluate((element) =>
+        element.scrollIntoView({ block: 'start', behavior: 'instant' }),
+      )
+    await page.screenshot({
+      path: path.join(root, 'artifacts/desktop-custom-comfyui.png'),
+      fullPage: true,
+    })
     console.log(
-      'PASS: real native image IPC, HTTP protocol, candidate persistence, explicit selection, resume without resubmit, errors, imports and storyboard version isolation. Fixture images only; no AI inference.',
+      'PASS: real native image IPC, custom ComfyUI graph and reference upload, candidate persistence, explicit selection, resume without resubmit, errors, imports and storyboard version isolation. Fixture images only; no AI inference.',
     )
   } catch (error) {
     await page.screenshot({

@@ -9,6 +9,7 @@ import { chromium, expect } from '@playwright/test'
 import { testMedia } from './media-smoke.mjs'
 import { createCloudFixture, testCloudMedia } from './cloud-media-smoke.mjs'
 import { testLiveCloud } from './live-cloud-smoke.mjs'
+import { testLiveComfy } from './live-comfy-smoke.mjs'
 import { testLiveWorkflow } from './live-workflow-smoke.mjs'
 import { createVideoFixture, testVideoMedia } from './video-media-smoke.mjs'
 import { testTimelineMedia } from './timeline-media-smoke.mjs'
@@ -147,6 +148,7 @@ try {
     page.getByRole('heading', { name: /让每位 Agent/ }),
   ).toBeVisible()
   await testMedia(page, root)
+  await testLiveComfy(page, root)
   await testCloudMedia(page, cloudFixture)
   await testLiveCloud(page, root)
   await testVideoMedia(page, root, videoFixture)

@@ -40,6 +40,9 @@ export interface ImageRequest {
   steps: number
   seed: number
   count: number
+  workflowJson?: string
+  outputNodeId?: string
+  referenceVersionId?: string | null
 }
 export interface ImageJob {
   id: string

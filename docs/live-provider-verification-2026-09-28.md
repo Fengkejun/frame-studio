@@ -22,3 +22,11 @@
 把全部媒体模拟测试和两个真实文本工作流连在同一次 WebView2 进程中运行时，云端故事生成阶段曾出现一次测试页面关闭，Windows 应用事件日志没有相应崩溃记录。拆成隔离桌面进程重跑后通过；目前没有足够证据将其归为产品崩溃。原生测试现会在失败时打印应用退出码与 stderr，便于复现时定位。
 
 默认 `npm run test:desktop` 仍只使用本机模拟服务。设置 `FRAME_STUDIO_LIVE_IMAGE_BASE_URL` 和 `FRAME_STUDIO_LIVE_IMAGE_KEY` 后会额外执行一次真实桌面文生图；只有另外设置 `FRAME_STUDIO_LIVE_IMAGE_EDIT=1` 才会追加真实图生图。设置 `FRAME_STUDIO_LIVE_WORKFLOW=1` 后通过桌面 Rust IPC 运行本机 Ollama 故事与分镜；同时设置 `FRAME_STUDIO_LIVE_TEXT_BASE_URL` 和 `FRAME_STUDIO_LIVE_TEXT_KEY` 后还会运行云端文本工作流。`npm run test:live-workflow` 可单独运行这段原生文本验证，`FRAME_STUDIO_LIVE_WORKFLOW_SKIP_LOCAL=1` 可只测云端。`node scripts/live-text-smoke.mjs` 可验证同一文本协议。真实请求可能产生费用。
+
+## 2026-09-29 真实桌面图生图复核
+
+在隔离的 Windows 桌面测试数据目录中，使用同一图片网关重新执行 `npm run test:desktop`，开启真实图生图开关。脚本确认新任务入列后等待其完成，检查候选图从 3 张增加到 4 张，生成截图保存为 `artifacts/desktop-live-cloud-edit.png`。本次真实文生图和真实图生图均通过；旧任务的「结果未知」记录仍保持原判断，不会被本次新任务覆盖。测试密钥在进程内提供，运行后调用原生 IPC 清理系统凭据库中的测试密钥。其余 ComfyUI、Wan 和时间线验证在本轮桌面测试中使用本机协议模拟服务。
+
+## 2026-09-29 本机 ComfyUI 复核
+
+从本机已安装的 ComfyUI 启动隔离测试实例，使用独立数据目录、CPU 模式和 `127.0.0.1:8190`。设置 `FRAME_STUDIO_LIVE_COMFY_URL=http://127.0.0.1:8190` 后执行 `npm run test:desktop`：自定义 `EmptyImage → SaveImage` 工作流提交、历史查询、下载和素材入库通过；选择项目中的角色参考图后，`/upload/image` 与 `LoadImage → SaveImage` 工作流也通过。桌面截图在 `artifacts/desktop-live-comfyui.png`。这两条工作流不进行 AI 模型推理；本机测试目录没有可用 checkpoint，尚未验证 Flux、LoRA、ControlNet 或实际图生图画质。

@@ -25,6 +25,12 @@ pub struct ImageRequest {
     pub steps: u32,
     pub seed: u64,
     pub count: u32,
+    #[serde(default)]
+    pub workflow_json: String,
+    #[serde(default)]
+    pub output_node_id: String,
+    #[serde(default)]
+    pub reference_version_id: Option<String>,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,8 +104,7 @@ async fn get_json(client: &Client, url: Url) -> AppResult<Value> {
 }
 fn validate(request: &ImageRequest) -> AppResult<()> {
     endpoint(&request.base_url, "/")?;
-    if request.checkpoint.trim().is_empty()
-        || request.checkpoint.len() > 500
+    if request.checkpoint.len() > 500
         || request.positive.trim().is_empty()
         || request.positive.len() > 16_000
         || request.negative.len() > 16_000
@@ -115,7 +120,83 @@ fn validate(request: &ImageRequest) -> AppResult<()> {
             "请检查模型、提示词、尺寸（256–2048，64 的倍数）、步数（1–60）与候选数（1–4）".into(),
         );
     }
+    if request.workflow_json.is_empty() {
+        if request.checkpoint.trim().is_empty() || request.reference_version_id.is_some() {
+            return Err("标准工作流需要 Checkpoint；参考图请使用自定义 API 工作流".into());
+        }
+    } else {
+        custom_graph(request, "validation", "reference.png")?;
+    }
     Ok(())
+}
+
+fn custom_graph(request: &ImageRequest, id: &str, reference: &str) -> AppResult<Value> {
+    if request.workflow_json.len() > 256_000 {
+        return Err("工作流 JSON 不能超过 256 KB".into());
+    }
+    let mut graph: Value = serde_json::from_str(&request.workflow_json)
+        .map_err(|_| "请导入 ComfyUI 导出的 API 格式 JSON")?;
+    let nodes = graph
+        .as_object()
+        .filter(|nodes| !nodes.is_empty() && nodes.len() <= 512)
+        .ok_or("工作流需包含 1–512 个 API 格式节点")?;
+    if nodes
+        .values()
+        .any(|node| !node["class_type"].is_string() || !node["inputs"].is_object())
+    {
+        return Err("工作流节点需包含 class_type 和 inputs；请导出 API 格式".into());
+    }
+    if request.output_node_id.is_empty()
+        || nodes
+            .get(&request.output_node_id)
+            .and_then(|node| node["class_type"].as_str())
+            != Some("SaveImage")
+    {
+        return Err("请选择工作流中的 SaveImage 输出节点 ID".into());
+    }
+    let has_reference = request.workflow_json.contains("{{reference_image}}");
+    if has_reference != request.reference_version_id.is_some() {
+        return Err("参考图选择与 {{reference_image}} 占位符需同时设置".into());
+    }
+    let values = [
+        ("{{positive}}", json!(request.positive)),
+        ("{{negative}}", json!(request.negative)),
+        ("{{checkpoint}}", json!(request.checkpoint)),
+        ("{{width}}", json!(request.width)),
+        ("{{height}}", json!(request.height)),
+        ("{{steps}}", json!(request.steps)),
+        ("{{seed}}", json!(request.seed)),
+        ("{{count}}", json!(request.count)),
+        ("{{reference_image}}", json!(reference)),
+        ("{{output_prefix}}", json!(format!("FrameStudio/{id}"))),
+    ];
+    fn expand(value: &mut Value, values: &[(&str, Value)]) {
+        match value {
+            Value::Object(fields) => fields.values_mut().for_each(|v| expand(v, values)),
+            Value::Array(items) => items.iter_mut().for_each(|v| expand(v, values)),
+            Value::String(input) => {
+                if let Some((_, replacement)) = values.iter().find(|(token, _)| input == token) {
+                    *value = replacement.clone();
+                } else {
+                    for (token, replacement) in values {
+                        if input.contains(token) {
+                            *input = input.replace(
+                                token,
+                                replacement
+                                    .as_str()
+                                    .map(str::to_owned)
+                                    .unwrap_or_else(|| replacement.to_string())
+                                    .as_str(),
+                            );
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    expand(&mut graph, &values);
+    Ok(graph)
 }
 fn graph(r: &ImageRequest, id: &str) -> Value {
     json!({
@@ -226,6 +307,17 @@ pub fn start_image_job(
 ) -> AppResult<ImageJob> {
     validate(&request)?;
     validate_context(&state, &request.context)?;
+    if let Some(version_id) = &request.reference_version_id {
+        let entry = asset(&state, version_id)?;
+        if !state
+            .directory
+            .join("assets")
+            .join(entry.file_name)
+            .is_file()
+        {
+            return Err("参考图原文件已丢失，请重新导入".into());
+        }
+    }
     let mut active = state.media_active.lock().map_err(|_| "图片任务锁不可用")?;
     if active.is_some() {
         return Err("已有图片任务正在执行，请等待或停止等待".into());
@@ -317,10 +409,49 @@ async fn execute(
 ) -> AppResult<()> {
     let client = client()?;
     if submit {
+        let graph = if job.request.workflow_json.is_empty() {
+            graph(&job.request, &job.id)
+        } else {
+            let reference = if let Some(version_id) = &job.request.reference_version_id {
+                let entry = asset(state, version_id)?;
+                let bytes = std::fs::read(state.directory.join("assets").join(&entry.file_name))
+                    .map_err(|_| "参考图原文件已丢失")?;
+                if bytes.len() > MAX_IMAGE_BYTES {
+                    return Err("参考图超过 20 MB 限制".into());
+                }
+                let filename = format!("frame-studio-{}-{}", job.id, entry.file_name);
+                let part = reqwest::multipart::Part::bytes(bytes).file_name(filename);
+                let response = client
+                    .post(endpoint(&job.request.base_url, "/upload/image")?)
+                    .multipart(
+                        reqwest::multipart::Form::new()
+                            .part("image", part)
+                            .text("type", "input"),
+                    )
+                    .send()
+                    .await
+                    .map_err(|_| "参考图上传响应未收到；请检查 ComfyUI 输入目录")?;
+                let body: Value = serde_json::from_slice(&limited(response, 4_000_000).await?)
+                    .map_err(|_| "参考图上传响应无效")?;
+                let name = body["name"]
+                    .as_str()
+                    .filter(|name| !name.is_empty())
+                    .ok_or("ComfyUI 未返回参考图文件名")?;
+                let subfolder = body["subfolder"].as_str().unwrap_or("");
+                if subfolder.is_empty() {
+                    name.to_owned()
+                } else {
+                    format!("{subfolder}/{name}")
+                }
+            } else {
+                String::new()
+            };
+            custom_graph(&job.request, &job.id, &reference)?
+        };
         // Persisted before POST. A lost response becomes unknown, never an automatic retry.
         let response = client
             .post(endpoint(&job.request.base_url, "/prompt")?)
-            .json(&json!({"prompt":graph(&job.request,&job.id),"client_id":job.id}))
+            .json(&json!({"prompt":graph,"client_id":job.id}))
             .send()
             .await
             .map_err(|_| "提交响应未收到，结果未知；请检查 ComfyUI 队列，避免重复生成")?;
@@ -364,9 +495,13 @@ async fn execute(
                 );
             }
             if result.pointer("/status/completed").and_then(Value::as_bool) == Some(true) {
-                let outputs = result
-                    .pointer("/outputs/9/images")
-                    .and_then(Value::as_array)
+                let output_node_id = if job.request.workflow_json.is_empty() {
+                    "9"
+                } else {
+                    &job.request.output_node_id
+                };
+                let outputs = result["outputs"][output_node_id]["images"]
+                    .as_array()
                     .ok_or("任务完成但没有图片输出")?;
                 if outputs.is_empty() || outputs.len() != job.request.count as usize {
                     return Err("图片数量与请求不一致，请检查 ComfyUI 输出".into());
@@ -437,6 +572,45 @@ async fn execute(
 mod tests {
     use super::*;
     #[test]
+    fn custom_api_graph_expands_typed_inputs_and_reference() {
+        let request: ImageRequest = serde_json::from_value(json!({
+            "context":{"workflowId":"w","nodeId":"n","artifactId":"a","shotId":"s"},
+            "baseUrl":"http://127.0.0.1:8188", "checkpoint":"", "positive":"cat",
+            "negative":"blur", "width":512, "height":768, "steps":20, "seed":42,
+            "count":2, "outputNodeId":"20", "referenceVersionId":"v1",
+            "workflowJson":serde_json::to_string(&json!({
+                "10":{"class_type":"LoadImage","inputs":{"image":"{{reference_image}}"}},
+                "12":{"class_type":"SomeSampler","inputs":{"seed":"{{seed}}","batch":"{{count}}","prompt":"portrait of {{positive}}"}},
+                "20":{"class_type":"SaveImage","inputs":{"images":["12",0],"filename_prefix":"{{output_prefix}}"}}
+            })).unwrap()
+        })).unwrap();
+        validate(&request).unwrap();
+        let graph = custom_graph(&request, "job-1", "uploaded.png").unwrap();
+        assert_eq!(graph["10"]["inputs"]["image"], "uploaded.png");
+        assert_eq!(graph["12"]["inputs"]["seed"], 42);
+        assert_eq!(graph["12"]["inputs"]["batch"], 2);
+        assert_eq!(graph["12"]["inputs"]["prompt"], "portrait of cat");
+        assert_eq!(
+            graph["20"]["inputs"]["filename_prefix"],
+            "FrameStudio/job-1"
+        );
+    }
+    #[test]
+    fn custom_api_graph_rejects_ui_export_and_unbound_reference() {
+        let mut request: ImageRequest = serde_json::from_value(json!({
+            "context":{"workflowId":"w","nodeId":"n","artifactId":"a","shotId":"s"},
+            "baseUrl":"http://127.0.0.1:8188", "checkpoint":"", "positive":"cat",
+            "negative":"", "width":512, "height":768, "steps":20, "seed":42,
+            "count":1, "outputNodeId":"9", "workflowJson":"{\"nodes\":[]}"
+        }))
+        .unwrap();
+        assert!(validate(&request).is_err());
+        request.workflow_json = json!({
+            "9":{"class_type":"SaveImage","inputs":{"images":["8",0],"filename_prefix":"{{reference_image}}"}}
+        }).to_string();
+        assert!(validate(&request).is_err());
+    }
+    #[test]
     fn restart_recovers_pollable_jobs_without_resubmission() {
         let directory = std::env::temp_dir().join(format!("frame-media-test-{}", uid()));
         std::fs::create_dir(&directory).unwrap();
@@ -465,6 +639,9 @@ mod tests {
             steps: 20,
             seed: 1,
             count: 1,
+            workflow_json: String::new(),
+            output_node_id: String::new(),
+            reference_version_id: None,
         };
         let mut job = ImageJob {
             id: "known".into(),

@@ -21,7 +21,7 @@
 2. 在云端生图表单的「生图方式」中选择该角色参考图。提交后，桌面端读取本地原图，通过 OpenAI Images `/v1/images/edits` 的 multipart `image[]` 发送图片和提示词。返回图作为新版本保存，不覆盖参考图，也不自动改变首帧。
 3. 检查候选后按需要再次绑定角色或选为镜头首帧。任务记录保存请求时所选的参考图版本，重启后仍可核对来源。图生图同样可能产生云端费用，提交结果未知时不会自动重发。
 
-角色参考图需要先存在本地素材库，图生图目前通过云端 OpenAI 图片编辑接口实现。本机 ComfyUI 适配器仍是文生图模板。
+角色参考图需要先存在本地素材库。云端图生图通过 OpenAI 图片编辑接口实现；本机 ComfyUI 可通过自定义 API 格式工作流的 LoadImage 节点使用参考图。
 
 ## 本机 ComfyUI 使用
 
@@ -29,10 +29,12 @@
 2. 在桌面应用中生成分镜，或在分镜节点的「编辑结构化结果」中录入已有分镜。分镜必须确认且未过期。
 3. 点击镜头卡片的「制作首帧」，进入「首帧与素材」，选择「本机 ComfyUI」。填本机根地址（默认 `http://127.0.0.1:8188`），检测连接并选择 checkpoint。
 4. 镜头的 `imagePrompt` 自动带入正面提示词；可编辑正面/负面词。设置尺寸、步数、种子和候选数后生成。初始 512 × 768、20 步、1 张；按模型要求调整，SDXL 常需更高尺寸及更多显存。
-5. 从候选图选择，或把素材拖到首帧区域，再确认使用该版本。再次生成只增加候选，不替换已选首帧。相同种子和参数通常生成同样的图，探索时更换种子。
-6. 可导入 PNG、JPEG、WebP（最多 20 MiB、最长边 8192、最多 16,777,216 像素），并明确绑定到镜头或角色。导入图片可作为云端图生图参考输入。
+5. 如需 Flux、LoRA、ControlNet 或本机图生图，切换「导入 API 格式工作流」，选择 ComfyUI 导出的 API JSON。应用自动填入第一个 SaveImage 节点 ID；有多个 SaveImage 时可手动指定。将需要动态赋值的输入改成字符串占位符：`{{positive}}`、`{{negative}}`、`{{seed}}`、`{{width}}`、`{{height}}`、`{{steps}}`、`{{count}}`、`{{checkpoint}}`，以及可选的 `{{output_prefix}}`。其中完全等于数字占位符的输入会保持数字类型。
+6. 本机图生图时，先绑定一张角色参考图，在自定义工作流的 LoadImage.image 输入中写 `{{reference_image}}`，然后在表单中选择该角色。应用在提交工作流前上传当前素材版本的原图，再把 ComfyUI 返回的文件名填入节点。上传和任务提交都是本机请求；提交结果丢失时仍按原规则标记结果未知，不自动重发。
+7. 从候选图选择，或把素材拖到首帧区域，再确认使用该版本。再次生成只增加候选，不替换已选首帧。相同种子和参数通常生成同样的图，探索时更换种子。
+8. 可导入 PNG、JPEG、WebP（最多 20 MiB、最长边 8192、最多 16,777,216 像素），并明确绑定到镜头或角色。导入图片可作为云端或本机图生图参考输入。
 
-目前 ComfyUI 适配标准 `CheckpointLoaderSimple → CLIPTextEncode → EmptyLatentImage → KSampler → VAEDecode → SaveImage` 文生图流程。Flux、LoRA、ControlNet、ComfyUI 图生图与自定义工作流待后续适配。UI 的检测仅验证服务及模型列表，不保证选中的模型架构兼容该模板。
+内置模式仍使用 `CheckpointLoaderSimple → CLIPTextEncode → EmptyLatentImage → KSampler → VAEDecode → SaveImage`。自定义模式执行导入的 API JSON，最多 256 KB、512 个节点，要求指定 SaveImage 输出节点，返回图片数量应与表单中的候选数一致。ComfyUI 自身仍需安装工作流使用的节点和模型。UI 的连接检测仅验证服务及 Checkpoint 列表，不保证自定义工作流的节点、模型或显存可用。
 
 ## 任务与版本行为
 
@@ -56,12 +58,12 @@
 
 ## 验证范围
 
-`npm run test:desktop` 在隔离 WebView2 配置和数据库内执行真实 Rust IPC，使用 localhost 协议测试服务返回固定 PNG。覆盖候选入库、选择、角色版本绑定、文生图与图生图 multipart 请求、暂停恢复、下载失败后恢复、执行错误、HTTP 拒绝、导入校验、页面重载持久化、分镜版本隔离，以及图片节点的等待、汇集和版本变更后待更新状态。默认使用假 API Key 和本机假服务；设置 `FRAME_STUDIO_LIVE_IMAGE_BASE_URL` 与 `FRAME_STUDIO_LIVE_IMAGE_KEY` 时追加真实文生图，另设置 `FRAME_STUDIO_LIVE_IMAGE_EDIT=1` 时追加真实图生图，可能产生费用。Rust 单元测试覆盖重启恢复及 v1/v2/v3 数据库迁移。
+`npm run test:desktop` 在隔离 WebView2 配置和数据库内执行真实 Rust IPC，使用 localhost 协议测试服务返回固定 PNG。覆盖候选入库、选择、角色版本绑定、文生图与图生图 multipart 请求、自定义 ComfyUI 工作流参数替换与参考图上传、暂停恢复、下载失败后恢复、执行错误、HTTP 拒绝、导入校验、页面重载持久化、分镜版本隔离，以及图片节点的等待、汇集和版本变更后待更新状态。默认使用假 API Key 和本机假服务；设置 `FRAME_STUDIO_LIVE_IMAGE_BASE_URL` 与 `FRAME_STUDIO_LIVE_IMAGE_KEY` 时追加真实文生图，另设置 `FRAME_STUDIO_LIVE_IMAGE_EDIT=1` 时追加真实图生图，可能产生费用。Rust 单元测试覆盖模板校验、重启恢复及 v1/v2/v3 数据库迁移。
 
-协议测试不执行 AI 推理，不评估模型权限、模型兼容性、显存占用和图片质量。真实模型验收需配置可用 API Key 或启动本机 ComfyUI，并运行一条镜头。
+协议测试不执行 AI 推理，不评估模型权限、模型兼容性、显存占用和图片质量。设置 `FRAME_STUDIO_LIVE_COMFY_URL` 可在桌面测试中对运行中的本机 ComfyUI 执行无需模型的 EmptyImage 工作流，以及上传现有角色参考图的 LoadImage 工作流；这两条真实服务测试覆盖队列、历史、图片下载和素材入库。自定义工作流的真实推理验收仍需启动装有对应节点和模型的本机 ComfyUI，并运行一条镜头。
 
 ## 接口依据
 
-本次通过 Context7 核对 [ComfyUI API 示例](https://github.com/comfy-org/ComfyUI/blob/master/script_examples/basic_api_example.py)、[服务端路由](https://github.com/comfy-org/ComfyUI/blob/master/server.py) 与 [执行历史状态](https://github.com/comfy-org/ComfyUI/blob/master/execution.py)。
+本次通过 Context7 核对 [ComfyUI API 格式导出](https://github.com/comfy-org/docs/blob/main/development/api-development/workflow-api-format.mdx)、[ComfyUI API 示例](https://github.com/comfy-org/ComfyUI/blob/master/script_examples/basic_api_example.py)、[服务端路由](https://github.com/comfy-org/ComfyUI/blob/master/server.py) 与 [执行历史状态](https://github.com/comfy-org/ComfyUI/blob/master/execution.py)。
 
 云端图片接口对照 [OpenAI 图片生成指南](https://developers.openai.com/api/docs/guides/image-generation)、[生成接口](https://developers.openai.com/api/reference/resources/images/methods/generate) 与 [编辑接口](https://developers.openai.com/api/reference/resources/images/methods/edit)。

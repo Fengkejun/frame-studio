@@ -228,6 +228,8 @@ export function ImageStudio({
                     })
                   }
                   onError={media.setError}
+                  roleReferences={media.roleReferences}
+                  assets={media.assets}
                 />
               )}
             </>
@@ -482,10 +484,18 @@ export function ImageStudio({
                 <details>
                   <summary>生成参数</summary>
                   <p>
-                    模型：{job.request.checkpoint} · {job.request.width} ×{' '}
-                    {job.request.height} · {job.request.count} 张 · Seed{' '}
-                    {job.request.seed} · {job.request.steps} 步
+                    {job.request.workflowJson
+                      ? `自定义工作流 · SaveImage #${job.request.outputNodeId}`
+                      : `模型：${job.request.checkpoint}`}{' '}
+                    · {job.request.width} × {job.request.height} ·{' '}
+                    {job.request.count} 张 · Seed {job.request.seed} ·{' '}
+                    {job.request.steps} 步
                   </p>
+                  {job.request.referenceVersionId && (
+                    <p>
+                      参考图版本：{versionLabel(job.request.referenceVersionId)}
+                    </p>
+                  )}
                   <p>正面：{job.request.positive}</p>
                   <p>负面：{job.request.negative || '无'}</p>
                   <p>任务 ID：{job.promptId ?? '尚未收到'}</p>
@@ -598,12 +608,16 @@ function ImageForm({
   disabled,
   onStart,
   onError,
+  roleReferences,
+  assets,
 }: {
   context: api.ShotContext
   shot: Shot
   disabled: boolean
   onStart: (request: api.ImageRequest) => Promise<void>
   onError: (message: string) => void
+  roleReferences: api.RoleReference[]
+  assets: api.ImageAsset[]
 }) {
   const [request, setRequest] = useState<api.ImageRequest>(() => ({
     context,
@@ -616,7 +630,11 @@ function ImageForm({
     steps: 20,
     seed: Math.floor(Math.random() * 1_000_000_000),
     count: 1,
+    workflowJson: '',
+    outputNodeId: '',
+    referenceVersionId: null,
   }))
+  const [mode, setMode] = useState<'standard' | 'custom'>('standard')
   const [checkpoints, setCheckpoints] = useState<string[]>([])
   const [connection, setConnection] = useState('尚未检测连接')
   const [testing, setTesting] = useState(false)
@@ -626,7 +644,7 @@ function ImageForm({
     api
       .imageSettings()
       .then((saved) => {
-        if (alive && saved)
+        if (alive && saved) {
           setRequest((r) => ({
             ...r,
             baseUrl: saved.baseUrl,
@@ -636,7 +654,12 @@ function ImageForm({
             steps: saved.steps,
             count: saved.count,
             negative: saved.negative,
+            workflowJson: saved.workflowJson ?? '',
+            outputNodeId: saved.outputNodeId ?? '',
+            referenceVersionId: null,
           }))
+          setMode(saved.workflowJson ? 'custom' : 'standard')
+        }
       })
       .catch((e) => {
         if (alive) onError(errorMessage(e))
@@ -674,12 +697,48 @@ function ImageForm({
       setTesting(false)
     }
   }
+  async function loadWorkflow(file: File | undefined) {
+    if (!file) return
+    if (file.size > 256_000) {
+      onError('工作流 JSON 不能超过 256 KB')
+      return
+    }
+    const json = await file.text()
+    try {
+      const parsed: unknown = JSON.parse(json)
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+        throw new Error('请导入 ComfyUI 导出的 API 格式 JSON')
+      const outputs = Object.entries(parsed).filter(
+        ([, node]) =>
+          !!node &&
+          typeof node === 'object' &&
+          'class_type' in node &&
+          node.class_type === 'SaveImage',
+      )
+      const firstOutput = outputs[0]
+      if (!firstOutput) throw new Error('工作流中需要 SaveImage 输出节点')
+      setRequest((r) => ({
+        ...r,
+        workflowJson: json,
+        outputNodeId: firstOutput[0],
+      }))
+      setMode('custom')
+    } catch (error) {
+      onError(errorMessage(error))
+    }
+  }
   return (
     <form
       className="image-form"
       onSubmit={(e) => {
         e.preventDefault()
-        void onStart(request)
+        void onStart({
+          ...request,
+          workflowJson: mode === 'custom' ? request.workflowJson : '',
+          outputNodeId: mode === 'custom' ? request.outputNodeId : '',
+          referenceVersionId:
+            mode === 'custom' ? request.referenceVersionId : null,
+        })
       }}
     >
       <fieldset disabled={!loaded || disabled || testing || !isDesktop}>
@@ -708,25 +767,96 @@ function ImageForm({
           {connection}
         </p>
         <label className="field-label">
-          Checkpoint 模型
-          <input
-            list="comfy-checkpoints"
-            aria-label="Checkpoint 模型"
-            required
-            maxLength={500}
-            placeholder="选择或输入本机模型文件名"
-            value={request.checkpoint}
-            onChange={(e) => field('checkpoint', e.target.value)}
-          />
-          <datalist id="comfy-checkpoints">
-            {checkpoints.map((name) => (
-              <option key={name} value={name} />
-            ))}
-          </datalist>
+          ComfyUI 工作流模式
+          <select
+            aria-label="ComfyUI 工作流模式"
+            value={mode}
+            onChange={(e) => setMode(e.target.value as 'standard' | 'custom')}
+          >
+            <option value="standard">内置 SD 文生图</option>
+            <option value="custom">导入 API 格式工作流</option>
+          </select>
         </label>
-        <p className="field-hint">
-          标准 SD 1.5 / SDXL 文生图流程。其他架构与自定义工作流将在后续接入。
-        </p>
+        {mode === 'standard' ? (
+          <>
+            <label className="field-label">
+              Checkpoint 模型
+              <input
+                list="comfy-checkpoints"
+                aria-label="Checkpoint 模型"
+                required
+                maxLength={500}
+                placeholder="选择或输入本机模型文件名"
+                value={request.checkpoint}
+                onChange={(e) => field('checkpoint', e.target.value)}
+              />
+              <datalist id="comfy-checkpoints">
+                {checkpoints.map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+            </label>
+            <p className="field-hint">标准 SD 1.5 / SDXL 文生图流程。</p>
+          </>
+        ) : (
+          <>
+            <label className="field-label">
+              导入 ComfyUI API 工作流 JSON
+              <input
+                aria-label="导入 ComfyUI API 工作流 JSON"
+                type="file"
+                accept=".json,application/json"
+                onChange={(e) => void loadWorkflow(e.target.files?.[0])}
+              />
+            </label>
+            <label className="field-label">
+              工作流 JSON
+              <textarea
+                aria-label="ComfyUI API 工作流 JSON"
+                required
+                maxLength={256000}
+                rows={6}
+                value={request.workflowJson ?? ''}
+                onChange={(e) => field('workflowJson', e.target.value)}
+              />
+            </label>
+            <label className="field-label">
+              SaveImage 输出节点 ID
+              <input
+                aria-label="SaveImage 输出节点 ID"
+                required
+                value={request.outputNodeId ?? ''}
+                onChange={(e) => field('outputNodeId', e.target.value)}
+              />
+            </label>
+            <label className="field-label">
+              角色参考图（可选）
+              <select
+                aria-label="ComfyUI 角色参考图"
+                value={request.referenceVersionId ?? ''}
+                onChange={(e) =>
+                  field('referenceVersionId', e.target.value || null)
+                }
+              >
+                <option value="">不使用参考图</option>
+                {roleReferences.map((role) => (
+                  <option key={role.roleName} value={role.versionId}>
+                    {role.roleName} ·{' '}
+                    {assets.find((a) => a.versionId === role.versionId)?.name ??
+                      role.versionId}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="field-hint">
+              从 ComfyUI 导出 API 格式，在对应输入值中使用 {'{{positive}}'}、
+              {'{{negative}}'}、{'{{seed}}'}、{'{{width}}'}、{'{{height}}'}、
+              {'{{steps}}'}、{'{{count}}'}、{'{{checkpoint}}'}；图生图请在
+              LoadImage.image 中使用 {'{{reference_image}}'}{' '}
+              并选择角色参考图。输出前缀可用 {'{{output_prefix}}'}。
+            </p>
+          </>
+        )}
         <label className="field-label">
           正面提示词
           <textarea
