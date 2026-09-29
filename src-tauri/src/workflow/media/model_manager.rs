@@ -51,7 +51,7 @@ fn available_space(path: &Path) -> AppResult<u64> {
         return Err(std::io::Error::last_os_error().to_string());
     }
     let stats = unsafe { stats.assume_init() };
-    Ok(stats.f_bavail.saturating_mul(stats.f_frsize))
+    Ok(u64::from(stats.f_bavail).saturating_mul(u64::from(stats.f_frsize)))
 }
 
 struct ModelSpec {
