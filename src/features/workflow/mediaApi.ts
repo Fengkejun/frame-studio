@@ -40,6 +40,7 @@ export interface ImageRequest {
   steps: number
   seed: number
   count: number
+  preset?: 'sd' | 'flux1-dev-fp8'
   workflowJson?: string
   outputNodeId?: string
   referenceVersionId?: string | null

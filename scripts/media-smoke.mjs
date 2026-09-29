@@ -13,6 +13,8 @@ export async function testMedia(page, root) {
   let reject = false
   let downloadFails = false
   let loseResponse = false
+  let fluxAvailable = false
+  let fluxNodesAvailable = false
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost')
     res.setHeader('Content-Type', 'application/json')
@@ -20,9 +22,29 @@ export async function testMedia(page, root) {
       res.end(
         JSON.stringify({
           CheckpointLoaderSimple: {
-            input: { required: { ckpt_name: [['fixture-sd.safetensors']] } },
+            input: {
+              required: {
+                ckpt_name: [
+                  fluxAvailable
+                    ? ['fixture-sd.safetensors', 'flux1-dev-fp8.safetensors']
+                    : ['fixture-sd.safetensors'],
+                ],
+              },
+            },
           },
         }),
+      )
+    } else if (url.pathname === '/object_info/EmptySD3LatentImage') {
+      res.end(
+        JSON.stringify(
+          fluxNodesAvailable ? { EmptySD3LatentImage: { input: {} } } : {},
+        ),
+      )
+    } else if (url.pathname === '/object_info/FluxGuidance') {
+      res.end(
+        JSON.stringify(
+          fluxNodesAvailable ? { FluxGuidance: { input: {} } } : {},
+        ),
       )
     } else if (url.pathname === '/upload/image') {
       const chunks = []
@@ -57,7 +79,8 @@ export async function testMedia(page, root) {
       }
       const id = url.pathname.split('/').at(-1)
       const n = Number(id.split('-').at(-1)) - 1
-      const count = submissions[n].prompt['5'].inputs.batch_size
+      const count = (submissions[n].prompt['5'] ?? submissions[n].prompt['27'])
+        .inputs.batch_size
       const outputId = Object.entries(submissions[n].prompt).find(
         ([, node]) => node.class_type === 'SaveImage',
       )?.[0]
@@ -233,6 +256,7 @@ export async function testMedia(page, root) {
       .evaluate((element) =>
         element.scrollIntoView({ block: 'start', behavior: 'instant' }),
       )
+    await page.getByRole('button', { name: '适应画布' }).click()
     await page
       .getByTestId('rf__node-image-fixture')
       .locator('.node-mark')
@@ -407,14 +431,20 @@ export async function testMedia(page, root) {
       .locator('.asset-card')
       .filter({ hasText: '导入参考图.png' })
     await expect(card).toHaveAttribute('draggable', 'true')
-    const from = await card.boundingBox()
-    const to = await dropZone.boundingBox()
-    await page.mouse.move(from.x + 30, from.y + 30)
-    await page.mouse.down()
-    await page.mouse.move(from.x + 50, from.y + 35, { steps: 5 })
-    await page.mouse.move(to.x + 40, to.y + 40, { steps: 15 })
-    await page.mouse.move(to.x + 45, to.y + 45)
-    await page.mouse.up()
+    // CDP pointer drags in WebView2 are unreliable; dispatch the browser drag
+    // events to exercise the same asset-reference handler deterministically.
+    await card.evaluate((source) => {
+      const target = source.ownerDocument.querySelector('.first-frame-target')
+      if (!target) throw new Error('Missing first-frame drop target')
+      const view = source.ownerDocument.defaultView
+      const dataTransfer = new view.DataTransfer()
+      source.dispatchEvent(
+        new view.DragEvent('dragstart', { bubbles: true, dataTransfer }),
+      )
+      target.dispatchEvent(
+        new view.DragEvent('drop', { bubbles: true, dataTransfer }),
+      )
+    })
     await expect(page.getByRole('dialog')).toBeVisible()
     await page.getByRole('button', { name: '确认使用此版本' }).click()
     await expect(page.locator('.asset-card.is-selected')).toContainText(
@@ -510,8 +540,37 @@ export async function testMedia(page, root) {
       path: path.join(root, 'artifacts/desktop-custom-comfyui.png'),
       fullPage: true,
     })
+    await page.getByLabel('ComfyUI 工作流模式').selectOption('flux')
+    await expect(page.getByLabel('Checkpoint 模型')).toHaveValue(
+      'flux1-dev-fp8.safetensors',
+    )
+    await generate()
+    await expect(page.getByRole('alert')).toContainText('未识别 flux1-dev-fp8')
+    expect(submissions).toHaveLength(6)
+    fluxAvailable = true
+    await page.getByRole('button', { name: '检测连接与模型' }).click()
+    await expect(page.getByText('连接成功 · 2 个模型')).toBeVisible()
+    await generate()
+    await expect(jobs).toHaveCount(8)
+    await expect(jobs.first()).toContainText('缺少 EmptySD3LatentImage')
+    expect(submissions).toHaveLength(6)
+    fluxNodesAvailable = true
+    await generate()
+    await expect(jobs).toHaveCount(9)
+    await expect(jobs.first().getByText('已完成', { exact: true })).toBeVisible(
+      { timeout: 15000 },
+    )
+    expect(submissions).toHaveLength(7)
+    const flux = submissions[6].prompt
+    expect(flux['27'].class_type).toBe('EmptySD3LatentImage')
+    expect(flux['27'].inputs.width).toBe(1024)
+    expect(flux['31'].inputs.cfg).toBe(1)
+    expect(flux['31'].inputs.scheduler).toBe('simple')
+    expect(flux['35'].class_type).toBe('FluxGuidance')
+    expect(flux['30'].inputs.ckpt_name).toBe('flux1-dev-fp8.safetensors')
+    expect(flux['33'].inputs.text).toBe('')
     console.log(
-      'PASS: real native image IPC, custom ComfyUI graph and reference upload, candidate persistence, explicit selection, resume without resubmit, errors, imports and storyboard version isolation. Fixture images only; no AI inference.',
+      'PASS: real native image IPC, FLUX FP8 preset and missing-model guard, custom ComfyUI graph and reference upload, candidate persistence, explicit selection, resume without resubmit, errors, imports and storyboard version isolation. Fixture images only; no AI inference.',
     )
   } catch (error) {
     await page.screenshot({

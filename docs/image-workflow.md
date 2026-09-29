@@ -29,18 +29,19 @@
 2. 在桌面应用中生成分镜，或在分镜节点的「编辑结构化结果」中录入已有分镜。分镜必须确认且未过期。
 3. 点击镜头卡片的「制作首帧」，进入「首帧与素材」，选择「本机 ComfyUI」。填本机根地址（默认 `http://127.0.0.1:8188`），检测连接并选择 checkpoint。
 4. 镜头的 `imagePrompt` 自动带入正面提示词；可编辑正面/负面词。设置尺寸、步数、种子和候选数后生成。初始 512 × 768、20 步、1 张；按模型要求调整，SDXL 常需更高尺寸及更多显存。
-5. 如需 Flux、LoRA、ControlNet 或本机图生图，切换「导入 API 格式工作流」，选择 ComfyUI 导出的 API JSON。应用自动填入第一个 SaveImage 节点 ID；有多个 SaveImage 时可手动指定。将需要动态赋值的输入改成字符串占位符：`{{positive}}`、`{{negative}}`、`{{seed}}`、`{{width}}`、`{{height}}`、`{{steps}}`、`{{count}}`、`{{checkpoint}}`，以及可选的 `{{output_prefix}}`。其中完全等于数字占位符的输入会保持数字类型。
-6. 本机图生图时，先绑定一张角色参考图，在自定义工作流的 LoadImage.image 输入中写 `{{reference_image}}`，然后在表单中选择该角色。应用在提交工作流前上传当前素材版本的原图，再把 ComfyUI 返回的文件名填入节点。上传和任务提交都是本机请求；提交结果丢失时仍按原规则标记结果未知，不自动重发。
-7. 从候选图选择，或把素材拖到首帧区域，再确认使用该版本。再次生成只增加候选，不替换已选首帧。相同种子和参数通常生成同样的图，探索时更换种子。
-8. 可导入 PNG、JPEG、WebP（最多 20 MiB、最长边 8192、最多 16,777,216 像素），并明确绑定到镜头或角色。导入图片可作为云端或本机图生图参考输入。
+5. 若已安装 `flux1-dev-fp8.safetensors`，选择「内置 FLUX.1-dev FP8 文生图」。该预设依据 ComfyUI 官方单文件 FP8 示例，使用 `EmptySD3LatentImage`、`FluxGuidance`、CFG 1 和 Euler / simple；负面提示词不参与。点击生成前会检查 ComfyUI 的 checkpoint 列表，后台提交前还会核对所需节点。检查只确认模型名称与节点存在，不验证显存、模型文件完整性或最终出图效果。
+6. 如需 Depth LoRA、ControlNet 或本机图生图，切换「导入 API 格式工作流」，选择 ComfyUI 导出的 API JSON。应用自动填入第一个 SaveImage 节点 ID；有多个 SaveImage 时可手动指定。将需要动态赋值的输入改成字符串占位符：`{{positive}}`、`{{negative}}`、`{{seed}}`、`{{width}}`、`{{height}}`、`{{steps}}`、`{{count}}`、`{{checkpoint}}`，以及可选的 `{{output_prefix}}`。其中完全等于数字占位符的输入会保持数字类型。
+7. 本机图生图时，先绑定一张角色参考图，在自定义工作流的 LoadImage.image 输入中写 `{{reference_image}}`，然后在表单中选择该角色。应用在提交工作流前上传当前素材版本的原图，再把 ComfyUI 返回的文件名填入节点。上传和任务提交都是本机请求；提交结果丢失时仍按原规则标记结果未知，不自动重发。
+8. 从候选图选择，或把素材拖到首帧区域，再确认使用该版本。再次生成只增加候选，不替换已选首帧。相同种子和参数通常生成同样的图，探索时更换种子。
+9. 可导入 PNG、JPEG、WebP（最多 20 MiB、最长边 8192、最多 16,777,216 像素），并明确绑定到镜头或角色。导入图片可作为云端或本机图生图参考输入。
 
-内置模式仍使用 `CheckpointLoaderSimple → CLIPTextEncode → EmptyLatentImage → KSampler → VAEDecode → SaveImage`。自定义模式执行导入的 API JSON，最多 256 KB、512 个节点，要求指定 SaveImage 输出节点，返回图片数量应与表单中的候选数一致。ComfyUI 自身仍需安装工作流使用的节点和模型。UI 的连接检测仅验证服务及 Checkpoint 列表，不保证自定义工作流的节点、模型或显存可用。
+内置 SD 模式使用 `CheckpointLoaderSimple → CLIPTextEncode → EmptyLatentImage → KSampler → VAEDecode → SaveImage`；内置 FLUX 模式使用其专用 latent 与 guidance。自定义模式执行导入的 API JSON，最多 256 KB、512 个节点，要求指定 SaveImage 输出节点，返回图片数量应与表单中的候选数一致。ComfyUI 自身仍需安装工作流使用的节点和模型。连接检测不保证自定义工作流的节点、模型或显存可用。
 
 ### 可选 FLUX 模型下载
 
 在「本机 ComfyUI」的「可选下载 FLUX / LoRA 模型」中选择现有 ComfyUI 的 `models` 文件夹。应用显示当前磁盘剩余空间、目标文件和未完成的 `.part` 文件。选择模型并确认许可与体积后才会下载。可选 [FLUX.1-dev FP8 checkpoint](https://huggingface.co/Comfy-Org/flux1-dev/blob/main/flux1-dev-fp8.safetensors)（17,246,524,772 字节）和 [FLUX.1 Depth LoRA](https://huggingface.co/Comfy-Org/flux1-dev/blob/a6518765851ffa45c55e2bb9ca5ad208fd5d8023/split_files/loras/flux1-depth-dev-lora.safetensors)（1,244,440,512 字节）；两者均受 FLUX.1-dev 非商业许可约束。Depth LoRA 还需要兼容的 FLUX.1-dev 基础模型及 Depth 工作流。
 
-下载器只接受内置模型目录中的文件，写入 `models/checkpoints` 或 `models/loras`。如模型仓库要求认证，先在 Hugging Face 网页接受许可，再输入有读取权限的 Token；Token 仅用于本次请求，不保存到项目或系统凭据库。HTTP Range 用于续传；下载结束核对固定 SHA-256，成功后才发布最终文件名。暂停或退出应用会保留 `.part`，下次点击「继续下载」即可恢复。已有最终文件不会被覆盖，界面仅报告其存在及大小，不声称已校验。校验失败会清理损坏的 `.part`。下载完成后重启 ComfyUI，再导入对应 FLUX API 格式工作流；内置 SD 工作流不兼容 FLUX。Windows 和 macOS 安装包均不附带这些模型。仅使用云端生图时无需下载。
+下载器只接受内置模型目录中的文件，写入 `models/checkpoints` 或 `models/loras`。如模型仓库要求认证，先在 Hugging Face 网页接受许可，再输入有读取权限的 Token；Token 仅用于本次请求，不保存到项目或系统凭据库。HTTP Range 用于续传；下载结束核对固定 SHA-256，成功后才发布最终文件名。暂停或退出应用会保留 `.part`，下次点击「继续下载」即可恢复。已有最终文件不会被覆盖，界面仅报告其存在及大小，不声称已校验。校验失败会清理损坏的 `.part`。下载完成后重启 ComfyUI，FP8 checkpoint 可选内置预设，Depth LoRA 需导入相应 API 工作流。Windows 和 macOS 安装包均不附带这些模型。仅使用云端生图时无需下载。
 
 ## 任务与版本行为
 
@@ -70,6 +71,6 @@
 
 ## 接口依据
 
-本次通过 Context7 核对 [ComfyUI API 格式导出](https://github.com/comfy-org/docs/blob/main/development/api-development/workflow-api-format.mdx)、[ComfyUI API 示例](https://github.com/comfy-org/ComfyUI/blob/master/script_examples/basic_api_example.py)、[服务端路由](https://github.com/comfy-org/ComfyUI/blob/master/server.py) 与 [执行历史状态](https://github.com/comfy-org/ComfyUI/blob/master/execution.py)。
+本次通过 Context7 核对 [ComfyUI API 格式导出](https://github.com/comfy-org/docs/blob/main/development/api-development/workflow-api-format.mdx)、[ComfyUI API 示例](https://github.com/comfy-org/ComfyUI/blob/master/script_examples/basic_api_example.py)、[服务端路由](https://github.com/comfy-org/ComfyUI/blob/master/server.py) 与 [执行历史状态](https://github.com/comfy-org/ComfyUI/blob/master/execution.py)。FLUX 预设参照 [ComfyUI 官方 FP8 checkpoint 示例](https://comfyanonymous.github.io/ComfyUI_examples/flux/) 和 [工作流示例图](https://comfyanonymous.github.io/ComfyUI_examples/flux/flux_dev_checkpoint_example.png) 中的 API 图。
 
 云端图片接口对照 [OpenAI 图片生成指南](https://developers.openai.com/api/docs/guides/image-generation)、[生成接口](https://developers.openai.com/api/reference/resources/images/methods/generate) 与 [编辑接口](https://developers.openai.com/api/reference/resources/images/methods/edit)。

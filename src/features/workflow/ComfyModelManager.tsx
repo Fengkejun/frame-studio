@@ -110,8 +110,9 @@ export function ComfyModelManager() {
     <details className="comfy-model-manager">
       <summary>可选下载 FLUX / LoRA 模型</summary>
       <p className="field-hint">
-        模型单独下载到现有 ComfyUI 的 models 文件夹；云端生图无需下载。FLUX
-        请使用自定义 API 工作流，内置 SD 工作流不适用。
+        模型单独下载到现有 ComfyUI 的 models 文件夹；云端生图无需下载。FLUX FP8
+        下载后重启 ComfyUI，可在工作流模式选择内置预设。Depth LoRA
+        仍需匹配的自定义 Depth 工作流。
       </p>
       <div className="comfy-model-actions">
         <button

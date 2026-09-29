@@ -84,7 +84,7 @@ const MODELS: [ModelSpec; 2] = [
         url: "https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors",
         page_url: "https://huggingface.co/Comfy-Org/flux1-dev",
         license: "FLUX.1-dev 非商业许可",
-        note: "约 17.2 GB；需要独立运行的 ComfyUI 和足够的显存。请使用自定义 FLUX API 工作流。",
+        note: "约 17.2 GB；需要独立运行的 ComfyUI 和足够的显存。重启 ComfyUI 后可选内置 FLUX.1-dev FP8 文生图。",
     },
     ModelSpec {
         id: "flux1-depth-dev-lora",

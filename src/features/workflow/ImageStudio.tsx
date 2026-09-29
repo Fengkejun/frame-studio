@@ -487,7 +487,9 @@ export function ImageStudio({
                   <p>
                     {job.request.workflowJson
                       ? `自定义工作流 · SaveImage #${job.request.outputNodeId}`
-                      : `模型：${job.request.checkpoint}`}{' '}
+                      : job.request.preset === 'flux1-dev-fp8'
+                        ? `FLUX.1-dev FP8 · ${job.request.checkpoint}`
+                        : `模型：${job.request.checkpoint}`}{' '}
                     · {job.request.width} × {job.request.height} ·{' '}
                     {job.request.count} 张 · Seed {job.request.seed} ·{' '}
                     {job.request.steps} 步
@@ -635,7 +637,7 @@ function ImageForm({
     outputNodeId: '',
     referenceVersionId: null,
   }))
-  const [mode, setMode] = useState<'standard' | 'custom'>('standard')
+  const [mode, setMode] = useState<'standard' | 'flux' | 'custom'>('standard')
   const [checkpoints, setCheckpoints] = useState<string[]>([])
   const [connection, setConnection] = useState('尚未检测连接')
   const [testing, setTesting] = useState(false)
@@ -659,7 +661,13 @@ function ImageForm({
             outputNodeId: saved.outputNodeId ?? '',
             referenceVersionId: null,
           }))
-          setMode(saved.workflowJson ? 'custom' : 'standard')
+          setMode(
+            saved.workflowJson
+              ? 'custom'
+              : saved.preset === 'flux1-dev-fp8'
+                ? 'flux'
+                : 'standard',
+          )
         }
       })
       .catch((e) => {
@@ -685,11 +693,13 @@ function ImageForm({
       const names = await api.testComfy(request.baseUrl)
       setCheckpoints(names)
       setConnection(
-        names.length
-          ? `连接成功 · ${names.length} 个模型`
-          : '服务已连接，但没有找到 Checkpoint 模型',
+        mode === 'flux' && !names.includes('flux1-dev-fp8.safetensors')
+          ? '服务已连接，但未识别 FLUX.1-dev FP8；请检查模型目录并重启 ComfyUI'
+          : names.length
+            ? `连接成功 · ${names.length} 个模型`
+            : '服务已连接，但没有找到 Checkpoint 模型',
       )
-      if (!names.includes(request.checkpoint))
+      if (mode === 'standard' && !names.includes(request.checkpoint))
         field('checkpoint', names[0] ?? '')
     } catch (e) {
       setCheckpoints([])
@@ -733,13 +743,28 @@ function ImageForm({
       className="image-form"
       onSubmit={(e) => {
         e.preventDefault()
-        void onStart({
-          ...request,
-          workflowJson: mode === 'custom' ? request.workflowJson : '',
-          outputNodeId: mode === 'custom' ? request.outputNodeId : '',
-          referenceVersionId:
-            mode === 'custom' ? request.referenceVersionId : null,
-        })
+        void (async () => {
+          if (mode === 'flux') {
+            const names = await api.testComfy(request.baseUrl)
+            if (!names.includes('flux1-dev-fp8.safetensors'))
+              throw new Error(
+                'ComfyUI 未识别 flux1-dev-fp8.safetensors；请检查 models/checkpoints 路径并重启 ComfyUI',
+              )
+          }
+          await onStart({
+            ...request,
+            checkpoint:
+              mode === 'flux'
+                ? 'flux1-dev-fp8.safetensors'
+                : request.checkpoint,
+            negative: mode === 'flux' ? '' : request.negative,
+            preset: mode === 'flux' ? 'flux1-dev-fp8' : 'sd',
+            workflowJson: mode === 'custom' ? request.workflowJson : '',
+            outputNodeId: mode === 'custom' ? request.outputNodeId : '',
+            referenceVersionId:
+              mode === 'custom' ? request.referenceVersionId : null,
+          })
+        })().catch((error: unknown) => onError(errorMessage(error)))
       }}
     >
       <fieldset disabled={!loaded || disabled || testing || !isDesktop}>
@@ -775,13 +800,26 @@ function ImageForm({
           <select
             aria-label="ComfyUI 工作流模式"
             value={mode}
-            onChange={(e) => setMode(e.target.value as 'standard' | 'custom')}
+            onChange={(e) => {
+              const next = e.target.value as 'standard' | 'flux' | 'custom'
+              setMode(next)
+              if (next === 'flux')
+                setRequest((current) => ({
+                  ...current,
+                  checkpoint: 'flux1-dev-fp8.safetensors',
+                  width: 1024,
+                  height: 1024,
+                  steps: 20,
+                  count: 1,
+                }))
+            }}
           >
             <option value="standard">内置 SD 文生图</option>
+            <option value="flux">内置 FLUX.1-dev FP8 文生图</option>
             <option value="custom">导入 API 格式工作流</option>
           </select>
         </label>
-        {mode === 'standard' ? (
+        {mode !== 'custom' ? (
           <>
             <label className="field-label">
               Checkpoint 模型
@@ -791,7 +829,12 @@ function ImageForm({
                 required
                 maxLength={500}
                 placeholder="选择或输入本机模型文件名"
-                value={request.checkpoint}
+                value={
+                  mode === 'flux'
+                    ? 'flux1-dev-fp8.safetensors'
+                    : request.checkpoint
+                }
+                readOnly={mode === 'flux'}
                 onChange={(e) => field('checkpoint', e.target.value)}
               />
               <datalist id="comfy-checkpoints">
@@ -800,7 +843,11 @@ function ImageForm({
                 ))}
               </datalist>
             </label>
-            <p className="field-hint">标准 SD 1.5 / SDXL 文生图流程。</p>
+            <p className="field-hint">
+              {mode === 'flux'
+                ? 'FLUX.1-dev FP8 单文件预设：CFG 1、Euler / simple，使用 FLUX 专用 latent 与 guidance；负面提示词不参与此预设。需遵守模型的非商业许可，显存和出图效果请在本机验证。'
+                : '标准 SD 1.5 / SDXL 文生图流程。'}
+            </p>
           </>
         ) : (
           <>
@@ -879,16 +926,18 @@ function ImageForm({
         >
           重新带入分镜提示词
         </button>
-        <label className="field-label">
-          负面提示词
-          <textarea
-            aria-label="生图负面提示词"
-            maxLength={16000}
-            rows={2}
-            value={request.negative}
-            onChange={(e) => field('negative', e.target.value)}
-          />
-        </label>
+        {mode !== 'flux' && (
+          <label className="field-label">
+            负面提示词
+            <textarea
+              aria-label="生图负面提示词"
+              maxLength={16000}
+              rows={2}
+              value={request.negative}
+              onChange={(e) => field('negative', e.target.value)}
+            />
+          </label>
+        )}
         <div className="image-number-grid">
           {(
             [

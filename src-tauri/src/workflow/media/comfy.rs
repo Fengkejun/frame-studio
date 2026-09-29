@@ -31,7 +31,17 @@ pub struct ImageRequest {
     pub output_node_id: String,
     #[serde(default)]
     pub reference_version_id: Option<String>,
+    #[serde(default)]
+    pub preset: ImagePreset,
 }
+#[derive(Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ImagePreset {
+    #[default]
+    Sd,
+    Flux1DevFp8,
+}
+const FLUX_CHECKPOINT: &str = "flux1-dev-fp8.safetensors";
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImageJob {
@@ -124,7 +134,13 @@ fn validate(request: &ImageRequest) -> AppResult<()> {
         if request.checkpoint.trim().is_empty() || request.reference_version_id.is_some() {
             return Err("标准工作流需要 Checkpoint；参考图请使用自定义 API 工作流".into());
         }
+        if request.preset == ImagePreset::Flux1DevFp8 && request.checkpoint != FLUX_CHECKPOINT {
+            return Err("FLUX.1-dev FP8 预设需要 flux1-dev-fp8.safetensors".into());
+        }
     } else {
+        if request.preset != ImagePreset::Sd {
+            return Err("自定义工作流不能同时使用内置预设".into());
+        }
         custom_graph(request, "validation", "reference.png")?;
     }
     Ok(())
@@ -199,6 +215,19 @@ fn custom_graph(request: &ImageRequest, id: &str, reference: &str) -> AppResult<
     Ok(graph)
 }
 fn graph(r: &ImageRequest, id: &str) -> Value {
+    if r.preset == ImagePreset::Flux1DevFp8 {
+        // Matches the API graph embedded in ComfyUI's official Flux Dev FP8 checkpoint example.
+        return json!({
+            "6":{"class_type":"CLIPTextEncode","inputs":{"text":r.positive,"clip":["30",1]}},
+            "8":{"class_type":"VAEDecode","inputs":{"samples":["31",0],"vae":["30",2]}},
+            "9":{"class_type":"SaveImage","inputs":{"filename_prefix":format!("FrameStudio/{id}"),"images":["8",0]}},
+            "27":{"class_type":"EmptySD3LatentImage","inputs":{"width":r.width,"height":r.height,"batch_size":r.count}},
+            "30":{"class_type":"CheckpointLoaderSimple","inputs":{"ckpt_name":FLUX_CHECKPOINT}},
+            "31":{"class_type":"KSampler","inputs":{"seed":r.seed,"steps":r.steps,"cfg":1.0,"sampler_name":"euler","scheduler":"simple","denoise":1.0,"model":["30",0],"positive":["35",0],"negative":["33",0],"latent_image":["27",0]}},
+            "33":{"class_type":"CLIPTextEncode","inputs":{"text":"","clip":["30",1]}},
+            "35":{"class_type":"FluxGuidance","inputs":{"guidance":3.5,"conditioning":["6",0]}}
+        });
+    }
     json!({
         "3":{"class_type":"KSampler","inputs":{"cfg":7,"denoise":1,"latent_image":["5",0],"model":["4",0],"negative":["7",0],"positive":["6",0],"sampler_name":"euler","scheduler":"normal","seed":r.seed,"steps":r.steps}},
         "4":{"class_type":"CheckpointLoaderSimple","inputs":{"ckpt_name":r.checkpoint}},
@@ -275,6 +304,34 @@ pub async fn test_comfy(base_url: String) -> AppResult<Vec<String>> {
         .iter()
         .filter_map(|v| v.as_str().map(str::to_owned))
         .collect())
+}
+async fn preflight_flux(client: &Client, base_url: &str) -> AppResult<()> {
+    let checkpoint_info = get_json(
+        client,
+        endpoint(base_url, "/object_info/CheckpointLoaderSimple")?,
+    )
+    .await?;
+    let checkpoints = checkpoint_info
+        .pointer("/CheckpointLoaderSimple/input/required/ckpt_name/0")
+        .and_then(Value::as_array)
+        .ok_or("ComfyUI 未提供 CheckpointLoaderSimple 模型列表")?;
+    if !checkpoints
+        .iter()
+        .any(|name| name.as_str() == Some(FLUX_CHECKPOINT))
+    {
+        return Err("ComfyUI 未识别 flux1-dev-fp8.safetensors；请确认 models/checkpoints 路径并重启 ComfyUI".into());
+    }
+    for class in ["EmptySD3LatentImage", "FluxGuidance"] {
+        let info = get_json(
+            client,
+            endpoint(base_url, &format!("/object_info/{class}"))?,
+        )
+        .await?;
+        if info.get(class).is_none() {
+            return Err(format!("ComfyUI 缺少 {class} 节点；请更新 ComfyUI"));
+        }
+    }
+    Ok(())
 }
 #[tauri::command]
 pub fn image_settings(state: tauri::State<WorkflowState>) -> AppResult<Option<ImageRequest>> {
@@ -409,6 +466,13 @@ async fn execute(
 ) -> AppResult<()> {
     let client = client()?;
     if submit {
+        if job.request.preset == ImagePreset::Flux1DevFp8 {
+            // A failed local preflight has not sent /prompt, so it is safe to mark failed.
+            if let Err(error) = preflight_flux(&client, &job.request.base_url).await {
+                job.status = "failed".into();
+                return Err(error);
+            }
+        }
         let graph = if job.request.workflow_json.is_empty() {
             graph(&job.request, &job.id)
         } else {
@@ -572,6 +636,45 @@ async fn execute(
 mod tests {
     use super::*;
     #[test]
+    fn flux_preset_uses_official_fp8_checkpoint_graph() {
+        let request: ImageRequest = serde_json::from_value(json!({
+            "context":{"workflowId":"w","nodeId":"n","artifactId":"a","shotId":"s"},
+            "baseUrl":"http://127.0.0.1:8188", "checkpoint":FLUX_CHECKPOINT,
+            "positive":"cat in rain", "negative":"ignored", "width":1024,
+            "height":768, "steps":20, "seed":42, "count":2,
+            "preset":"flux1-dev-fp8"
+        }))
+        .unwrap();
+        validate(&request).unwrap();
+        let prompt = graph(&request, "job-1");
+        assert_eq!(prompt["30"]["inputs"]["ckpt_name"], FLUX_CHECKPOINT);
+        assert_eq!(prompt["27"]["class_type"], "EmptySD3LatentImage");
+        assert_eq!(prompt["27"]["inputs"]["batch_size"], 2);
+        assert_eq!(prompt["31"]["inputs"]["cfg"], 1.0);
+        assert_eq!(prompt["31"]["inputs"]["scheduler"], "simple");
+        assert_eq!(prompt["35"]["class_type"], "FluxGuidance");
+        assert_eq!(prompt["33"]["inputs"]["text"], "");
+        assert_eq!(
+            prompt["9"]["inputs"]["filename_prefix"],
+            "FrameStudio/job-1"
+        );
+    }
+    #[test]
+    fn old_image_requests_default_to_sd_preset() {
+        let request: ImageRequest = serde_json::from_value(json!({
+            "context":{"workflowId":"w","nodeId":"n","artifactId":"a","shotId":"s"},
+            "baseUrl":"http://127.0.0.1:8188", "checkpoint":"sd.safetensors",
+            "positive":"cat", "negative":"", "width":512,
+            "height":512, "steps":20, "seed":1, "count":1
+        }))
+        .unwrap();
+        assert!(request.preset == ImagePreset::Sd);
+        assert_eq!(
+            graph(&request, "old")["5"]["class_type"],
+            "EmptyLatentImage"
+        );
+    }
+    #[test]
     fn custom_api_graph_expands_typed_inputs_and_reference() {
         let request: ImageRequest = serde_json::from_value(json!({
             "context":{"workflowId":"w","nodeId":"n","artifactId":"a","shotId":"s"},
@@ -643,6 +746,7 @@ mod tests {
             workflow_json: String::new(),
             output_node_id: String::new(),
             reference_version_id: None,
+            preset: ImagePreset::Sd,
         };
         let mut job = ImageJob {
             id: "known".into(),
