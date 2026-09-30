@@ -5,6 +5,7 @@ pub mod comfy;
 pub mod composition;
 pub mod connection;
 pub mod model_manager;
+pub mod speech;
 pub mod video;
 use super::{types::*, WorkflowState};
 use base64::{engine::general_purpose::STANDARD, Engine};

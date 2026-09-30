@@ -29,6 +29,7 @@ pub struct WorkflowState {
     media_active: Mutex<Option<ActiveRun>>,
     video_active: Mutex<HashMap<String, media::video::ActiveVideo>>,
     export_active: Mutex<Option<ActiveRun>>,
+    speech_active: Mutex<Option<String>>,
     model_pull: Mutex<Option<ActiveModelPull>>,
     comfy_download: Mutex<Option<media::model_manager::ActiveDownload>>,
     directory: std::path::PathBuf,
@@ -49,6 +50,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         media_active: Mutex::new(None),
         video_active: Mutex::new(HashMap::new()),
         export_active: Mutex::new(None),
+        speech_active: Mutex::new(None),
         model_pull: Mutex::new(None),
         comfy_download: Mutex::new(None),
         directory,
@@ -57,6 +59,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     media::cloud::recover(&app.state::<WorkflowState>())?;
     media::video::recover(&app.state::<WorkflowState>())?;
     media::composition::recover(&app.state::<WorkflowState>())?;
+    media::speech::recover(&app.state::<WorkflowState>())?;
     Ok(())
 }
 fn idle(state: &WorkflowState) -> AppResult<()> {

@@ -880,6 +880,11 @@ fn insert_snapshot(db: &rusqlite::Transaction<'_>, snapshot: &Snapshot) -> AppRe
 fn no_active_tasks(state: &WorkflowState) -> AppResult<()> {
     if state.active.lock().map_err(|_| "任务锁不可用")?.is_some()
         || state
+            .speech_active
+            .lock()
+            .map_err(|_| "配音任务锁不可用")?
+            .is_some()
+        || state
             .media_active
             .lock()
             .map_err(|_| "图片任务锁不可用")?

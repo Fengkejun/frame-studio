@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-speech-jobs"
+description = "Enables the list_speech_jobs command without any pre-configured scope."
+commands.allow = ["list_speech_jobs"]
+
+[[permission]]
+identifier = "deny-list-speech-jobs"
+description = "Denies the list_speech_jobs command without any pre-configured scope."
+commands.deny = ["list_speech_jobs"]

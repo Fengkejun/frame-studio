@@ -74,7 +74,7 @@ fn validate(request: &CloudImageRequest) -> AppResult<()> {
     Ok(())
 }
 
-fn api_base(base_url: &str) -> AppResult<Url> {
+pub(super) fn api_base(base_url: &str) -> AppResult<Url> {
     if base_url.len() > 512 || base_url.trim() != base_url {
         return Err("图片 API 根地址无效".into());
     }
@@ -324,7 +324,7 @@ fn request_body(request: &CloudImageRequest) -> Value {
     })
 }
 
-fn endpoint(base_url: &str, suffix: &str) -> AppResult<Url> {
+pub(super) fn endpoint(base_url: &str, suffix: &str) -> AppResult<Url> {
     let mut url = api_base(base_url)?;
     url.set_path(&format!("/v1/{suffix}"));
     Ok(url)

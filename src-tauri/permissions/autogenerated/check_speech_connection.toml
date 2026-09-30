@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-check-speech-connection"
+description = "Enables the check_speech_connection command without any pre-configured scope."
+commands.allow = ["check_speech_connection"]
+
+[[permission]]
+identifier = "deny-check-speech-connection"
+description = "Denies the check_speech_connection command without any pre-configured scope."
+commands.deny = ["check_speech_connection"]
