@@ -569,3 +569,51 @@
     grid-column: span 1;
   }
 }
+
+.subtitle-studio,
+.subtitle-editor,
+.transcription-history,
+.transcription-job {
+  display: grid;
+  gap: 12px;
+}
+.transcription-connection {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.transcription-connection summary,
+.transcription-history summary {
+  cursor: pointer;
+}
+.subtitle-source {
+  overflow-wrap: anywhere;
+}
+.subtitle-cues {
+  display: grid;
+  gap: 12px;
+  max-height: 420px;
+  overflow: auto;
+}
+.subtitle-cue {
+  display: grid;
+  grid-template-columns: 28px 110px 110px minmax(180px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+.transcription-job {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+}
+.transcription-job small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1100px) {
+  .subtitle-cue {
+    grid-template-columns: 28px 1fr 1fr;
+  }
+  .subtitle-text {
+    grid-column: 2 / 4;
+  }
+}

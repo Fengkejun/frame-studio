@@ -188,3 +188,35 @@ test('voiceover stays native-only and tolerates broken optional settings', async
     ),
   ).toBe(true)
 })
+
+test('automatic subtitles stay native-only with broken optional settings', async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem('frame-studio.transcription-settings', '{broken'),
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: '工作流', exact: true }).click()
+  await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
+  const studio = page.locator('.subtitle-studio')
+  await expect(
+    studio.getByRole('heading', { name: '配音自动字幕' }),
+  ).toBeVisible()
+  await expect(
+    studio.getByRole('button', { name: '发送当前配音并生成字幕' }),
+  ).toBeDisabled()
+  await studio.locator('.transcription-connection summary').click()
+  await expect(studio.getByLabel('转写 API 根地址')).toHaveValue(
+    'https://api.openai.com/v1',
+  )
+  await expect(studio.getByLabel('转写模型 ID')).toHaveValue('whisper-1')
+  await expect(
+    studio.getByRole('button', { name: '保存转写密钥' }),
+  ).toBeDisabled()
+  await page.setViewportSize({ width: 960, height: 640 })
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true)
+})

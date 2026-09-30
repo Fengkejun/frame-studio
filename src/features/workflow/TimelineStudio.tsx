@@ -4,6 +4,7 @@ import { errorMessage } from './api'
 import * as api from './mediaApi'
 import { AssetImage } from './AssetImage'
 import { AudioPreview } from './AudioPreview'
+import { SubtitleStudio } from './SubtitleStudio'
 import { VoiceoverStudio } from './VoiceoverStudio'
 import type { Workflow } from './model'
 import type { useMedia } from './useMedia'
@@ -18,6 +19,7 @@ function initialDraft(workflowId: string): api.Composition {
     musicVersionId: null,
     voiceVersionId: null,
     musicVolume: 35,
+    subtitleVersionId: null,
     subtitleFormat: 'none',
     subtitleText: '',
   }
@@ -39,6 +41,7 @@ export function TimelineStudio({
   )
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [subtitles, setSubtitles] = useState<api.SubtitleAsset[]>([])
   const [audio, setAudio] = useState<api.AudioAsset[]>([])
   const [jobs, setJobs] = useState<api.ExportJob[]>([])
   const [error, setError] = useState('')
@@ -111,6 +114,13 @@ export function TimelineStudio({
     }, 700)
     return () => window.clearInterval(timer)
   }, [jobs, workflow.id])
+  const boundSubtitle = subtitles.find(
+    (item) => item.versionId === draft.subtitleVersionId,
+  )
+  const staleSubtitles =
+    !!draft.subtitleVersionId &&
+    (!boundSubtitle ||
+      boundSubtitle.sourceAudioVersionId !== draft.voiceVersionId)
   const active = jobs.find((job) => job.status === 'running')
   const totalMs = draft.clips.reduce(
     (sum, clip) => sum + clip.trimEndMs - clip.trimStartMs,
@@ -485,6 +495,29 @@ export function TimelineStudio({
           .filter(Boolean)
           .join('\n')}
       />
+      <SubtitleStudio
+        key={`subtitles-${workflow.id}`}
+        workflow={workflow}
+        save={save}
+        voice={audio.find((item) => item.versionId === draft.voiceVersionId)}
+        audio={audio}
+        assets={subtitles}
+        setAssets={setSubtitles}
+        appliedId={draft.subtitleVersionId}
+        onApply={(asset, srt) =>
+          setDraft((value) => ({
+            ...value,
+            subtitleVersionId: asset.versionId,
+            subtitleFormat: 'srt',
+            subtitleText: srt,
+          }))
+        }
+      />
+      {staleSubtitles && (
+        <p className="workflow-error" role="alert">
+          已应用字幕与当前配音不匹配；请应用匹配的字幕，或改用片段字幕后再导出。
+        </p>
+      )}
       <section className="timeline-section timeline-settings">
         <h3>字幕</h3>
         <p className="field-hint">
@@ -510,6 +543,7 @@ export function TimelineStudio({
                           ? 'vtt'
                           : 'srt',
                         subtitleText: text,
+                        subtitleVersionId: null,
                       })),
                     )
                     .catch((reason) => setError(errorMessage(reason)))
@@ -521,7 +555,9 @@ export function TimelineStudio({
         {draft.subtitleFormat !== 'none' && (
           <div>
             <p className="field-hint">
-              已导入 {draft.subtitleFormat.toUpperCase()} 字幕
+              {draft.subtitleVersionId
+                ? `已应用自动字幕版本 ${draft.subtitleVersionId.slice(0, 8)}`
+                : `已导入 ${draft.subtitleFormat.toUpperCase()} 字幕`}
             </p>
             <button
               className="text-button"
@@ -530,6 +566,7 @@ export function TimelineStudio({
                   ...value,
                   subtitleFormat: 'none',
                   subtitleText: '',
+                  subtitleVersionId: null,
                 }))
               }
             >
@@ -549,6 +586,7 @@ export function TimelineStudio({
             !!active ||
             !draft.clips.length ||
             missing ||
+            staleSubtitles ||
             draft.clips.some((clip) => clip.trimEndMs <= clip.trimStartMs)
           }
           onClick={() => void exportVideo()}

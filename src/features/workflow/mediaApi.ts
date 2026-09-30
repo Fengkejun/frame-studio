@@ -165,6 +165,7 @@ export interface Composition {
   musicVersionId: string | null
   voiceVersionId: string | null
   musicVolume: number
+  subtitleVersionId: string | null
   subtitleFormat: 'none' | 'srt' | 'vtt'
   subtitleText: string
 }
@@ -426,3 +427,74 @@ export async function importImage(file: File): Promise<ImageAsset> {
     bytes: Array.from(new Uint8Array(await file.arrayBuffer())),
   })
 }
+
+export interface SubtitleCue {
+  startMs: number
+  endMs: number
+  text: string
+}
+export interface SubtitleAsset {
+  versionId: string
+  workflowId: string
+  sourceAudioVersionId: string
+  parentVersionId: string | null
+  cues: SubtitleCue[]
+  createdAt: number
+}
+export interface TranscriptionRequest {
+  workflowId: string
+  sourceAudioVersionId: string
+  baseUrl: string
+  model: string
+  budgetReservationMicroUsd: number
+}
+export interface TranscriptionJob {
+  id: string
+  request: TranscriptionRequest
+  status: string
+  message: string
+  createdAt: number
+  updatedAt: number
+  assetId: string | null
+  estimatedCostMicroUsd: number
+}
+export const isTranscriptionRunning = (job: TranscriptionJob) =>
+  ['submitting', 'saving'].includes(job.status)
+export const transcriptionKeyStatus = (baseUrl: string): Promise<boolean> =>
+  isDesktop
+    ? invoke('transcription_key_status', { baseUrl })
+    : Promise.resolve(false)
+export const saveTranscriptionKey = (
+  baseUrl: string,
+  apiKey: string,
+): Promise<void> => invoke('save_transcription_key', { baseUrl, apiKey })
+export const clearTranscriptionKey = (baseUrl: string): Promise<void> =>
+  invoke('clear_transcription_key', { baseUrl })
+export const checkTranscriptionConnection = (
+  baseUrl: string,
+  model: string,
+): Promise<ConnectionCheck> =>
+  invoke('check_transcription_connection', { baseUrl, model })
+export const listTranscriptionJobs = (
+  workflowId: string,
+): Promise<TranscriptionJob[]> =>
+  isDesktop
+    ? invoke('list_transcription_jobs', { workflowId })
+    : Promise.resolve([])
+export const startTranscriptionJob = (
+  request: TranscriptionRequest,
+): Promise<TranscriptionJob> => invoke('start_transcription_job', { request })
+export const listSubtitleAssets = (
+  workflowId: string,
+): Promise<SubtitleAsset[]> =>
+  isDesktop
+    ? invoke('list_subtitle_assets', { workflowId })
+    : Promise.resolve([])
+export const saveSubtitleVersion = (
+  workflowId: string,
+  parentVersionId: string,
+  cues: SubtitleCue[],
+): Promise<SubtitleAsset> =>
+  invoke('save_subtitle_version', { workflowId, parentVersionId, cues })
+export const getSubtitleSrt = (versionId: string): Promise<string> =>
+  invoke('get_subtitle_srt', { versionId })

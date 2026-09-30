@@ -120,14 +120,14 @@ export async function testSpeechMedia(page, fixture, root) {
     await expect(page.getByLabel('配音', { exact: true })).toHaveValue(selected)
   }
   expect(fixture.requests).toHaveLength(5)
-  await page.getByLabel('项目云端媒体预算上限').fill('0')
-  await page.getByRole('button', { name: '保存预算' }).click()
+  await studio.getByLabel('项目云端媒体预算上限').fill('0')
+  await studio.getByRole('button', { name: '保存预算' }).click()
   await expect(studio.locator('.media-budget-panel')).toContainText('/ $0.00')
   await page.getByRole('button', { name: '生成配音', exact: true }).click()
   await expect(studio.getByRole('alert')).toContainText('超过项目预算上限')
   expect(fixture.requests).toHaveLength(5)
-  await page.getByLabel('项目云端媒体预算上限').fill('')
-  await page.getByRole('button', { name: '保存预算' }).click()
+  await studio.getByLabel('项目云端媒体预算上限').fill('')
+  await studio.getByRole('button', { name: '保存预算' }).click()
   await expect(studio.locator('.media-budget-panel')).toContainText(
     '未设置上限',
   )

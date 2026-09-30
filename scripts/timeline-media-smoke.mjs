@@ -3,8 +3,15 @@ import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect } from '@playwright/test'
 import { testSpeechMedia } from './speech-media-smoke.mjs'
+import { testSubtitleMedia } from './subtitle-media-smoke.mjs'
 
-export async function testTimelineMedia(page, root, profile, speechFixture) {
+export async function testTimelineMedia(
+  page,
+  root,
+  profile,
+  speechFixture,
+  transcriptionFixture,
+) {
   function probe(file) {
     return JSON.parse(
       execFileSync(
@@ -45,6 +52,7 @@ export async function testTimelineMedia(page, root, profile, speechFixture) {
     .getByLabel('配音', { exact: true })
     .selectOption({ label: 'voice.wav' })
   await testSpeechMedia(page, speechFixture, root)
+  await testSubtitleMedia(page, transcriptionFixture, root)
   await page.getByRole('button', { name: '选择位置并导出 MP4' }).click()
   const exportRecord = page.locator('.timeline-export').first()
   await expect(exportRecord).toContainText('已完成', { timeout: 60000 })
@@ -64,6 +72,43 @@ export async function testTimelineMedia(page, root, profile, speechFixture) {
   expect(audio?.codec_name).toBe('aac')
   expect(Number(first.format.duration)).toBeGreaterThan(0.55)
   expect(Number(first.format.duration)).toBeLessThan(0.9)
+  // Solid-color fixture: the subtitle's white glyphs and dark outline must be rendered in the lower quarter.
+  const captionPixels = execFileSync('ffmpeg', [
+    '-v',
+    'error',
+    '-ss',
+    '0.35',
+    '-i',
+    mp4,
+    '-vf',
+    'crop=iw:ih/4:0:3*ih/4',
+    '-frames:v',
+    '1',
+    '-f',
+    'rawvideo',
+    '-pix_fmt',
+    'gray',
+    '-',
+  ])
+  let darkest = 255
+  let brightest = 0
+  for (const pixel of captionPixels) {
+    darkest = Math.min(darkest, pixel)
+    brightest = Math.max(brightest, pixel)
+  }
+  expect(brightest - darkest).toBeGreaterThan(128)
+  execFileSync('ffmpeg', [
+    '-v',
+    'error',
+    '-y',
+    '-ss',
+    '0.35',
+    '-i',
+    mp4,
+    '-frames:v',
+    '1',
+    path.join(root, 'artifacts/subtitle-export-frame.png'),
+  ])
   await page.getByLabel('导出画幅').selectOption('9:16')
   await page.getByLabel('导出分辨率').selectOption('1080')
   await page.getByLabel('导入字幕文件').setInputFiles({
@@ -106,6 +151,8 @@ export async function testTimelineMedia(page, root, profile, speechFixture) {
   await expect(page.locator('.speech-job')).toHaveCount(5)
   await expect(page.locator('.speech-job').first()).toContainText('结果待核实')
   expect(speechFixture.requests).toHaveLength(5)
+  await expect(page.locator('.transcription-job')).toHaveCount(6)
+  expect(transcriptionFixture.requests).toHaveLength(6)
   await expect(page.getByLabel('片段 1 开始')).toHaveValue('0.1')
   await expect(page.getByLabel('片段 1 结束')).toHaveValue('0.8')
   await expect(page.locator('.timeline-export').first()).toContainText(

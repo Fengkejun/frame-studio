@@ -42,13 +42,17 @@ VideoStudio.tsx 与 media/video.rs 提供 Wan 2.7 图生视频的单镜头提交
 
 TimelineStudio.tsx 与 media/composition.rs 提供版本化时间线、镜头裁剪与排序、SRT/VTT 字幕、配音与音乐混合、本地 FFmpeg 导出。SQLite 保存草稿、音频资产和导出记录；成片节点在视频节点之后汇集已完成且与当前时间线相符的 MP4。可选的 Tauri sidecar 打包脚本为 Windows 安装包准备 FFmpeg/FFprobe。详见 [成片时间线](timeline-workflow.md)。
 
+## 配音自动字幕阶段（已实现）
+
+SubtitleStudio.tsx、SubtitleEditor.tsx 与 media/transcription.rs、media/subtitles.rs 提供配音上传转写、分段时间戳校验、不可变字幕版本、校对、显式应用及 SRT 下载。自动字幕绑定源配音版本，MP4 导出前校验绑定及 SRT 内容；未知提交不自动重发。数据库版本 8 和项目包版本 2 保留字幕版本关系，兼容旧草稿与项目包。
+
 ## 后续入口
 
 工作台已加入[首次使用清单](getting-started.md)，汇总文本与 ComfyUI 的主动连接检测、云端密钥保存状态和本机 FFmpeg 能力检测。密钥存在不代表服务权限已验证。
 
 1. 扩展更多云端媒体适配器；角色参考图、文生图、图生图及本机 ComfyUI API 格式工作流已接入。复杂工作流仍需实际节点与模型验证。
 2. 扩展视频参数、实际媒体元数据读取与大文件流式预览。
-3. 扩展转场、音频自动对齐及可视化波形。语音生成已接入，详见 [AI 配音生成](voiceover-workflow.md)。
+3. 扩展转场、音频自动对齐及可视化波形。语音生成和基于配音的字幕识别已接入，详见 [AI 配音生成](voiceover-workflow.md) 与 [配音自动字幕](subtitle-workflow.md)。
 4. 增加磁盘清理与增量备份；含媒体、绑定、时间线和成片的 [项目素材包](project-bundles.md) 已实现。
 
 ## 验证分层

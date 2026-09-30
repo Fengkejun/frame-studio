@@ -1,5 +1,5 @@
 import { spawn, execFileSync } from 'node:child_process'
-import { access, mkdir, mkdtemp, readFile } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import { createServer } from 'node:http'
 import path from 'node:path'
@@ -14,6 +14,7 @@ import { testLiveWorkflow } from './live-workflow-smoke.mjs'
 import { createVideoFixture, testVideoMedia } from './video-media-smoke.mjs'
 import { testTimelineMedia } from './timeline-media-smoke.mjs'
 import { createSpeechFixture } from './speech-media-smoke.mjs'
+import { createTranscriptionFixture } from './subtitle-media-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -41,6 +42,7 @@ const endpoint = `http://127.0.0.1:${port}`
 const cloudFixture = await createCloudFixture(root)
 const videoFixture = await createVideoFixture(root)
 const speechFixture = await createSpeechFixture(root)
+const transcriptionFixture = await createTranscriptionFixture(root)
 const installedModels = new Set(['fixture-model:latest'])
 const textServer = createServer(async (request, response) => {
   if (request.url === '/api/pull' && request.method === 'POST') {
@@ -161,7 +163,13 @@ try {
   await testCloudMedia(page, cloudFixture)
   await testLiveCloud(page, root)
   await testVideoMedia(page, root, videoFixture)
-  await testTimelineMedia(page, root, profile, speechFixture)
+  await testTimelineMedia(
+    page,
+    root,
+    profile,
+    speechFixture,
+    transcriptionFixture,
+  )
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '导出项目包' }).click()
   await expect
@@ -221,6 +229,10 @@ try {
     if (bytes)
       expect(bytes.includes(Buffer.from('fixture-speech-key'))).toBe(false)
     if (bytes)
+      expect(bytes.includes(Buffer.from('fixture-transcription-key'))).toBe(
+        false,
+      )
+    if (bytes)
       expect(bytes.includes(Buffer.from('fixture-wan-key'))).toBe(false)
   }
   expect(errors).toEqual([])
@@ -228,6 +240,39 @@ try {
     'PASS: native Windows app, embedded assets, real Rust IPC, retry and persistent theme.',
   )
 } catch (error) {
+  const failedPage = browser?.contexts()[0]?.pages()[0]
+  if (failedPage)
+    await writeFile(
+      path.join(root, 'artifacts/desktop-smoke-failure.json'),
+      JSON.stringify(
+        await failedPage.evaluate(() => ({
+          viewport: globalThis.document
+            .querySelector('.react-flow__viewport')
+            ?.getAttribute('style'),
+          nodes: [
+            ...globalThis.document.querySelectorAll('.react-flow__node'),
+          ].map((n) => ({
+            id: n.getAttribute('data-id'),
+            style: n.getAttribute('style'),
+            rect: n.getBoundingClientRect().toJSON(),
+            visibility: globalThis.getComputedStyle(n).visibility,
+          })),
+          canvas: globalThis.document
+            .querySelector('.canvas-area')
+            ?.getBoundingClientRect()
+            .toJSON(),
+        })),
+        null,
+        2,
+      ),
+    ).catch(() => {})
+  await browser
+    ?.contexts()[0]
+    ?.pages()[0]
+    ?.screenshot({
+      path: path.join(root, 'artifacts/desktop-smoke-failure.png'),
+    })
+    .catch(() => {})
   console.error(
     `Native app exit=${app.exitCode}; stderr=${stderr || '(empty)'}`,
   )
@@ -237,6 +282,7 @@ try {
   await cloudFixture.close()
   await videoFixture.close()
   await speechFixture.close()
+  await transcriptionFixture.close()
   await new Promise((resolve) => textServer.close(resolve))
   if (app.pid && app.exitCode === null) {
     execFileSync('taskkill', ['/PID', String(app.pid), '/T', '/F'], {
