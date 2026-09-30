@@ -65,6 +65,7 @@
     "allow-save-composition",
     "allow-import-audio",
     "allow-audio-preview",
+    "allow-get-audio-waveform",
     "allow-speech-key-status",
     "allow-save-speech-key",
     "allow-clear-speech-key",

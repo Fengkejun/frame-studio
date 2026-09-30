@@ -1149,6 +1149,7 @@ mod tests {
             resolution: 720,
             music_version_id: Some(audio_id.clone()),
             voice_version_id: Some(audio_id.clone()),
+            voice_start_ms: 200,
             music_volume: 50,
             subtitle_version_id: Some(subtitle.version_id.clone()),
             subtitle_format: "srt".into(),
@@ -1262,6 +1263,7 @@ mod tests {
         assert_eq!(recovered.subtitles.len(), 1);
         assert_eq!(recovered.subtitles[0].source_audio_version_id, audio_id);
         assert_eq!(recovered.subtitles[0].cues, subtitle.cues);
+        assert_eq!(recovered.composition.as_ref().unwrap().voice_start_ms, 200);
         assert_eq!(
             recovered
                 .composition

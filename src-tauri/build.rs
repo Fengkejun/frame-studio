@@ -60,6 +60,7 @@ fn main() {
             "save_composition",
             "import_audio",
             "audio_preview",
+            "get_audio_waveform",
             "speech_key_status",
             "save_speech_key",
             "clear_speech_key",

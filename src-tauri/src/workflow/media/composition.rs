@@ -33,6 +33,8 @@ pub struct Composition {
     pub resolution: u16,
     pub music_version_id: Option<String>,
     pub voice_version_id: Option<String>,
+    #[serde(default)]
+    pub voice_start_ms: u32,
     pub music_volume: u8,
     #[serde(default)]
     pub subtitle_version_id: Option<String>,
@@ -67,7 +69,7 @@ pub struct ExportJob {
     pub updated_at: u64,
 }
 
-fn binary(name: &str) -> PathBuf {
+pub(super) fn binary(name: &str) -> PathBuf {
     let filename = if cfg!(windows) {
         format!("{name}.exe")
     } else {
@@ -180,6 +182,7 @@ fn validate_draft(draft: &Composition) -> AppResult<()> {
         || !["9:16", "16:9", "1:1"].contains(&draft.aspect.as_str())
         || ![720, 1080].contains(&draft.resolution)
         || draft.music_volume > 100
+        || draft.voice_start_ms > 1_440_000
         || !["none", "srt", "vtt"].contains(&draft.subtitle_format.as_str())
         || draft.subtitle_text.len() > 100_000
         || draft.clips.iter().any(|clip| {
@@ -710,6 +713,10 @@ fn temporary_output(job: &ExportJob) -> PathBuf {
     final_path.with_file_name(format!(".frame-studio-{}.partial.mp4", job.id))
 }
 
+fn voice_filter(input: usize, total_ms: u64, offset_ms: u32, output: &str) -> String {
+    format!("[{input}:a]asetpts=PTS-STARTPTS,adelay={offset_ms}:all=1,apad,atrim=duration={:.3}[{output}]", total_ms as f64 / 1000.0)
+}
+
 async fn render(
     state: &WorkflowState,
     job: &mut ExportJob,
@@ -739,7 +746,12 @@ async fn render(
         }
         let labels = (0..clips.len()).map(|index|format!("[v{index}]")).collect::<String>();
         filters.push(format!("{labels}concat=n={}:v=1:a=0[joined]", clips.len()));
-        if let Some((name, content)) = subtitles(&job.draft, &clips) {
+        let captions = if let Some(id) = &job.draft.subtitle_version_id {
+            let source = super::subtitles::asset(state, id)?;
+            let aligned = super::subtitles::align_cues(&source.cues, job.draft.voice_start_ms, total_ms as u32)?;
+            (!aligned.is_empty()).then(|| ("captions.srt".into(), super::subtitles::to_srt(&aligned)))
+        } else { subtitles(&job.draft, &clips) };
+        if let Some((name, content)) = captions {
             tokio::fs::write(work.join(&name), content).await.map_err(|_|"无法写入字幕")?;
             filters.push(format!("[joined]subtitles={name}[video]"));
         } else { filters.push("[joined]null[video]".into()); }
@@ -747,11 +759,11 @@ async fn render(
         match (job.draft.music_version_id.is_some(),job.draft.voice_version_id.is_some()) {
             (true,true) => {
                 filters.push(format!("[{base}:a]atrim=duration={:.3},asetpts=PTS-STARTPTS,volume={:.2}[music]", total_ms as f64/1000.0, f64::from(job.draft.music_volume)/100.0));
-                filters.push(format!("[{}:a]apad,atrim=duration={:.3},asetpts=PTS-STARTPTS[voice]",base+1,total_ms as f64/1000.0));
+                filters.push(voice_filter(base+1, total_ms, job.draft.voice_start_ms, "voice"));
                 filters.push("[music][voice]amix=inputs=2:duration=first:normalize=0[audio]".into());
             }
             (true,false) => filters.push(format!("[{base}:a]atrim=duration={:.3},asetpts=PTS-STARTPTS,volume={:.2}[audio]", total_ms as f64/1000.0, f64::from(job.draft.music_volume)/100.0)),
-            (false,true) => filters.push(format!("[{base}:a]apad,atrim=duration={:.3},asetpts=PTS-STARTPTS[audio]",total_ms as f64/1000.0)),
+            (false,true) => filters.push(voice_filter(base, total_ms, job.draft.voice_start_ms, "audio")),
             (false,false) => {},
         }
         command.arg("-filter_complex").arg(filters.join(";"))
@@ -819,6 +831,14 @@ pub fn start_export(
     validate_draft(&draft)?;
     if draft.clips.is_empty() {
         return Err("时间线至少需要一个视频片段".into());
+    }
+    let total_ms: u32 = draft
+        .clips
+        .iter()
+        .map(|c| c.trim_end_ms - c.trim_start_ms)
+        .sum();
+    if draft.voice_version_id.is_some() && draft.voice_start_ms >= total_ms {
+        return Err("配音起点须早于成片结束时间；请调整起点或延长时间线".into());
     }
     workflow_exists(&state, &draft.workflow_id)?;
     let path = Path::new(&output_path);
@@ -905,6 +925,24 @@ mod tests {
     use super::*;
 
     #[test]
+    fn legacy_drafts_default_voice_start_and_round_trip_alignment() {
+        let legacy = json!({"workflowId":"w", "clips":[], "aspect":"9:16", "resolution":720, "musicVersionId":null, "voiceVersionId":null, "musicVolume":35, "subtitleFormat":"none", "subtitleText":""});
+        let mut draft: Composition = serde_json::from_value(legacy).unwrap();
+        assert_eq!(draft.voice_start_ms, 0);
+        draft.voice_start_ms = 200;
+        assert!(validate_draft(&draft).is_ok());
+        let restored: Composition =
+            serde_json::from_str(&serde_json::to_string(&draft).unwrap()).unwrap();
+        assert_eq!(restored.voice_start_ms, 200);
+        draft.voice_start_ms = 1_440_001;
+        assert!(validate_draft(&draft).is_err());
+        assert_eq!(
+            voice_filter(2, 700, 200, "audio"),
+            "[2:a]asetpts=PTS-STARTPTS,adelay=200:all=1,apad,atrim=duration=0.700[audio]"
+        );
+    }
+
+    #[test]
     fn interrupted_export_cleans_temporary_output() {
         let directory = std::env::temp_dir().join(format!("frame-export-test-{}", uid()));
         std::fs::create_dir(&directory).unwrap();
@@ -930,6 +968,7 @@ mod tests {
                 resolution: 720,
                 music_version_id: None,
                 voice_version_id: None,
+                voice_start_ms: 0,
                 music_volume: 35,
                 subtitle_version_id: None,
                 subtitle_format: "none".into(),

@@ -73,6 +73,34 @@ pub fn to_srt(cues: &[SubtitleCue]) -> String {
         .collect()
 }
 
+// Source times stay immutable. Only timeline exports are shifted and clipped.
+pub fn align_cues(
+    cues: &[SubtitleCue],
+    offset_ms: u32,
+    total_ms: u32,
+) -> AppResult<Vec<SubtitleCue>> {
+    let mut result = Vec::new();
+    for cue in cues {
+        let start_ms = cue
+            .start_ms
+            .checked_add(offset_ms)
+            .ok_or("字幕时间超出范围")?;
+        let end_ms = cue
+            .end_ms
+            .checked_add(offset_ms)
+            .ok_or("字幕时间超出范围")?
+            .min(total_ms);
+        if start_ms < end_ms {
+            result.push(SubtitleCue {
+                start_ms,
+                end_ms,
+                text: cue.text.clone(),
+            });
+        }
+    }
+    Ok(result)
+}
+
 pub(super) fn asset(state: &WorkflowState, id: &str) -> AppResult<SubtitleAsset> {
     let json: String = state
         .store
@@ -139,13 +167,23 @@ pub fn list_subtitle_assets(
 pub fn get_subtitle_srt(
     state: tauri::State<WorkflowState>,
     version_id: String,
+    offset_ms: Option<u32>,
+    timeline_duration_ms: Option<u32>,
 ) -> AppResult<String> {
     let selected = asset(&state, &version_id)?;
     validate_cues(
         &selected.cues,
         audio(&state, &selected.source_audio_version_id)?.duration_ms,
     )?;
-    Ok(to_srt(&selected.cues))
+    let offset = offset_ms.unwrap_or(0);
+    if offset > 1_440_000 || timeline_duration_ms.is_some_and(|ms| ms == 0 || ms > 1_440_000) {
+        return Err("字幕对齐时间超出范围".into());
+    }
+    Ok(to_srt(&align_cues(
+        &selected.cues,
+        offset,
+        timeline_duration_ms.unwrap_or(u32::MAX),
+    )?))
 }
 
 #[tauri::command]
@@ -190,6 +228,33 @@ pub(super) fn validate_binding(state: &WorkflowState, draft: &Composition) -> Ap
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn timeline_alignment_clips_end_drops_late_cues_and_preserves_source() {
+        let source = vec![
+            SubtitleCue {
+                start_ms: 50,
+                end_ms: 650,
+                text: "Hello".into(),
+            },
+            SubtitleCue {
+                start_ms: 700,
+                end_ms: 900,
+                text: "Later".into(),
+            },
+        ];
+        let shifted = align_cues(&source, 200, 700).unwrap();
+        assert_eq!(
+            shifted,
+            vec![SubtitleCue {
+                start_ms: 250,
+                end_ms: 700,
+                text: "Hello".into()
+            }]
+        );
+        assert_eq!(source[0].start_ms, 50);
+        assert_eq!(align_cues(&source, 0, 1000).unwrap(), source);
+        assert!(align_cues(&source, u32::MAX, 700).is_err());
+    }
     #[test]
     fn captions_reject_overlap_overflow_and_srt_injection() {
         let cue = SubtitleCue {

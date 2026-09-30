@@ -458,6 +458,7 @@ mod tests {
             resolution: 720,
             music_version_id: None,
             voice_version_id: Some(audio.version_id.clone()),
+            voice_start_ms: 0,
             music_volume: 50,
             subtitle_version_id: Some(asset.version_id.clone()),
             subtitle_format: "srt".into(),
