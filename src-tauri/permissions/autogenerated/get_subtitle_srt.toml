@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-get-subtitle-srt"
+description = "Enables the get_subtitle_srt command without any pre-configured scope."
+commands.allow = ["get_subtitle_srt"]
+
+[[permission]]
+identifier = "deny-get-subtitle-srt"
+description = "Denies the get_subtitle_srt command without any pre-configured scope."
+commands.deny = ["get_subtitle_srt"]

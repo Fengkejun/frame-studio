@@ -17,7 +17,7 @@ impl Store {
         let version: u32 = c
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(|e| e.to_string())?;
-        if version > 7 {
+        if version > 8 {
             return Err("项目数据库版本较新，请升级应用".into());
         }
         if version < 2 {
@@ -59,6 +59,12 @@ impl Store {
             c.execute_batch("BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS speech_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
                 PRAGMA user_version=7; COMMIT;").map_err(|e|e.to_string())?;
+        }
+        if version < 8 {
+            c.execute_batch("BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS subtitle_assets(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
+                CREATE TABLE IF NOT EXISTS transcription_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
+                PRAGMA user_version=8; COMMIT;").map_err(|e|e.to_string())?;
         }
         let store = Self(Mutex::new(c));
         // A text request has no pollable provider task ID. Never resubmit after a crash.
@@ -167,7 +173,7 @@ mod tests {
                     .unwrap()
                     .pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
                     .unwrap(),
-                7
+                8
             );
         }
         assert_eq!(Store::open(&path).unwrap().providers().unwrap().len(), 1);
@@ -195,7 +201,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!((count, version, cloud_table), (1, 7, 1));
+        assert_eq!((count, version, cloud_table), (1, 8, 1));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();
@@ -219,7 +225,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!((version, table), (7, 1));
+        assert_eq!((version, table), (8, 1));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();
@@ -237,7 +243,7 @@ mod tests {
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
         let count: u32 = db.query_row("SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('video_jobs','video_assets','selected_videos')", [], |r| r.get(0)).unwrap();
-        assert_eq!((version, count), (7, 3));
+        assert_eq!((version, count), (8, 3));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();
@@ -255,8 +261,53 @@ mod tests {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
         let count: u32 = db.query_row("SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('compositions','audio_assets','export_jobs')",[],|row|row.get(0)).unwrap();
-        assert_eq!((version, count), (7, 3));
+        assert_eq!((version, count), (8, 3));
         drop(db);
+        drop(store);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn upgrades_v7_preserving_speech_and_legacy_composition() {
+        let path = std::env::temp_dir().join(format!("frame-studio-v7-{}.sqlite", uid()));
+        let store = Store::open(&path).unwrap();
+        store
+            .db()
+            .unwrap()
+            .execute_batch(
+                "INSERT INTO speech_jobs VALUES ('voice','project','{}',1);
+            INSERT INTO compositions VALUES ('project','{}',1);
+            DROP TABLE subtitle_assets; DROP TABLE transcription_jobs; PRAGMA user_version=7;",
+            )
+            .unwrap();
+        drop(store);
+        let store = Store::open(&path).unwrap();
+        {
+            let db = store.db().unwrap();
+            assert_eq!(
+                db.pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
+                    .unwrap(),
+                8
+            );
+            assert_eq!(
+                db.query_row("SELECT count(*) FROM speech_jobs", [], |r| r
+                    .get::<_, u32>(0))
+                    .unwrap(),
+                1
+            );
+            assert_eq!(
+                db.query_row("SELECT count(*) FROM compositions", [], |r| r
+                    .get::<_, u32>(0))
+                    .unwrap(),
+                1
+            );
+            assert_eq!(
+                db.query_row("SELECT count(*) FROM transcription_jobs", [], |r| r
+                    .get::<_, u32>(0))
+                    .unwrap(),
+                0
+            );
+        }
         drop(store);
         std::fs::remove_file(path).unwrap();
     }
@@ -288,7 +339,7 @@ mod tests {
                     |r| r.get(0),
                 )
                 .unwrap();
-            assert_eq!((version, count), (7, 2));
+            assert_eq!((version, count), (8, 2));
             assert_eq!(
                 db.query_row("SELECT count(*) FROM speech_jobs", [], |r| r
                     .get::<_, u32>(0))

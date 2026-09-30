@@ -22,6 +22,7 @@ pub enum BillableJob {
     CloudImage,
     Video,
     Speech,
+    Transcription,
 }
 
 fn setting_id(workflow_id: &str) -> String {
@@ -61,7 +62,12 @@ fn read(db: &Connection, workflow_id: &str) -> AppResult<MediaBudget> {
         .map_err(|_| "项目预算设置已损坏")?
         .flatten();
     let mut reserved_micro_usd = 0_u64;
-    for table in ["cloud_image_jobs", "video_jobs", "speech_jobs"] {
+    for table in [
+        "cloud_image_jobs",
+        "video_jobs",
+        "speech_jobs",
+        "transcription_jobs",
+    ] {
         let sql = format!(
             "SELECT COALESCE(SUM(COALESCE(json_extract(json, '$.estimatedCostMicroUsd'), 0)), 0) FROM {table} WHERE workflow_id=?1"
         );
@@ -149,6 +155,7 @@ fn reserve_in_db<T: Serialize>(
     let sql = match kind {
         BillableJob::CloudImage => "INSERT INTO cloud_image_jobs VALUES (?1,?2,?3,?4)",
         BillableJob::Video => "INSERT INTO video_jobs VALUES (?1,?2,?3,?4)",
+        BillableJob::Transcription => "INSERT INTO transcription_jobs VALUES (?1,?2,?3,?4)",
         BillableJob::Speech => "INSERT INTO speech_jobs VALUES (?1,?2,?3,?4)",
     };
     db.execute(
@@ -206,6 +213,7 @@ mod tests {
              CREATE TABLE cloud_image_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
              CREATE TABLE video_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
              CREATE TABLE speech_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
+             CREATE TABLE transcription_jobs(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
              INSERT INTO workflows VALUES ('project');
              INSERT INTO media_settings VALUES ('budget:project', '{\"limitMicroUsd\":700000}');",
         ).unwrap();
@@ -243,6 +251,17 @@ mod tests {
         )
         .unwrap();
         assert_eq!(read(&db, "project").unwrap().reserved_micro_usd, 681_060);
+        reserve_in_db(
+            &db,
+            BillableJob::Transcription,
+            "project",
+            "subtitle",
+            4,
+            1000,
+            &serde_json::json!({"estimatedCostMicroUsd":1000}),
+        )
+        .unwrap();
+        assert_eq!(read(&db, "project").unwrap().reserved_micro_usd, 682_060);
         let extra = serde_json::json!({"estimatedCostMicroUsd":20000});
         assert!(reserve_in_db(
             &db,

@@ -724,6 +724,7 @@ mod tests {
             video_active: std::sync::Mutex::new(std::collections::HashMap::new()),
             export_active: std::sync::Mutex::new(None),
             speech_active: std::sync::Mutex::new(None),
+            transcription_active: std::sync::Mutex::new(None),
             model_pull: std::sync::Mutex::new(None),
             comfy_download: std::sync::Mutex::new(None),
             directory: directory.clone(),

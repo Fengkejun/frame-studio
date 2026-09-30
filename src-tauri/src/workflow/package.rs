@@ -3,6 +3,7 @@
 use super::{
     media::{
         composition::{AudioAsset, Composition, ExportJob},
+        subtitles::{self, SubtitleAsset},
         video::VideoAsset,
         ImageAsset, ShotContext,
     },
@@ -47,6 +48,8 @@ struct Snapshot {
     images: Vec<ImageAsset>,
     videos: Vec<VideoAsset>,
     audios: Vec<AudioAsset>,
+    #[serde(default)]
+    subtitles: Vec<SubtitleAsset>,
     first_frames: Vec<Binding>,
     role_references: Vec<RoleBinding>,
     selected_videos: Vec<Binding>,
@@ -231,6 +234,11 @@ fn snapshot(store: &Store, workflow_id: &str) -> AppResult<Snapshot> {
         images,
         videos,
         audios,
+        subtitles: db_rows(
+            store,
+            "SELECT json FROM subtitle_assets WHERE workflow_id=?1",
+            workflow_id,
+        )?,
         first_frames,
         role_references,
         selected_videos,
@@ -337,6 +345,35 @@ fn validate_snapshot(snapshot: &Snapshot) -> AppResult<()> {
             return Err("项目包的音频素材信息无效".into());
         }
     }
+    let subtitle_ids: HashSet<_> = snapshot
+        .subtitles
+        .iter()
+        .map(|item| item.version_id.as_str())
+        .collect();
+    if subtitle_ids.len() != snapshot.subtitles.len()
+        || !subtitle_ids.is_disjoint(&audio_ids)
+        || !subtitle_ids.is_disjoint(&image_ids)
+        || !subtitle_ids.is_disjoint(&video_ids)
+    {
+        return Err("项目包字幕版本 ID 重复".into());
+    }
+    for subtitle in &snapshot.subtitles {
+        let source = snapshot
+            .audios
+            .iter()
+            .find(|a| a.version_id == subtitle.source_audio_version_id)
+            .ok_or("项目包字幕的配音来源缺失")?;
+        if !safe_id(&subtitle.version_id)
+            || subtitle.workflow_id != *workflow_id
+            || subtitle
+                .parent_version_id
+                .as_ref()
+                .is_some_and(|id| !subtitle_ids.contains(id.as_str()))
+        {
+            return Err("项目包字幕版本引用无效".into());
+        }
+        subtitles::validate_cues(&subtitle.cues, source.duration_ms)?;
+    }
     for binding in &snapshot.first_frames {
         if binding.context.workflow_id != *workflow_id
             || !image_ids.contains(binding.version_id.as_str())
@@ -357,7 +394,11 @@ fn validate_snapshot(snapshot: &Snapshot) -> AppResult<()> {
         }
     }
     if let Some(draft) = &snapshot.composition {
-        if draft.workflow_id != *workflow_id
+        if draft
+            .subtitle_version_id
+            .as_ref()
+            .is_some_and(|id| !subtitle_ids.contains(id.as_str()))
+            || draft.workflow_id != *workflow_id
             || draft
                 .clips
                 .iter()
@@ -520,7 +561,7 @@ fn write_archive(
             });
         }
         let manifest = serde_json::to_vec(&Manifest {
-            schema_version: 1,
+            schema_version: 2,
             snapshot,
             files: entries,
         })
@@ -563,7 +604,7 @@ fn read_manifest(zip: &mut ZipArchive<File>) -> AppResult<Manifest> {
         return Err("项目元数据过大".into());
     }
     let manifest: Manifest = serde_json::from_slice(&data).map_err(|_| "项目包元数据格式无效")?;
-    if manifest.schema_version != 1 {
+    if ![1, 2].contains(&manifest.schema_version) {
         return Err("项目包版本不受支持，请升级应用".into());
     }
     Ok(manifest)
@@ -816,6 +857,18 @@ fn insert_snapshot(db: &rusqlite::Transaction<'_>, snapshot: &Snapshot) -> AppRe
         )
         .map_err(|e| e.to_string())?;
     }
+    for subtitle in &snapshot.subtitles {
+        db.execute(
+            "INSERT INTO subtitle_assets VALUES (?1,?2,?3,?4)",
+            params![
+                subtitle.version_id,
+                subtitle.workflow_id,
+                serde_json::to_string(subtitle).map_err(|e| e.to_string())?,
+                subtitle.created_at
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     for binding in &snapshot.first_frames {
         let c = &binding.context;
         db.execute(
@@ -878,7 +931,12 @@ fn insert_snapshot(db: &rusqlite::Transaction<'_>, snapshot: &Snapshot) -> AppRe
 }
 
 fn no_active_tasks(state: &WorkflowState) -> AppResult<()> {
-    if state.active.lock().map_err(|_| "任务锁不可用")?.is_some()
+    if state
+        .transcription_active
+        .lock()
+        .map_err(|_| "字幕任务锁不可用")?
+        .is_some()
+        || state.active.lock().map_err(|_| "任务锁不可用")?.is_some()
         || state
             .speech_active
             .lock()
@@ -1067,6 +1125,18 @@ mod tests {
             duration_ms: 5000,
             created_at: now(),
         };
+        let subtitle = SubtitleAsset {
+            version_id: uid(),
+            workflow_id: workflow.id.clone(),
+            source_audio_version_id: audio_id.clone(),
+            parent_version_id: None,
+            cues: vec![subtitles::SubtitleCue {
+                start_ms: 50,
+                end_ms: 650,
+                text: "Hello".into(),
+            }],
+            created_at: now(),
+        };
         let draft = Composition {
             workflow_id: workflow.id.clone(),
             clips: vec![super::super::media::composition::TimelineClip {
@@ -1078,10 +1148,11 @@ mod tests {
             aspect: "16:9".into(),
             resolution: 720,
             music_version_id: Some(audio_id.clone()),
-            voice_version_id: None,
+            voice_version_id: Some(audio_id.clone()),
             music_volume: 50,
-            subtitle_format: "none".into(),
-            subtitle_text: String::new(),
+            subtitle_version_id: Some(subtitle.version_id.clone()),
+            subtitle_format: "srt".into(),
+            subtitle_text: subtitles::to_srt(&subtitle.cues),
         };
         let render = source.join("original.mp4");
         fs::write(&render, b"mp4").unwrap();
@@ -1114,6 +1185,7 @@ mod tests {
             workflow: workflow.clone(),
             images: vec![image.clone()],
             videos: vec![video.clone()],
+            subtitles: vec![subtitle.clone()],
             audios: vec![audio.clone()],
             first_frames: vec![Binding {
                 context: context.clone(),
@@ -1187,6 +1259,18 @@ mod tests {
             b"mp4"
         );
         let recovered = snapshot(&restored_store, &workflow.id).unwrap();
+        assert_eq!(recovered.subtitles.len(), 1);
+        assert_eq!(recovered.subtitles[0].source_audio_version_id, audio_id);
+        assert_eq!(recovered.subtitles[0].cues, subtitle.cues);
+        assert_eq!(
+            recovered
+                .composition
+                .as_ref()
+                .unwrap()
+                .subtitle_version_id
+                .as_ref(),
+            Some(&subtitle.version_id)
+        );
         assert_eq!(recovered.first_frames.len(), 1);
         assert_eq!(recovered.role_references.len(), 1);
         assert_eq!(recovered.selected_videos.len(), 1);
@@ -1212,6 +1296,19 @@ mod tests {
     }
 
     #[test]
+    fn legacy_package_defaults_to_no_automatic_subtitles() {
+        let (directory, store, workflow) = fixture();
+        let data = snapshot(&store, &workflow.id).unwrap();
+        let mut value = serde_json::to_value(&data).unwrap();
+        value.as_object_mut().unwrap().remove("subtitles");
+        let legacy: Snapshot = serde_json::from_value(value).unwrap();
+        assert!(legacy.subtitles.is_empty());
+        validate_snapshot(&legacy).unwrap();
+        drop(store);
+        fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
     fn corrupt_bundle_is_rejected_without_partial_restore() {
         let (source, store, workflow) = fixture();
         let id = uid();
@@ -1232,6 +1329,7 @@ mod tests {
             workflow: workflow.clone(),
             images: vec![image.clone()],
             videos: vec![],
+            subtitles: vec![],
             audios: vec![],
             first_frames: vec![],
             role_references: vec![RoleBinding {

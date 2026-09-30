@@ -6,6 +6,8 @@ pub mod composition;
 pub mod connection;
 pub mod model_manager;
 pub mod speech;
+pub mod subtitles;
+pub mod transcription;
 pub mod video;
 use super::{types::*, WorkflowState};
 use base64::{engine::general_purpose::STANDARD, Engine};

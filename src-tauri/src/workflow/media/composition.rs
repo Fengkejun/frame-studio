@@ -34,6 +34,8 @@ pub struct Composition {
     pub music_version_id: Option<String>,
     pub voice_version_id: Option<String>,
     pub music_volume: u8,
+    #[serde(default)]
+    pub subtitle_version_id: Option<String>,
     pub subtitle_format: String,
     pub subtitle_text: String,
 }
@@ -847,6 +849,7 @@ pub fn start_export(
         updated_at: now(),
     };
     // Resolve every version before reserving or writing the destination.
+    subtitles::validate_binding(&state, &draft)?;
     resolve_inputs(&state, &draft)?;
     save_draft(&state, &draft)?;
     save_job(&state, &job)?;
@@ -912,6 +915,7 @@ mod tests {
             video_active: std::sync::Mutex::new(std::collections::HashMap::new()),
             export_active: std::sync::Mutex::new(None),
             speech_active: std::sync::Mutex::new(None),
+            transcription_active: std::sync::Mutex::new(None),
             model_pull: std::sync::Mutex::new(None),
             comfy_download: std::sync::Mutex::new(None),
             directory: directory.clone(),
@@ -927,6 +931,7 @@ mod tests {
                 music_version_id: None,
                 voice_version_id: None,
                 music_volume: 35,
+                subtitle_version_id: None,
                 subtitle_format: "none".into(),
                 subtitle_text: String::new(),
             },
