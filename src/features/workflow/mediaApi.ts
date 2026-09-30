@@ -177,6 +177,44 @@ export interface AudioAsset {
   durationMs: number
   createdAt: number
 }
+export interface SpeechRequest {
+  workflowId: string
+  baseUrl: string
+  model: string
+  input: string
+  voice: string
+  speed: number
+  budgetReservationMicroUsd: number
+}
+export interface SpeechJob {
+  id: string
+  request: SpeechRequest
+  status: string
+  message: string
+  createdAt: number
+  updatedAt: number
+  assetId: string | null
+  estimatedCostMicroUsd: number
+}
+export const isSpeechRunning = (job: SpeechJob) =>
+  ['submitting', 'saving'].includes(job.status)
+export const speechKeyStatus = (baseUrl: string): Promise<boolean> =>
+  isDesktop ? invoke('speech_key_status', { baseUrl }) : Promise.resolve(false)
+export const saveSpeechKey = (baseUrl: string, apiKey: string): Promise<void> =>
+  invoke('save_speech_key', { baseUrl, apiKey })
+export const clearSpeechKey = (baseUrl: string): Promise<void> =>
+  invoke('clear_speech_key', { baseUrl })
+export const checkSpeechConnection = (
+  baseUrl: string,
+  model: string,
+): Promise<ConnectionCheck> =>
+  invoke('check_speech_connection', { baseUrl, model })
+export const listSpeechJobs = (workflowId: string): Promise<SpeechJob[]> =>
+  isDesktop ? invoke('list_speech_jobs', { workflowId }) : Promise.resolve([])
+export const startSpeechJob = (request: SpeechRequest): Promise<SpeechJob> =>
+  invoke('start_speech_job', { request })
+export const audioPreview = (versionId: string): Promise<string> =>
+  invoke('audio_preview', { versionId })
 export interface ExportJob {
   id: string
   workflowId: string

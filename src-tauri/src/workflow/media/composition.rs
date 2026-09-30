@@ -340,7 +340,7 @@ pub(super) fn store_audio(
     bytes: Vec<u8>,
     version_id: String,
 ) -> AppResult<AudioAsset> {
-    workflow_exists(&state, &workflow_id)?;
+    workflow_exists(state, &workflow_id)?;
     let ext = Path::new(&name)
         .extension()
         .and_then(|value| value.to_str())

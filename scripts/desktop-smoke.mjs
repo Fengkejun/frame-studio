@@ -13,6 +13,7 @@ import { testLiveComfy } from './live-comfy-smoke.mjs'
 import { testLiveWorkflow } from './live-workflow-smoke.mjs'
 import { createVideoFixture, testVideoMedia } from './video-media-smoke.mjs'
 import { testTimelineMedia } from './timeline-media-smoke.mjs'
+import { createSpeechFixture } from './speech-media-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -39,6 +40,7 @@ const port = await new Promise((resolve, reject) => {
 const endpoint = `http://127.0.0.1:${port}`
 const cloudFixture = await createCloudFixture(root)
 const videoFixture = await createVideoFixture(root)
+const speechFixture = await createSpeechFixture(root)
 const installedModels = new Set(['fixture-model:latest'])
 const textServer = createServer(async (request, response) => {
   if (request.url === '/api/pull' && request.method === 'POST') {
@@ -159,7 +161,7 @@ try {
   await testCloudMedia(page, cloudFixture)
   await testLiveCloud(page, root)
   await testVideoMedia(page, root, videoFixture)
-  await testTimelineMedia(page, root, profile)
+  await testTimelineMedia(page, root, profile, speechFixture)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '导出项目包' }).click()
   await expect
@@ -217,6 +219,8 @@ try {
     const bytes = await readFile(path.join(profile, file)).catch(() => null)
     if (bytes) expect(bytes.includes(Buffer.from('fixture-key'))).toBe(false)
     if (bytes)
+      expect(bytes.includes(Buffer.from('fixture-speech-key'))).toBe(false)
+    if (bytes)
       expect(bytes.includes(Buffer.from('fixture-wan-key'))).toBe(false)
   }
   expect(errors).toEqual([])
@@ -232,6 +236,7 @@ try {
   await browser?.close()
   await cloudFixture.close()
   await videoFixture.close()
+  await speechFixture.close()
   await new Promise((resolve) => textServer.close(resolve))
   if (app.pid && app.exitCode === null) {
     execFileSync('taskkill', ['/PID', String(app.pid), '/T', '/F'], {

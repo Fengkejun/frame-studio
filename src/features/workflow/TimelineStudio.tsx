@@ -3,6 +3,8 @@ import { isDesktop } from '@/shared/lib/desktop'
 import { errorMessage } from './api'
 import * as api from './mediaApi'
 import { AssetImage } from './AssetImage'
+import { AudioPreview } from './AudioPreview'
+import { VoiceoverStudio } from './VoiceoverStudio'
 import type { Workflow } from './model'
 import type { useMedia } from './useMedia'
 import './media.css'
@@ -459,6 +461,30 @@ export function TimelineStudio({
           </label>
         </div>
       </section>
+      {draft.voiceVersionId && (
+        <div className="timeline-section">
+          <strong>当前配音试听</strong>
+          <AudioPreview
+            key={draft.voiceVersionId}
+            versionId={draft.voiceVersionId}
+          />
+        </div>
+      )}
+      <VoiceoverStudio
+        key={workflow.id}
+        workflow={workflow}
+        save={save}
+        assets={audio}
+        setAssets={setAudio}
+        selectedId={draft.voiceVersionId}
+        onUse={(versionId) =>
+          setDraft((value) => ({ ...value, voiceVersionId: versionId }))
+        }
+        captions={draft.clips
+          .map((clip) => clip.caption)
+          .filter(Boolean)
+          .join('\n')}
+      />
       <section className="timeline-section timeline-settings">
         <h3>字幕</h3>
         <p className="field-hint">

@@ -159,3 +159,32 @@ test('image studio keeps native-only operations disabled in browser preview', as
     ),
   ).toBe(true)
 })
+
+test('voiceover stays native-only and tolerates broken optional settings', async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem('frame-studio.speech-settings', '{broken'),
+  )
+  await page.goto('/')
+  await page.getByRole('button', { name: '工作流', exact: true }).click()
+  await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'AI 配音生成' })).toBeVisible()
+  await page.getByLabel('旁白文本').fill('中文旁白')
+  await expect(
+    page.getByRole('button', { name: '生成配音', exact: true }),
+  ).toBeDisabled()
+  await page.locator('.speech-connection summary').click()
+  await expect(page.getByLabel('语音 API 根地址')).toHaveValue(
+    'https://api.openai.com/v1',
+  )
+  await expect(
+    page.getByRole('button', { name: '保存配音密钥' }),
+  ).toBeDisabled()
+  await page.setViewportSize({ width: 960, height: 640 })
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true)
+})

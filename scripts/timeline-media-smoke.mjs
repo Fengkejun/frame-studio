@@ -2,8 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect } from '@playwright/test'
+import { testSpeechMedia } from './speech-media-smoke.mjs'
 
-export async function testTimelineMedia(page, root, profile) {
+export async function testTimelineMedia(page, root, profile, speechFixture) {
   function probe(file) {
     return JSON.parse(
       execFileSync(
@@ -36,9 +37,14 @@ export async function testTimelineMedia(page, root, profile) {
   await page
     .getByLabel('导入音频')
     .setInputFiles(path.join(root, 'tests/fixtures/voice.wav'))
-  await expect(page.getByLabel('配音')).toContainText('voice.wav')
+  await expect(page.getByLabel('配音', { exact: true })).toContainText(
+    'voice.wav',
+  )
   await page.getByLabel('背景音乐').selectOption({ label: 'music.wav' })
-  await page.getByLabel('配音').selectOption({ label: 'voice.wav' })
+  await page
+    .getByLabel('配音', { exact: true })
+    .selectOption({ label: 'voice.wav' })
+  await testSpeechMedia(page, speechFixture, root)
   await page.getByRole('button', { name: '选择位置并导出 MP4' }).click()
   const exportRecord = page.locator('.timeline-export').first()
   await expect(exportRecord).toContainText('已完成', { timeout: 60000 })
@@ -81,7 +87,7 @@ export async function testTimelineMedia(page, root, profile) {
   await page.getByLabel('导出分辨率').selectOption('720')
   await page.getByRole('button', { name: '改用片段字幕' }).click()
   await page.getByLabel('背景音乐').selectOption('')
-  await page.getByLabel('配音').selectOption('')
+  await page.getByLabel('配音', { exact: true }).selectOption('')
   await page.getByRole('button', { name: '选择位置并导出 MP4' }).click()
   await expect(
     page.locator('.timeline-export').filter({ hasText: 'finished-3.mp4' }),
@@ -97,6 +103,9 @@ export async function testTimelineMedia(page, root, profile) {
   await page.reload()
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
+  await expect(page.locator('.speech-job')).toHaveCount(5)
+  await expect(page.locator('.speech-job').first()).toContainText('结果待核实')
+  expect(speechFixture.requests).toHaveLength(5)
   await expect(page.getByLabel('片段 1 开始')).toHaveValue('0.1')
   await expect(page.getByLabel('片段 1 结束')).toHaveValue('0.8')
   await expect(page.locator('.timeline-export').first()).toContainText(

@@ -21,7 +21,8 @@
   padding-right: 24px;
   border-right: 1px solid var(--border);
 }
-.image-settings .field-label {
+.image-settings .field-label,
+.timeline-studio .field-label {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -30,7 +31,10 @@
 }
 .image-settings input,
 .image-settings select,
-.image-settings textarea {
+.image-settings textarea,
+.timeline-studio input:not([type='range']),
+.timeline-studio select,
+.timeline-studio textarea {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--border);
@@ -40,7 +44,8 @@
   padding: 10px;
   font: inherit;
 }
-.image-settings textarea {
+.image-settings textarea,
+.timeline-studio textarea {
   resize: vertical;
   line-height: 1.6;
 }
@@ -518,6 +523,43 @@
 .timeline-path {
   display: block;
   overflow-wrap: anywhere;
+}
+.voiceover-studio,
+.speech-history,
+.speech-job {
+  display: grid;
+  gap: 12px;
+}
+.speech-connection {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.speech-connection summary {
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+.timeline-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 14px;
+}
+.speech-job {
+  border-top: 1px solid var(--border);
+  padding: 16px 0;
+  overflow-wrap: anywhere;
+}
+.voiceover-studio > button {
+  justify-self: start;
+}
+.speech-job small {
+  color: var(--muted);
+}
+.speech-text {
+  white-space: pre-wrap;
+}
+.audio-preview audio {
+  max-width: 100%;
 }
 @media (max-width: 760px) {
   .timeline-studio {
