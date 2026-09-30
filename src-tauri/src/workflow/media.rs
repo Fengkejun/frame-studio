@@ -4,6 +4,7 @@ pub mod cloud;
 pub mod comfy;
 pub mod composition;
 pub mod connection;
+pub mod editing;
 pub mod model_manager;
 pub mod speech;
 pub mod subtitles;

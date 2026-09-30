@@ -35,6 +35,8 @@ pub struct Composition {
     pub voice_version_id: Option<String>,
     #[serde(default)]
     pub voice_start_ms: u32,
+    #[serde(default)]
+    pub effects: editing::TimelineEffects,
     pub music_volume: u8,
     #[serde(default)]
     pub subtitle_version_id: Option<String>,
@@ -176,6 +178,7 @@ fn workflow_exists(state: &WorkflowState, id: &str) -> AppResult<()> {
 }
 
 fn validate_draft(draft: &Composition) -> AppResult<()> {
+    editing::validate_effects(&draft.effects)?;
     if draft.workflow_id.is_empty()
         || draft.workflow_id.len() > 128
         || draft.clips.len() > 24
@@ -509,12 +512,7 @@ pub fn collect_export(
                 .all(|clip| approved.contains(clip.version_id.as_str()))
             && Path::new(&job.output_path).is_file()
         {
-            let duration_ms: u64 = job
-                .draft
-                .clips
-                .iter()
-                .map(|clip| u64::from(clip.trim_end_ms - clip.trim_start_ms))
-                .sum();
+            let duration_ms = editing::layout(&job.draft)?.total_ms;
             return Ok(Some(
                 json!({"exportId":job.id,"outputPath":job.output_path,"durationMs":duration_ms,
                 "aspect":job.draft.aspect,"resolution":job.draft.resolution,
@@ -686,20 +684,29 @@ fn subtitles(draft: &Composition, clips: &[ResolvedClip]) -> Option<(String, Str
         ));
     }
     let mut content = String::new();
-    let mut position = 0u64;
+    let layout = editing::layout(draft).ok()?;
     let mut count = 0;
-    for clip in clips {
-        let duration = u64::from(clip.end_ms - clip.start_ms);
+    for (index, clip) in clips.iter().enumerate() {
+        let position = u64::from(layout.starts_ms[index])
+            + if index > 0 {
+                u64::from(layout.overlap_ms / 2)
+            } else {
+                0
+            };
+        let end = if index + 1 < clips.len() {
+            u64::from(layout.starts_ms[index + 1] + layout.overlap_ms / 2)
+        } else {
+            u64::from(layout.total_ms)
+        };
         if !clip.caption.trim().is_empty() {
             count += 1;
             content.push_str(&format!(
                 "{count}\n{} --> {}\n{}\n\n",
                 srt_time(position),
-                srt_time(position + duration),
+                srt_time(end),
                 clip.caption.trim().replace(['\r', '\n'], " ")
             ));
         }
-        position += duration;
     }
     if count == 0 {
         None
@@ -713,8 +720,12 @@ fn temporary_output(job: &ExportJob) -> PathBuf {
     final_path.with_file_name(format!(".frame-studio-{}.partial.mp4", job.id))
 }
 
-fn voice_filter(input: usize, total_ms: u64, offset_ms: u32, output: &str) -> String {
-    format!("[{input}:a]asetpts=PTS-STARTPTS,adelay={offset_ms}:all=1,apad,atrim=duration={:.3}[{output}]", total_ms as f64 / 1000.0)
+fn voice_filter(input: usize, total_ms: u64, offset_ms: u32, fades: &str, output: &str) -> String {
+    format!("[{input}:a]asetpts=PTS-STARTPTS,adelay={offset_ms}:all=1,apad,atrim=duration={:.3}{fades}[{output}]", total_ms as f64 / 1000.0)
+}
+
+fn audio_asset_duration(state: &WorkflowState, id: &str) -> AppResult<u32> {
+    Ok(audio(state, id)?.duration_ms)
 }
 
 async fn render(
@@ -723,10 +734,34 @@ async fn render(
     cancel: Arc<std::sync::atomic::AtomicBool>,
 ) -> AppResult<()> {
     let (clips, audio) = resolve_inputs(state, &job.draft)?;
-    let total_ms: u64 = clips
-        .iter()
-        .map(|clip| u64::from(clip.end_ms - clip.start_ms))
-        .sum();
+    let layout = editing::layout(&job.draft)?;
+    let total_ms = u64::from(layout.total_ms);
+    let voice_duration = job
+        .draft
+        .voice_version_id
+        .as_ref()
+        .map(|id| audio_asset_duration(state, id))
+        .transpose()?;
+    let music_fades = if job.draft.music_version_id.is_some() {
+        editing::fades(
+            0,
+            layout.total_ms,
+            job.draft.effects.music_fade_in_ms,
+            job.draft.effects.music_fade_out_ms,
+        )
+    } else {
+        String::new()
+    };
+    let voice_fades = voice_duration
+        .map(|duration| {
+            editing::fades(
+                job.draft.voice_start_ms,
+                duration.min(layout.total_ms - job.draft.voice_start_ms),
+                job.draft.effects.voice_fade_in_ms,
+                job.draft.effects.voice_fade_out_ms,
+            )
+        })
+        .unwrap_or_default();
     let (width, height) = dimensions(&job.draft.aspect, job.draft.resolution);
     let work = state.directory.join(format!("export-{}", job.id));
     tokio::fs::create_dir_all(&work)
@@ -734,7 +769,7 @@ async fn render(
         .map_err(|_| "无法创建导出工作目录")?;
     let result = async {
         let mut command = tokio::process::Command::new(binary("ffmpeg"));
-        command.args(["-hide_banner","-nostdin","-n","-loglevel","error","-progress","pipe:1"]);
+        command.args(["-hide_banner","-nostdin","-n","-loglevel","error","-filter_complex_threads","1","-progress","pipe:1"]);
         for clip in &clips { command.arg("-i").arg(&clip.path); }
         for (index,path) in audio.iter().enumerate() {
             if index == 0 && job.draft.music_version_id.is_some() { command.args(["-stream_loop","-1"]); }
@@ -742,10 +777,9 @@ async fn render(
         }
         let mut filters = Vec::new();
         for (index,clip) in clips.iter().enumerate() {
-            filters.push(format!("[{index}:v]trim=start={:.3}:end={:.3},setpts=PTS-STARTPTS,fps=30,scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p[v{index}]", f64::from(clip.start_ms)/1000.0, f64::from(clip.end_ms)/1000.0));
+            filters.push(format!("[{index}:v]trim=start={:.3}:end={:.3},setpts=PTS-STARTPTS,fps=30,scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,settb=AVTB[v{index}]", f64::from(clip.start_ms)/1000.0, f64::from(clip.end_ms)/1000.0));
         }
-        let labels = (0..clips.len()).map(|index|format!("[v{index}]")).collect::<String>();
-        filters.push(format!("{labels}concat=n={}:v=1:a=0[joined]", clips.len()));
+        filters.extend(editing::video_join(&job.draft, &layout));
         let captions = if let Some(id) = &job.draft.subtitle_version_id {
             let source = super::subtitles::asset(state, id)?;
             let aligned = super::subtitles::align_cues(&source.cues, job.draft.voice_start_ms, total_ms as u32)?;
@@ -758,12 +792,12 @@ async fn render(
         let base = clips.len();
         match (job.draft.music_version_id.is_some(),job.draft.voice_version_id.is_some()) {
             (true,true) => {
-                filters.push(format!("[{base}:a]atrim=duration={:.3},asetpts=PTS-STARTPTS,volume={:.2}[music]", total_ms as f64/1000.0, f64::from(job.draft.music_volume)/100.0));
-                filters.push(voice_filter(base+1, total_ms, job.draft.voice_start_ms, "voice"));
+                filters.push(format!("[{base}:a]atrim=duration={:.3},asetpts=PTS-STARTPTS,volume={:.2}{music_fades}[music]", total_ms as f64/1000.0, f64::from(job.draft.music_volume)/100.0));
+                filters.push(voice_filter(base+1, total_ms, job.draft.voice_start_ms, &voice_fades, "voice"));
                 filters.push("[music][voice]amix=inputs=2:duration=first:normalize=0[audio]".into());
             }
-            (true,false) => filters.push(format!("[{base}:a]atrim=duration={:.3},asetpts=PTS-STARTPTS,volume={:.2}[audio]", total_ms as f64/1000.0, f64::from(job.draft.music_volume)/100.0)),
-            (false,true) => filters.push(voice_filter(base, total_ms, job.draft.voice_start_ms, "audio")),
+            (true,false) => filters.push(format!("[{base}:a]atrim=duration={:.3},asetpts=PTS-STARTPTS,volume={:.2}{music_fades}[audio]", total_ms as f64/1000.0, f64::from(job.draft.music_volume)/100.0)),
+            (false,true) => filters.push(voice_filter(base, total_ms, job.draft.voice_start_ms, &voice_fades, "audio")),
             (false,false) => {},
         }
         command.arg("-filter_complex").arg(filters.join(";"))
@@ -832,14 +866,13 @@ pub fn start_export(
     if draft.clips.is_empty() {
         return Err("时间线至少需要一个视频片段".into());
     }
-    let total_ms: u32 = draft
-        .clips
-        .iter()
-        .map(|c| c.trim_end_ms - c.trim_start_ms)
-        .sum();
-    if draft.voice_version_id.is_some() && draft.voice_start_ms >= total_ms {
-        return Err("配音起点须早于成片结束时间；请调整起点或延长时间线".into());
-    }
+    let layout = editing::layout(&draft)?;
+    let voice_duration = draft
+        .voice_version_id
+        .as_ref()
+        .map(|id| audio_asset_duration(&state, id))
+        .transpose()?;
+    editing::validate_audio(&draft, layout.total_ms, voice_duration)?;
     workflow_exists(&state, &draft.workflow_id)?;
     let path = Path::new(&output_path);
     if !path.is_absolute()
@@ -923,6 +956,25 @@ pub fn cancel_export(state: tauri::State<WorkflowState>, id: String) -> AppResul
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn clip_captions_switch_at_transition_midpoint() {
+        let draft: Composition = serde_json::from_value(json!({"workflowId":"w", "clips":[{"versionId":"a","trimStartMs":0,"trimEndMs":1000,"caption":"One"},{"versionId":"b","trimStartMs":0,"trimEndMs":1000,"caption":"Two"}], "aspect":"1:1", "resolution":720, "musicVersionId":null, "voiceVersionId":null, "musicVolume":35, "subtitleFormat":"none", "subtitleText":"", "effects":{"transition":"fade","transitionDurationMs":300,"musicFadeInMs":0,"musicFadeOutMs":0,"voiceFadeInMs":0,"voiceFadeOutMs":0}})).unwrap();
+        let clips: Vec<ResolvedClip> = draft
+            .clips
+            .iter()
+            .map(|c| ResolvedClip {
+                path: PathBuf::new(),
+                start_ms: c.trim_start_ms,
+                end_ms: c.trim_end_ms,
+                caption: c.caption.clone(),
+            })
+            .collect();
+        let (_, srt) = subtitles(&draft, &clips).unwrap();
+        assert_eq!(
+            srt,
+            "1\n00:00:00,000 --> 00:00:00,850\nOne\n\n2\n00:00:00,850 --> 00:00:01,700\nTwo\n\n"
+        );
+    }
 
     #[test]
     fn legacy_drafts_default_voice_start_and_round_trip_alignment() {
@@ -937,7 +989,7 @@ mod tests {
         draft.voice_start_ms = 1_440_001;
         assert!(validate_draft(&draft).is_err());
         assert_eq!(
-            voice_filter(2, 700, 200, "audio"),
+            voice_filter(2, 700, 200, "", "audio"),
             "[2:a]asetpts=PTS-STARTPTS,adelay=200:all=1,apad,atrim=duration=0.700[audio]"
         );
     }
@@ -969,6 +1021,7 @@ mod tests {
                 music_version_id: None,
                 voice_version_id: None,
                 voice_start_ms: 0,
+                effects: Default::default(),
                 music_volume: 35,
                 subtitle_version_id: None,
                 subtitle_format: "none".into(),

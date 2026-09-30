@@ -459,6 +459,7 @@ mod tests {
             music_version_id: None,
             voice_version_id: Some(audio.version_id.clone()),
             voice_start_ms: 0,
+            effects: Default::default(),
             music_volume: 50,
             subtitle_version_id: Some(asset.version_id.clone()),
             subtitle_format: "srt".into(),
