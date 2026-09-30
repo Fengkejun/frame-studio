@@ -4,6 +4,7 @@ import { errorMessage } from './api'
 import * as api from './mediaApi'
 import { AssetImage } from './AssetImage'
 import { AudioPreview } from './AudioPreview'
+import { ExportPreview } from './ExportPreview'
 import { AudioAlignment } from './AudioAlignment'
 import { TimelineEffectsPanel } from './TimelineEffectsPanel'
 import {
@@ -23,6 +24,7 @@ function initialDraft(workflowId: string): api.Composition {
     clips: [],
     aspect: '9:16',
     resolution: 720,
+    quality: 'balanced',
     musicVersionId: null,
     voiceVersionId: null,
     voiceStartMs: 0,
@@ -56,6 +58,7 @@ export function TimelineStudio({
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
+  const [exportPreview, setExportPreview] = useState<api.ExportJob | null>(null)
   const candidates = useMemo(
     () =>
       media.selectedVideos.flatMap((selection) => {
@@ -428,6 +431,31 @@ export function TimelineStudio({
             />
           </label>
           <label className="field-label">
+            导出质量
+            <select
+              aria-label="导出质量"
+              value={draft.quality}
+              disabled={!isDesktop || busy || !!active || !loaded}
+              onChange={(event) =>
+                setDraft((value) => ({
+                  ...value,
+                  quality: event.target.value as api.Composition['quality'],
+                }))
+              }
+            >
+              <option value="compact">体积优先</option>
+              <option value="balanced">均衡（推荐）</option>
+              <option value="high">高画质</option>
+            </select>
+            <span className="field-hint">
+              {draft.quality === 'compact'
+                ? '更小的文件，适合快速分享。实际体积取决于画面内容。'
+                : draft.quality === 'high'
+                  ? '保留更多细节，编码耗时与文件体积通常更高。'
+                  : '兼顾画质、编码速度与文件体积。'}
+            </span>
+          </label>
+          <label className="field-label">
             背景音乐
             <select
               aria-label="背景音乐"
@@ -670,6 +698,14 @@ export function TimelineStudio({
               <small>{new Date(job.createdAt).toLocaleString('zh-CN')}</small>
             </div>
             <p>{job.message}</p>
+            <small>
+              {job.draft.aspect} · {job.draft.resolution}p ·
+              {job.draft.quality === 'high'
+                ? ' 高画质'
+                : job.draft.quality === 'compact'
+                  ? ' 体积优先'
+                  : ' 均衡'}
+            </small>
             <small className="timeline-path">{job.outputPath}</small>
             {job.coverPath && (
               <small className="timeline-path">封面：{job.coverPath}</small>
@@ -685,6 +721,22 @@ export function TimelineStudio({
               >
                 停止导出
               </button>
+            )}
+            {job.status === 'succeeded' && (
+              <button
+                className="small-button"
+                disabled={!isDesktop}
+                onClick={() => setExportPreview(job)}
+              >
+                播放成片
+              </button>
+            )}
+            {exportPreview?.id === job.id && (
+              <ExportPreview
+                key={job.id}
+                job={job}
+                onClose={() => setExportPreview(null)}
+              />
             )}
           </article>
         ))}

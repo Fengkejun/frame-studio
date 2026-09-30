@@ -524,6 +524,21 @@
   display: block;
   overflow-wrap: anywhere;
 }
+.export-preview {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.export-preview video {
+  display: block;
+  width: 100%;
+  max-height: 520px;
+  background: #000;
+  border-radius: 8px;
+}
 .voiceover-studio,
 .speech-history,
 .speech-job {

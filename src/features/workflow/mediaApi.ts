@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core'
+import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { isDesktop } from '@/shared/lib/desktop'
 
 export interface ShotContext {
@@ -162,6 +162,7 @@ export interface Composition {
   clips: TimelineClip[]
   aspect: '9:16' | '16:9' | '1:1'
   resolution: 720 | 1080
+  quality: 'compact' | 'balanced' | 'high'
   musicVersionId: string | null
   voiceVersionId: string | null
   voiceStartMs: number
@@ -414,6 +415,8 @@ export const listAudioAssets = (workflowId: string): Promise<AudioAsset[]> =>
   isDesktop ? invoke('list_audio_assets', { workflowId }) : Promise.resolve([])
 export const listExportJobs = (workflowId: string): Promise<ExportJob[]> =>
   isDesktop ? invoke('list_export_jobs', { workflowId }) : Promise.resolve([])
+export const exportPreview = async (id: string): Promise<string> =>
+  convertFileSrc(await invoke<string>('export_preview', { id }))
 export const chooseExportPath = (): Promise<string | null> =>
   invoke('choose_export_path')
 export const startExport = (

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect } from '@playwright/test'
 
@@ -324,7 +324,44 @@ export async function testTransitions(page, root, profile, fixture) {
   )
   await expect(page.getByLabel('音乐淡入', { exact: true })).toHaveValue('0.3')
   await expect(page.locator('.timeline-clips .timeline-clip')).toHaveCount(3)
+  // Quality presets must change the actual encoder settings, and completed
+  // exports must be playable through the job-scoped native preview command.
+  await page.getByLabel('导出质量', { exact: true }).selectOption('compact')
+  await page.getByRole('button', { name: '选择位置并导出 MP4' }).click()
+  await expect(
+    page.locator('.timeline-export').filter({ hasText: 'finished-8.mp4' }),
+  ).toContainText('已完成', { timeout: 60000 })
+  await page.getByLabel('导出质量', { exact: true }).selectOption('high')
+  await page.getByRole('button', { name: '选择位置并导出 MP4' }).click()
+  const highExport = page.locator('.timeline-export').filter({
+    hasText: 'finished-9.mp4',
+  })
+  await expect(highExport).toContainText('已完成', { timeout: 60000 })
+  const compactBytes = (await stat(path.join(profile, 'finished-8.mp4'))).size
+  const highBytes = (await stat(path.join(profile, 'finished-9.mp4'))).size
+  expect(highBytes).toBeGreaterThan(compactBytes)
+  await highExport.getByRole('button', { name: '播放成片' }).click()
+  const player = page.getByLabel('成片播放器')
+  await expect(player).toBeVisible()
+  await expect
+    .poll(() =>
+      player.evaluate((element) => ({
+        readyState: element.readyState,
+        duration: element.duration,
+        width: element.videoWidth,
+        height: element.videoHeight,
+      })),
+    )
+    .toMatchObject({ readyState: 4 })
+  const metadata = await player.evaluate((element) => ({
+    duration: element.duration,
+    width: element.videoWidth,
+    height: element.videoHeight,
+  }))
+  expect(metadata.duration).toBeGreaterThan(0)
+  expect(metadata.width).toBeGreaterThan(0)
+  expect(metadata.height).toBeGreaterThan(0)
   console.log(
-    'PASS: three genuine selected video versions; chained dissolve and black transitions; compact duration and fractional frame clock; voice offset with fades; looped music fades; pixel/PCM validation; guards and reload. Local fixtures only.',
+    'PASS: three genuine selected video versions; chained dissolve and black transitions; compact duration and fractional frame clock; voice offset with fades; looped music fades; quality preset size difference; native export playback; pixel/PCM validation; guards and reload. Local fixtures only.',
   )
 }

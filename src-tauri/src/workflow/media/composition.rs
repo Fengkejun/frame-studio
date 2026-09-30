@@ -15,6 +15,25 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 
 pub(super) const MAX_AUDIO_BYTES: usize = 20 * 1024 * 1024;
 
+#[derive(Clone, Copy, Default, Serialize, Deserialize, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum ExportQuality {
+    Compact,
+    #[default]
+    Balanced,
+    High,
+}
+
+impl ExportQuality {
+    fn encoding(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Compact => ("fast", "26"),
+            Self::Balanced => ("medium", "20"),
+            Self::High => ("slow", "18"),
+        }
+    }
+}
+
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TimelineClip {
@@ -31,6 +50,8 @@ pub struct Composition {
     pub clips: Vec<TimelineClip>,
     pub aspect: String,
     pub resolution: u16,
+    #[serde(default)]
+    pub quality: ExportQuality,
     pub music_version_id: Option<String>,
     pub voice_version_id: Option<String>,
     #[serde(default)]
@@ -472,6 +493,56 @@ pub fn list_export_jobs(
     result
 }
 
+fn export_preview_path(job: &ExportJob) -> AppResult<PathBuf> {
+    use std::io::Read;
+    if job.status != "succeeded" {
+        return Err("成片尚未完成导出".into());
+    }
+    let path = Path::new(&job.output_path)
+        .canonicalize()
+        .map_err(|_| "成片文件已移动或删除，请重新导出")?;
+    if !path.is_file()
+        || !path
+            .extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("mp4"))
+    {
+        return Err("成片文件格式无效".into());
+    }
+    // Only expose the exact completed MP4, never its parent directory.
+    let mut header = [0u8; 12];
+    std::fs::File::open(&path)
+        .and_then(|mut file| file.read_exact(&mut header))
+        .map_err(|_| "成片文件读取失败")?;
+    if &header[4..8] != b"ftyp" {
+        return Err("成片文件格式无效".into());
+    }
+    Ok(path)
+}
+
+#[tauri::command]
+pub async fn export_preview(app: tauri::AppHandle, id: String) -> AppResult<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<WorkflowState>();
+        let saved: Option<String> = state
+            .store
+            .db()?
+            .query_row("SELECT json FROM export_jobs WHERE id=?1", [&id], |row| {
+                row.get(0)
+            })
+            .optional()
+            .map_err(|e| e.to_string())?;
+        let job: ExportJob =
+            serde_json::from_str(&saved.ok_or("导出记录不存在")?).map_err(|e| e.to_string())?;
+        let path = export_preview_path(&job)?;
+        app.asset_protocol_scope()
+            .allow_file(&path)
+            .map_err(|e| e.to_string())?;
+        Ok(path.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|_| "成片预览任务异常".to_string())?
+}
+
 pub fn collect_export(
     state: &WorkflowState,
     workflow_id: &str,
@@ -813,7 +884,8 @@ async fn render(
         command.arg("-filter_complex").arg(filters.join(";"))
             .args(["-map","[video]"]);
         if !audio.is_empty() { command.args(["-map","[audio]","-c:a","aac","-b:a","192k"]); }
-        command.args(["-c:v","libx264","-preset","medium","-crf","20","-pix_fmt","yuv420p","-movflags","+faststart","-f","mp4"])
+        let (preset, crf) = job.draft.quality.encoding();
+        command.args(["-c:v","libx264","-preset",preset,"-crf",crf,"-pix_fmt","yuv420p","-movflags","+faststart","-f","mp4"])
             .arg(temporary_output(job)).current_dir(&work)
             .stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true);
         let mut child = command.spawn().map_err(|_|"未找到 FFmpeg 或无法启动导出进程")?;
@@ -991,11 +1063,14 @@ mod tests {
         let legacy = json!({"workflowId":"w", "clips":[], "aspect":"9:16", "resolution":720, "musicVersionId":null, "voiceVersionId":null, "musicVolume":35, "subtitleFormat":"none", "subtitleText":""});
         let mut draft: Composition = serde_json::from_value(legacy).unwrap();
         assert_eq!(draft.voice_start_ms, 0);
+        assert_eq!(draft.quality, ExportQuality::Balanced);
+        draft.quality = ExportQuality::High;
         draft.voice_start_ms = 200;
         assert!(validate_draft(&draft).is_ok());
         let restored: Composition =
             serde_json::from_str(&serde_json::to_string(&draft).unwrap()).unwrap();
         assert_eq!(restored.voice_start_ms, 200);
+        assert_eq!(restored.quality, ExportQuality::High);
         draft.voice_start_ms = 1_440_001;
         assert!(validate_draft(&draft).is_err());
         assert_eq!(
@@ -1028,6 +1103,7 @@ mod tests {
                 clips: vec![],
                 aspect: "9:16".into(),
                 resolution: 720,
+                quality: ExportQuality::Balanced,
                 music_version_id: None,
                 voice_version_id: None,
                 voice_start_ms: 0,

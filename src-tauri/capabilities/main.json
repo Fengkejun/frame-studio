@@ -85,6 +85,7 @@
     "allow-choose-export-path",
     "allow-start-export",
     "allow-list-export-jobs",
+    "allow-export-preview",
     "allow-cancel-export",
     "allow-check-export-tools"
   ]

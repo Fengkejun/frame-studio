@@ -80,6 +80,7 @@ fn main() {
             "choose_export_path",
             "start_export",
             "list_export_jobs",
+            "export_preview",
             "cancel_export",
             "check_export_tools",
         ]),

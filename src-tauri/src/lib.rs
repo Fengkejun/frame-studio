@@ -64,6 +64,7 @@ pub fn run() {
             workflow::media::composition::save_composition,
             workflow::media::composition::import_audio,
             workflow::media::composition::audio_preview,
+            workflow::media::composition::export_preview,
             workflow::media::waveform::get_audio_waveform,
             workflow::media::speech::speech_key_status,
             workflow::media::speech::save_speech_key,
