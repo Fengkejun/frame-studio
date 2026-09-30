@@ -70,6 +70,9 @@ function WorkflowEditor({
 }) {
   const { workflow: w, busy } = c
   const [providers, setProviders] = useState<Provider[]>([])
+  const [measurements, setMeasurements] = useState<
+    Record<string, { width: number; height: number }>
+  >({})
   const [selected, setSelected] = useState<string[]>([])
   const [selectedEdges, setSelectedEdges] = useState<string[]>([])
   const [tab, setTab] = useState<
@@ -109,6 +112,7 @@ function WorkflowEditor({
         type: 'agent',
         position: n.position,
         selected: selected.includes(n.id),
+        measured: measurements[`${w?.id}:${n.id}`],
         data: {
           node: n,
           providerName:
@@ -119,7 +123,7 @@ function WorkflowEditor({
               : undefined,
         },
       })),
-    [w?.nodes, selected, providers, c.activeRun],
+    [w?.id, w?.nodes, selected, providers, c.activeRun, measurements],
   )
   if (!w)
     return (
@@ -159,7 +163,28 @@ function WorkflowEditor({
     })
   }
   function nodesChange(changes: NodeChange<CanvasNode>[]) {
-    if (!w || busy) return
+    if (!w) return
+    const dimensions = changes.filter((change) => change.type === 'dimensions')
+    // Controlled nodes must keep measured dimensions when data/selection changes.
+    // Otherwise React Flow clears them while ResizeObserver may see no size change.
+    if (dimensions.length)
+      setMeasurements((previous) => {
+        let changed = false
+        const next = { ...previous }
+        for (const change of dimensions) {
+          if (!change.dimensions) continue
+          const key = `${w.id}:${change.id}`
+          if (
+            previous[key]?.width !== change.dimensions.width ||
+            previous[key]?.height !== change.dimensions.height
+          ) {
+            next[key] = change.dimensions
+            changed = true
+          }
+        }
+        return changed ? next : previous
+      })
+    if (busy) return
     const removed = changes
       .filter((change) => change.type === 'remove')
       .map((change) => change.id)
