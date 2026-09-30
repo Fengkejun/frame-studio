@@ -38,6 +38,9 @@ pub struct Layout {
     pub starts_ms: Vec<u32>,
     pub total_ms: u32,
     pub overlap_ms: u32,
+    pub starts_frames: Vec<u32>,
+    pub duration_frames: Vec<u32>,
+    pub overlap_frames: u32,
 }
 
 pub fn validate_effects(effects: &TimelineEffects) -> AppResult<()> {
@@ -59,32 +62,49 @@ pub fn validate_effects(effects: &TimelineEffects) -> AppResult<()> {
 
 pub fn layout(draft: &Composition) -> AppResult<Layout> {
     validate_effects(&draft.effects)?;
+    if draft.clips.len() > 24 {
+        return Err("时间线最多包含 24 个片段".into());
+    }
     let overlap_ms = if draft.clips.len() > 1 && draft.effects.transition != Transition::None {
         draft.effects.transition_duration_ms
     } else {
         0
     };
-    let mut total_ms = 0u32;
+    let overlap_frames = (overlap_ms * 30 + 500) / 1000;
+    let mut total_frames = 0u32;
     let mut starts_ms = Vec::new();
+    let mut starts_frames = Vec::new();
+    let mut duration_frames = Vec::new();
     for (index, clip) in draft.clips.iter().enumerate() {
         let duration = clip
             .trim_end_ms
             .checked_sub(clip.trim_start_ms)
-            .filter(|ms| *ms > 0)
+            .filter(|ms| *ms > 0 && *ms <= 60_000)
             .ok_or("片段裁剪时间无效")?;
-        if overlap_ms > duration / 2 {
+        let frames = duration
+            .checked_mul(30)
+            .ok_or("时间线时长超出范围")?
+            .div_ceil(1000);
+        if overlap_ms > duration / 2 || overlap_frames * 2 > frames {
             return Err("转场时长须不超过任一片段时长的一半".into());
         }
         if index > 0 {
-            total_ms -= overlap_ms;
+            total_frames -= overlap_frames;
         }
-        starts_ms.push(total_ms);
-        total_ms = total_ms.checked_add(duration).ok_or("时间线时长超出范围")?;
+        starts_frames.push(total_frames);
+        starts_ms.push((total_frames * 1000 + 15) / 30);
+        duration_frames.push(frames);
+        total_frames = total_frames
+            .checked_add(frames)
+            .ok_or("时间线时长超出范围")?;
     }
     Ok(Layout {
         starts_ms,
-        total_ms,
-        overlap_ms,
+        total_ms: (total_frames * 1000 + 15) / 30,
+        overlap_ms: (overlap_frames * 1000 + 15) / 30,
+        starts_frames,
+        duration_frames,
+        overlap_frames,
     })
 }
 
@@ -158,9 +178,9 @@ pub fn video_join(draft: &Composition, layout: &Layout) -> Vec<String> {
                 format!("join{i}")
             };
             format!(
-                "[{left}][v{i}]xfade=transition={kind}:duration={:.3}:offset={:.3}[{output}]",
-                f64::from(layout.overlap_ms) / 1000.0,
-                f64::from(layout.starts_ms[i]) / 1000.0
+                "[{left}][v{i}]xfade=transition={kind}:duration={:.6}:offset={:.6}[{output}]",
+                f64::from(layout.overlap_frames) / 30.0,
+                f64::from(layout.starts_frames[i]) / 30.0
             )
         })
         .collect()
@@ -182,9 +202,9 @@ mod tests {
         assert_eq!(l.total_ms, 2400);
         assert_eq!(l.starts_ms, vec![0, 700, 1400]);
         let filters = video_join(&d, &l);
-        assert!(filters[0].contains("offset=0.700[join1]"));
+        assert!(filters[0].contains("offset=0.700000[join1]"));
         assert!(filters[1].contains("[join1][v2]"));
-        assert!(filters[1].contains("offset=1.400[joined]"));
+        assert!(filters[1].contains("offset=1.400000[joined]"));
         d.effects.transition_duration_ms = 501;
         assert!(layout(&d).is_err());
         d.clips.truncate(1);
@@ -216,5 +236,21 @@ mod tests {
         d.effects.music_fade_out_ms = 10001;
         assert!(validate_effects(&d.effects).is_err());
         assert_eq!(fades(0, 700, 0, 0), "");
+    }
+    #[test]
+    fn fractional_trims_and_transitions_share_one_frame_clock() {
+        let mut d = draft();
+        for clip in &mut d.clips {
+            clip.trim_start_ms = 0;
+            clip.trim_end_ms = 1190;
+        }
+        d.effects.transition = Transition::Fade;
+        d.effects.transition_duration_ms = 333;
+        let l = layout(&d).unwrap();
+        assert_eq!(l.duration_frames, vec![36, 36, 36]);
+        assert_eq!(l.overlap_frames, 10);
+        assert_eq!(l.starts_frames, vec![0, 26, 52]);
+        assert_eq!(l.total_ms, 2933);
+        assert!(video_join(&d, &l)[1].contains("offset=1.733333"));
     }
 }

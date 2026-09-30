@@ -94,6 +94,8 @@ pub struct ExportToolsStatus {
     h264: bool,
     aac: bool,
     subtitles: bool,
+    transitions: bool,
+    audio_fades: bool,
     ready: bool,
     message: String,
 }
@@ -141,13 +143,19 @@ pub async fn check_export_tools() -> ExportToolsStatus {
     let subtitles = filters
         .as_deref()
         .is_some_and(|list| has_capability(list, "subtitles"));
-    let ready = ffmpeg && ffprobe && h264 && aac && subtitles;
+    let transitions = filters
+        .as_deref()
+        .is_some_and(|list| has_capability(list, "xfade"));
+    let audio_fades = filters
+        .as_deref()
+        .is_some_and(|list| has_capability(list, "afade"));
+    let ready = ffmpeg && ffprobe && h264 && aac && subtitles && transitions && audio_fades;
     let message = if !ffmpeg || !ffprobe {
         "未找到 FFmpeg 或 FFprobe；请安装工具或使用包含它们的安装包"
     } else if !ready {
-        "FFmpeg 缺少 H.264、AAC 编码器或字幕滤镜"
+        "FFmpeg 缺少 H.264、AAC 编码器、字幕、转场或音频淡化滤镜"
     } else {
-        "本机合成工具可用，支持 H.264、AAC 和字幕烧录"
+        "本机合成工具可用，支持 H.264、AAC、字幕、转场与音频淡化"
     };
     ExportToolsStatus {
         ffmpeg,
@@ -155,6 +163,8 @@ pub async fn check_export_tools() -> ExportToolsStatus {
         h264,
         aac,
         subtitles,
+        transitions,
+        audio_fades,
         ready,
         message: message.into(),
     }
@@ -777,7 +787,7 @@ async fn render(
         }
         let mut filters = Vec::new();
         for (index,clip) in clips.iter().enumerate() {
-            filters.push(format!("[{index}:v]trim=start={:.3}:end={:.3},setpts=PTS-STARTPTS,fps=30,scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,settb=AVTB[v{index}]", f64::from(clip.start_ms)/1000.0, f64::from(clip.end_ms)/1000.0));
+            filters.push(format!("[{index}:v]trim=start={:.3}:end={:.3},setpts=PTS-STARTPTS,fps=30,tpad=stop_mode=clone:stop_duration=0.1,trim=end_frame={},scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,settb=AVTB[v{index}]", f64::from(clip.start_ms)/1000.0, f64::from(clip.end_ms)/1000.0, layout.duration_frames[index]));
         }
         filters.extend(editing::video_join(&job.draft, &layout));
         let captions = if let Some(id) = &job.draft.subtitle_version_id {
