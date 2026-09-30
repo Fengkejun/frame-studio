@@ -4,6 +4,7 @@ import path from 'node:path'
 import { expect } from '@playwright/test'
 import { testSpeechMedia } from './speech-media-smoke.mjs'
 import { testSubtitleMedia } from './subtitle-media-smoke.mjs'
+import { testWaveform, testAlignedExport } from './audio-alignment-smoke.mjs'
 
 export async function testTimelineMedia(
   page,
@@ -53,6 +54,14 @@ export async function testTimelineMedia(
     .selectOption({ label: 'voice.wav' })
   await testSpeechMedia(page, speechFixture, root)
   await testSubtitleMedia(page, transcriptionFixture, root)
+  const workflowId = await testWaveform(page, root)
+  const sourceDraft = await page.evaluate(
+    (id) =>
+      globalThis.__TAURI_INTERNALS__.invoke('get_composition', {
+        workflowId: id,
+      }),
+    workflowId,
+  )
   await page.getByRole('button', { name: '选择位置并导出 MP4' }).click()
   const exportRecord = page.locator('.timeline-export').first()
   await expect(exportRecord).toContainText('已完成', { timeout: 60000 })
@@ -145,6 +154,7 @@ export async function testTimelineMedia(
     false,
   )
   await access(path.join(profile, 'finished-3.cover.jpg'))
+  await testAlignedExport(page, root, profile, workflowId, sourceDraft)
   await page.reload()
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
@@ -156,8 +166,9 @@ export async function testTimelineMedia(
   await expect(page.getByLabel('片段 1 开始')).toHaveValue('0.1')
   await expect(page.getByLabel('片段 1 结束')).toHaveValue('0.8')
   await expect(page.locator('.timeline-export').first()).toContainText(
-    'finished-3.mp4',
+    'finished-4.mp4',
   )
+  await expect(page.getByLabel('配音起点', { exact: true })).toHaveValue('0.2')
   await page
     .getByTestId('rf__node-timeline-fixture')
     .locator('.node-mark')

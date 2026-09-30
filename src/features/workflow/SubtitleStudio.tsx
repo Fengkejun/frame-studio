@@ -37,6 +37,8 @@ export function SubtitleStudio({
   workflow,
   save,
   voice,
+  voiceStartMs,
+  timelineDurationMs,
   audio,
   assets,
   setAssets,
@@ -46,6 +48,8 @@ export function SubtitleStudio({
   workflow: Workflow
   save: (workflow: Workflow) => Promise<void>
   voice: api.AudioAsset | undefined
+  voiceStartMs: number
+  timelineDurationMs: number
   audio: api.AudioAsset[]
   assets: api.SubtitleAsset[]
   setAssets: Dispatch<SetStateAction<api.SubtitleAsset[]>>
@@ -116,7 +120,12 @@ export function SubtitleStudio({
     setJobs((values) => [job, ...values])
   }
   async function download(asset: api.SubtitleAsset) {
-    const srt = await api.getSubtitleSrt(asset.versionId)
+    const matchesVoice = asset.sourceAudioVersionId === voice?.versionId
+    const srt = await api.getSubtitleSrt(
+      asset.versionId,
+      matchesVoice ? voiceStartMs : 0,
+      matchesVoice && timelineDurationMs > 0 ? timelineDurationMs : null,
+    )
     const url = URL.createObjectURL(
       new Blob([srt], { type: 'application/x-subrip;charset=utf-8' }),
     )
@@ -274,6 +283,9 @@ export function SubtitleStudio({
           key={preview.versionId}
           asset={preview}
           durationMs={source.durationMs}
+          voiceStartMs={
+            preview.sourceAudioVersionId === voice?.versionId ? voiceStartMs : 0
+          }
           busy={busy}
           appliedId={appliedId}
           matchesVoice={preview.sourceAudioVersionId === voice?.versionId}

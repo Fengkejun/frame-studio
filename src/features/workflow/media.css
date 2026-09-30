@@ -617,3 +617,67 @@
     grid-column: 2 / 4;
   }
 }
+
+.audio-offset-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+.audio-offset-controls .field-label {
+  flex: 1;
+  min-width: 150px;
+}
+.waveform-ruler {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.waveform-clips {
+  display: flex;
+  overflow: hidden;
+  margin: 6px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.waveform-clips span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 5px;
+  border-right: 1px solid var(--border);
+  font-size: 11px;
+}
+.waveform-label {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 8px 0 4px;
+}
+.waveform-label small {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+}
+.waveform-track svg {
+  display: block;
+  width: 100%;
+  height: 64px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.waveform-region {
+  fill: currentColor;
+  opacity: 0.05;
+}
+.waveform-baseline {
+  fill: none;
+  stroke: currentColor;
+  opacity: 0.15;
+}
+.waveform-peaks {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.2;
+}

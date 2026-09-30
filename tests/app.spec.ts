@@ -200,6 +200,10 @@ test('automatic subtitles stay native-only with broken optional settings', async
   await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
   const studio = page.locator('.subtitle-studio')
   await expect(
+    page.getByRole('heading', { name: '音频波形与时间对齐' }),
+  ).toBeVisible()
+  await expect(page.getByLabel('配音起点', { exact: true })).toBeDisabled()
+  await expect(
     studio.getByRole('heading', { name: '配音自动字幕' }),
   ).toBeVisible()
   await expect(

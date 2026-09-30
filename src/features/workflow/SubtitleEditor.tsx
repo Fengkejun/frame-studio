@@ -4,6 +4,7 @@ import type { SubtitleAsset, SubtitleCue } from './mediaApi'
 export function SubtitleEditor({
   asset,
   durationMs,
+  voiceStartMs,
   busy,
   matchesVoice,
   appliedId,
@@ -13,6 +14,7 @@ export function SubtitleEditor({
 }: {
   asset: SubtitleAsset
   durationMs: number
+  voiceStartMs: number
   busy: boolean
   matchesVoice: boolean
   appliedId: string | null
@@ -46,7 +48,9 @@ export function SubtitleEditor({
       <p className="field-hint">
         字幕版本 {asset.versionId.slice(0, 8)} · 配音版本{' '}
         {asset.sourceAudioVersionId.slice(0, 8)} · {cues.length}{' '}
-        段。时间从成片开始计算，配音从 0 秒播放。
+        段。编辑时间相对原始配音；当前配音在成片第{' '}
+        {(voiceStartMs / 1000).toFixed(3)} 秒开始。 匹配当前配音的 SRT
+        下载与成片导出会自动对齐并裁掉超出成片的部分。
       </p>
       {!matchesVoice && (
         <p className="workflow-error">

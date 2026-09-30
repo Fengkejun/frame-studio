@@ -4,6 +4,7 @@ import { errorMessage } from './api'
 import * as api from './mediaApi'
 import { AssetImage } from './AssetImage'
 import { AudioPreview } from './AudioPreview'
+import { AudioAlignment } from './AudioAlignment'
 import { SubtitleStudio } from './SubtitleStudio'
 import { VoiceoverStudio } from './VoiceoverStudio'
 import type { Workflow } from './model'
@@ -18,6 +19,7 @@ function initialDraft(workflowId: string): api.Composition {
     resolution: 720,
     musicVersionId: null,
     voiceVersionId: null,
+    voiceStartMs: 0,
     musicVolume: 35,
     subtitleVersionId: null,
     subtitleFormat: 'none',
@@ -126,6 +128,8 @@ export function TimelineStudio({
     (sum, clip) => sum + clip.trimEndMs - clip.trimStartMs,
     0,
   )
+  const invalidVoiceStart =
+    !!draft.voiceVersionId && draft.voiceStartMs >= totalMs
   const missing = draft.clips.some(
     (clip) =>
       !candidates.some(({ asset }) => asset.versionId === clip.versionId),
@@ -471,9 +475,26 @@ export function TimelineStudio({
           </label>
         </div>
       </section>
+      <AudioAlignment
+        key={`audio-alignment-${workflow.id}`}
+        voice={audio.find((item) => item.versionId === draft.voiceVersionId)}
+        music={audio.find((item) => item.versionId === draft.musicVersionId)}
+        clips={draft.clips}
+        voiceStartMs={draft.voiceStartMs}
+        musicVolume={draft.musicVolume}
+        busy={busy || !!active || !loaded}
+        onOffset={(voiceStartMs) =>
+          setDraft((value) => ({ ...value, voiceStartMs }))
+        }
+      />
+      {invalidVoiceStart && (
+        <p className="workflow-error" role="alert">
+          配音起点须早于成片结束时间；请调整起点或延长时间线。
+        </p>
+      )}
       {draft.voiceVersionId && (
         <div className="timeline-section">
-          <strong>当前配音试听</strong>
+          <strong>原始配音试听（未加入时间线延迟）</strong>
           <AudioPreview
             key={draft.voiceVersionId}
             versionId={draft.voiceVersionId}
@@ -500,6 +521,8 @@ export function TimelineStudio({
         workflow={workflow}
         save={save}
         voice={audio.find((item) => item.versionId === draft.voiceVersionId)}
+        voiceStartMs={draft.voiceStartMs}
+        timelineDurationMs={totalMs}
         audio={audio}
         assets={subtitles}
         setAssets={setSubtitles}
@@ -587,6 +610,7 @@ export function TimelineStudio({
             !draft.clips.length ||
             missing ||
             staleSubtitles ||
+            invalidVoiceStart ||
             draft.clips.some((clip) => clip.trimEndMs <= clip.trimStartMs)
           }
           onClick={() => void exportVideo()}

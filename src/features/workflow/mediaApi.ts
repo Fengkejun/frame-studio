@@ -164,6 +164,7 @@ export interface Composition {
   resolution: 720 | 1080
   musicVersionId: string | null
   voiceVersionId: string | null
+  voiceStartMs: number
   musicVolume: number
   subtitleVersionId: string | null
   subtitleFormat: 'none' | 'srt' | 'vtt'
@@ -216,6 +217,13 @@ export const startSpeechJob = (request: SpeechRequest): Promise<SpeechJob> =>
   invoke('start_speech_job', { request })
 export const audioPreview = (versionId: string): Promise<string> =>
   invoke('audio_preview', { versionId })
+export interface AudioWaveform {
+  versionId: string
+  durationMs: number
+  peaks: number[]
+}
+export const getAudioWaveform = (versionId: string): Promise<AudioWaveform> =>
+  invoke('get_audio_waveform', { versionId })
 export interface ExportJob {
   id: string
   workflowId: string
@@ -496,5 +504,9 @@ export const saveSubtitleVersion = (
   cues: SubtitleCue[],
 ): Promise<SubtitleAsset> =>
   invoke('save_subtitle_version', { workflowId, parentVersionId, cues })
-export const getSubtitleSrt = (versionId: string): Promise<string> =>
-  invoke('get_subtitle_srt', { versionId })
+export const getSubtitleSrt = (
+  versionId: string,
+  offsetMs = 0,
+  timelineDurationMs: number | null = null,
+): Promise<string> =>
+  invoke('get_subtitle_srt', { versionId, offsetMs, timelineDurationMs })
