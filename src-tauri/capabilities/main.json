@@ -64,6 +64,7 @@
     "allow-get-composition",
     "allow-save-composition",
     "allow-import-audio",
+    "allow-audio-preview",
     "allow-list-audio-assets",
     "allow-choose-export-path",
     "allow-start-export",

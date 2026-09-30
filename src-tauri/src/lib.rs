@@ -63,6 +63,7 @@ pub fn run() {
             workflow::media::composition::get_composition,
             workflow::media::composition::save_composition,
             workflow::media::composition::import_audio,
+            workflow::media::composition::audio_preview,
             workflow::media::composition::list_audio_assets,
             workflow::media::composition::choose_export_path,
             workflow::media::composition::start_export,

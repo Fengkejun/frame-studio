@@ -59,6 +59,7 @@ fn main() {
             "get_composition",
             "save_composition",
             "import_audio",
+            "audio_preview",
             "list_audio_assets",
             "choose_export_path",
             "start_export",

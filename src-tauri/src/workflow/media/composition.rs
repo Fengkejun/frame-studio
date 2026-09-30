@@ -13,7 +13,7 @@ use std::{
 use tauri::Manager;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 
-const MAX_AUDIO_BYTES: usize = 20 * 1024 * 1024;
+pub(super) const MAX_AUDIO_BYTES: usize = 20 * 1024 * 1024;
 
 #[derive(Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -242,7 +242,7 @@ pub fn save_composition(state: tauri::State<WorkflowState>, draft: Composition) 
     save_draft(&state, &draft)
 }
 
-fn audio(state: &WorkflowState, id: &str) -> AppResult<AudioAsset> {
+pub(super) fn audio(state: &WorkflowState, id: &str) -> AppResult<AudioAsset> {
     let json: String = state
         .store
         .db()?
@@ -327,56 +327,102 @@ pub async fn import_audio(
 ) -> AppResult<AudioAsset> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<WorkflowState>();
-        workflow_exists(&state, &workflow_id)?;
-        let ext = Path::new(&name)
-            .extension()
-            .and_then(|value| value.to_str())
-            .unwrap_or("")
-            .to_ascii_lowercase();
-        if !["mp3", "wav", "m4a", "aac", "flac", "ogg"].contains(&ext.as_str())
-            || name.len() > 255
-            || bytes.is_empty()
-            || bytes.len() > MAX_AUDIO_BYTES
-        {
-            return Err("音频需为 MP3、WAV、M4A、AAC、FLAC 或 OGG，且不超过 20 MB".into());
-        }
-        let version_id = uid();
-        let file_name = format!("{version_id}.{ext}");
-        let path = state.directory.join("assets").join(&file_name);
-        std::fs::create_dir_all(path.parent().ok_or("素材目录无效")?).map_err(|e| e.to_string())?;
-        std::fs::write(&path, &bytes).map_err(|_| "保存音频文件失败")?;
-        let duration_ms = match probe_audio_duration(&path) {
-            Ok(value) => value,
-            Err(error) => {
-                let _ = std::fs::remove_file(&path);
-                return Err(error);
-            }
-        };
-        let entry = AudioAsset {
-            version_id: version_id.clone(),
-            workflow_id: workflow_id.clone(),
-            name,
-            file_name,
-            bytes: bytes.len(),
-            duration_ms,
-            created_at: now(),
-        };
-        if let Err(error) = state.store.db()?.execute(
-            "INSERT INTO audio_assets VALUES (?1,?2,?3,?4)",
-            params![
-                version_id,
-                workflow_id,
-                serde_json::to_string(&entry).map_err(|e| e.to_string())?,
-                entry.created_at
-            ],
-        ) {
-            let _ = std::fs::remove_file(&path);
-            return Err(error.to_string());
-        }
-        Ok(entry)
+        store_audio(&state, workflow_id, name, bytes, uid())
     })
     .await
     .map_err(|_| "音频导入中断")?
+}
+
+pub(super) fn store_audio(
+    state: &WorkflowState,
+    workflow_id: String,
+    name: String,
+    bytes: Vec<u8>,
+    version_id: String,
+) -> AppResult<AudioAsset> {
+    workflow_exists(&state, &workflow_id)?;
+    let ext = Path::new(&name)
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !["mp3", "wav", "m4a", "aac", "flac", "ogg"].contains(&ext.as_str())
+        || name.len() > 255
+        || bytes.is_empty()
+        || bytes.len() > MAX_AUDIO_BYTES
+    {
+        return Err("音频需为 MP3、WAV、M4A、AAC、FLAC 或 OGG，且不超过 20 MB".into());
+    }
+    if uuid::Uuid::parse_str(&version_id).is_err() {
+        return Err("音频版本 ID 无效".into());
+    }
+    let file_name = format!("{version_id}.{ext}");
+    let path = state.directory.join("assets").join(&file_name);
+    std::fs::create_dir_all(path.parent().ok_or("素材目录无效")?).map_err(|e| e.to_string())?;
+    if path.exists() {
+        return Err("音频版本已存在".into());
+    }
+    let temporary = path.with_extension(format!("{ext}.part"));
+    std::fs::write(&temporary, &bytes).map_err(|_| "保存音频文件失败")?;
+    let duration_ms = match probe_audio_duration(&temporary) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = std::fs::remove_file(&temporary);
+            return Err(error);
+        }
+    };
+    std::fs::rename(&temporary, &path).map_err(|_| "保存音频版本失败")?;
+    let entry = AudioAsset {
+        version_id: version_id.clone(),
+        workflow_id: workflow_id.clone(),
+        name,
+        file_name,
+        bytes: bytes.len(),
+        duration_ms,
+        created_at: now(),
+    };
+    if let Err(error) = state.store.db()?.execute(
+        "INSERT INTO audio_assets VALUES (?1,?2,?3,?4)",
+        params![
+            version_id,
+            workflow_id,
+            serde_json::to_string(&entry).map_err(|e| e.to_string())?,
+            entry.created_at
+        ],
+    ) {
+        let _ = std::fs::remove_file(&path);
+        return Err(error.to_string());
+    }
+    Ok(entry)
+}
+
+#[tauri::command]
+pub async fn audio_preview(app: tauri::AppHandle, version_id: String) -> AppResult<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<WorkflowState>();
+        let entry = audio(&state, &version_id)?;
+        let path = state.directory.join("assets").join(&entry.file_name);
+        let metadata = std::fs::metadata(&path).map_err(|_| "音频原文件已丢失")?;
+        if metadata.len() > MAX_AUDIO_BYTES as u64 {
+            return Err("音频文件超过试听限制".into());
+        }
+        let mime = match path.extension().and_then(|ext| ext.to_str()) {
+            Some("wav") => "audio/wav",
+            Some("mp3") => "audio/mpeg",
+            Some("m4a") => "audio/mp4",
+            Some("aac") => "audio/aac",
+            Some("flac") => "audio/flac",
+            Some("ogg") => "audio/ogg",
+            _ => return Err("音频格式无效".into()),
+        };
+        let bytes = std::fs::read(path).map_err(|_| "读取音频失败")?;
+        if bytes.len() > MAX_AUDIO_BYTES {
+            return Err("音频文件超过试听限制".into());
+        }
+        Ok(format!("data:{mime};base64,{}", STANDARD.encode(bytes)))
+    })
+    .await
+    .map_err(|_| "音频试听中断")?
 }
 
 fn save_job(state: &WorkflowState, job: &ExportJob) -> AppResult<()> {
