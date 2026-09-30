@@ -681,3 +681,21 @@
   stroke: var(--accent);
   stroke-width: 1.2;
 }
+
+.waveform-clips {
+  position: relative;
+  height: 30px;
+}
+.waveform-clips span {
+  position: absolute;
+  top: 0;
+  height: 100%;
+}
+.waveform-transition {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--accent);
+  opacity: 0.12;
+  pointer-events: none;
+}

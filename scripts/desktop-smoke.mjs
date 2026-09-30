@@ -15,6 +15,7 @@ import { createVideoFixture, testVideoMedia } from './video-media-smoke.mjs'
 import { testTimelineMedia } from './timeline-media-smoke.mjs'
 import { createSpeechFixture } from './speech-media-smoke.mjs'
 import { createTranscriptionFixture } from './subtitle-media-smoke.mjs'
+import { testTransitions } from './transitions-media-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -170,6 +171,7 @@ try {
     speechFixture,
     transcriptionFixture,
   )
+  await testTransitions(page, root, profile, videoFixture)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '导出项目包' }).click()
   await expect

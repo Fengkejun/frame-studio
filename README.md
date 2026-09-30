@@ -2,7 +2,7 @@
 
 AI 短视频创作桌面应用。支持故事、分镜和提示词可视化工作流、本地 Ollama 或 OpenAI 兼容文本服务，以及首帧生图、镜头视频、AI 配音、自动字幕、素材版本和本地成片导出。
 
-配音使用可配置的 OpenAI 兼容语音服务，生成后试听并手动选入时间线。操作说明见 [AI 配音生成](docs/voiceover-workflow.md)；字幕识别、校对和 SRT 下载见 [配音自动字幕](docs/subtitle-workflow.md)；波形与配音起点调整见 [音频时间对齐](docs/audio-alignment-workflow.md)；跨设备迁移见 [项目素材包](docs/project-bundles.md)。
+配音使用可配置的 OpenAI 兼容语音服务，生成后试听并手动选入时间线。操作说明见 [AI 配音生成](docs/voiceover-workflow.md)；字幕识别、校对和 SRT 下载见 [配音自动字幕](docs/subtitle-workflow.md)；波形与配音起点调整见 [音频时间对齐](docs/audio-alignment-workflow.md)；镜头转场与声音淡化见 [转场与淡入淡出](docs/transitions-audio-fades.md)；跨设备迁移见 [项目素材包](docs/project-bundles.md)。
 
 ## 技术栈
 

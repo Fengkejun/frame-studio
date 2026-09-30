@@ -204,6 +204,11 @@ test('automatic subtitles stay native-only with broken optional settings', async
   ).toBeVisible()
   await expect(page.getByLabel('配音起点', { exact: true })).toBeDisabled()
   await expect(
+    page.getByRole('heading', { name: '镜头转场与音频淡入淡出' }),
+  ).toBeVisible()
+  await expect(page.getByLabel('镜头转场', { exact: true })).toBeDisabled()
+  await expect(page.getByLabel('音乐淡入', { exact: true })).toBeDisabled()
+  await expect(
     studio.getByRole('heading', { name: '配音自动字幕' }),
   ).toBeVisible()
   await expect(

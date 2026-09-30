@@ -52,7 +52,7 @@ SubtitleStudio.tsx、SubtitleEditor.tsx 与 media/transcription.rs、media/subti
 
 1. 扩展更多云端媒体适配器；角色参考图、文生图、图生图及本机 ComfyUI API 格式工作流已接入。复杂工作流仍需实际节点与模型验证。
 2. 扩展视频参数、实际媒体元数据读取与大文件流式预览。
-3. 扩展镜头转场及更细的音频编辑。配音起点调整、可视化波形和自动字幕同步已接入，详见 [音频波形与时间对齐](audio-alignment-workflow.md)、[AI 配音生成](voiceover-workflow.md) 与 [配音自动字幕](subtitle-workflow.md)。
+3. 扩展多轨音频编辑与成片预览。交叉溶解、黑场切换和配音/音乐淡化已接入，详见 [转场与音频淡入淡出](transitions-audio-fades.md)。配音起点、可视化波形和自动字幕同步见 [音频时间对齐](audio-alignment-workflow.md)、[AI 配音](voiceover-workflow.md) 与 [配音自动字幕](subtitle-workflow.md)。
 4. 增加磁盘清理与增量备份；含媒体、绑定、时间线和成片的 [项目素材包](project-bundles.md) 已实现。
 
 ## 验证分层

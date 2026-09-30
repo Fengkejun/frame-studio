@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react'
 import { isDesktop } from '@/shared/lib/desktop'
 import { errorMessage } from './api'
 import { getAudioWaveform } from './mediaApi'
-import type { AudioAsset, AudioWaveform, TimelineClip } from './mediaApi'
+import type {
+  AudioAsset,
+  AudioWaveform,
+  TimelineClip,
+  TimelineEffects,
+} from './mediaApi'
+import type { timelineLayout } from './timelineTiming'
 
 // Immutable versions can share a small in-memory cache across both tracks.
 const cache = new Map<string, Promise<AudioWaveform>>()
@@ -26,6 +32,8 @@ function WaveformTrack({
   offsetMs,
   loop,
   volume,
+  fadeInMs,
+  fadeOutMs,
 }: {
   asset: AudioAsset
   label: string
@@ -33,6 +41,8 @@ function WaveformTrack({
   offsetMs: number
   loop: boolean
   volume: number
+  fadeInMs: number
+  fadeOutMs: number
 }) {
   const [data, setData] = useState<AudioWaveform | null>(null)
   const [error, setError] = useState('')
@@ -58,13 +68,27 @@ function WaveformTrack({
         const time = (i * span) / 512 - offsetMs
         const inTrack = time >= 0 && (loop || time < data.durationMs)
         const sourceTime = loop ? time % data.durationMs : time
+        const audibleMs = Math.max(
+          0,
+          Math.min(loop ? totalMs : data.durationMs, totalMs - offsetMs),
+        )
+        const gain = Math.max(
+          0,
+          Math.min(
+            1,
+            fadeInMs ? time / fadeInMs : 1,
+            fadeOutMs ? (audibleMs - time) / fadeOutMs : 1,
+          ),
+        )
         const peak = inTrack
           ? (data.peaks[
               Math.min(
                 data.peaks.length - 1,
                 Math.floor((sourceTime / data.durationMs) * data.peaks.length),
               )
-            ] ?? 0) * volume
+            ] ?? 0) *
+            volume *
+            gain
           : 0
         const x = ((i + 0.5) * 1000) / 512
         return `M${x.toFixed(2)},${(40 - peak * 36).toFixed(2)}v${(peak * 72).toFixed(2)}`
@@ -128,6 +152,8 @@ export function AudioAlignment({
   voice,
   music,
   clips,
+  layout,
+  effects,
   voiceStartMs,
   musicVolume,
   busy,
@@ -136,15 +162,14 @@ export function AudioAlignment({
   voice: AudioAsset | undefined
   music: AudioAsset | undefined
   clips: TimelineClip[]
+  layout: ReturnType<typeof timelineLayout>
+  effects: TimelineEffects
   voiceStartMs: number
   musicVolume: number
   busy: boolean
   onOffset: (offsetMs: number) => void
 }) {
-  const totalMs = clips.reduce(
-    (sum, clip) => sum + Math.max(0, clip.trimEndMs - clip.trimStartMs),
-    0,
-  )
+  const totalMs = layout.totalMs
   const maxOffset = Math.max(0, totalMs - 1)
   const disabled = !isDesktop || busy || !voice || totalMs <= 0
   const [input, setInput] = useState<string | null>(null)
@@ -226,12 +251,28 @@ export function AudioAlignment({
             {clips.map((clip, i) => (
               <span
                 key={clip.versionId}
-                style={{ flex: Math.max(0, clip.trimEndMs - clip.trimStartMs) }}
+                style={{
+                  left: `${(Math.max(0, layout.startsMs[i]! + (i ? layout.overlapMs / 2 : 0)) / totalMs) * 100}%`,
+                  width: `${(Math.max(0, (i + 1 < clips.length ? layout.startsMs[i + 1]! + layout.overlapMs / 2 : totalMs) - layout.startsMs[i]! - (i ? layout.overlapMs / 2 : 0)) / totalMs) * 100}%`,
+                }}
                 title={`片段 ${i + 1} · ${((clip.trimEndMs - clip.trimStartMs) / 1000).toFixed(3)} 秒`}
               >
                 片段 {i + 1}
               </span>
             ))}
+            {layout.overlapMs > 0 &&
+              layout.startsMs.slice(1).map((start, i) => (
+                <i
+                  key={i}
+                  className="waveform-transition"
+                  title={`转场 ${i + 1}`}
+                  aria-hidden="true"
+                  style={{
+                    left: `${(Math.max(0, start) / totalMs) * 100}%`,
+                    width: `${(layout.overlapMs / totalMs) * 100}%`,
+                  }}
+                />
+              ))}
           </div>
           {voice && (
             <WaveformTrack
@@ -242,6 +283,8 @@ export function AudioAlignment({
               offsetMs={voiceStartMs}
               loop={false}
               volume={1}
+              fadeInMs={effects.voiceFadeInMs}
+              fadeOutMs={effects.voiceFadeOutMs}
             />
           )}
           {music && (
@@ -253,6 +296,8 @@ export function AudioAlignment({
               offsetMs={0}
               loop
               volume={musicVolume / 100}
+              fadeInMs={effects.musicFadeInMs}
+              fadeOutMs={effects.musicFadeOutMs}
             />
           )}
         </>

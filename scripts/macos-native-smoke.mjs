@@ -61,6 +61,10 @@ if (!encoders.includes('libx264') || !encoders.includes('aac')) {
 if (!/\bsubtitles\b/.test(filters)) {
   throw new Error('Bundled FFmpeg is missing the subtitles filter.')
 }
+for (const filter of ['xfade', 'afade', 'adelay']) {
+  if (!new RegExp(`\\b${filter}\\b`).test(filters))
+    throw new Error(`Bundled FFmpeg is missing the ${filter} filter.`)
+}
 execFileSync(ffprobe, ['-version'], { stdio: 'ignore' })
 console.log('PASS: validated bundle metadata and FFmpeg/FFprobe sidecars.')
 

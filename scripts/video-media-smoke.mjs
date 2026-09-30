@@ -11,6 +11,8 @@ export async function createVideoFixture(root) {
   const polls = new Map()
   let mode = 'success'
   let catalogMode = 'success'
+  let nextClip = mp4
+  const taskClips = new Map()
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost')
     if (req.method === 'GET' && url.pathname === '/api/v1/models') {
@@ -42,6 +44,7 @@ export async function createVideoFixture(root) {
       for await (const chunk of req) body += chunk
       const payload = JSON.parse(body)
       const id = `video-${requests.length + 1}`
+      taskClips.set(id, nextClip)
       requests.push({
         payload,
         authorization: req.headers.authorization,
@@ -79,14 +82,14 @@ export async function createVideoFixture(root) {
           output: {
             task_id: id,
             task_status: status,
-            video_url: `http://127.0.0.1:${server.address().port}/clip.mp4`,
+            video_url: `http://127.0.0.1:${server.address().port}/clip.mp4?id=${id}`,
             message: status === 'FAILED' ? 'fixture video failure' : '',
           },
         }),
       )
     } else if (req.method === 'GET' && url.pathname === '/clip.mp4') {
       res.setHeader('Content-Type', 'video/mp4')
-      res.end(mp4)
+      res.end(taskClips.get(url.searchParams.get('id')) ?? mp4)
     } else {
       res.writeHead(404).end()
     }
@@ -97,6 +100,9 @@ export async function createVideoFixture(root) {
     requests,
     catalogRequests,
     polls,
+    setClip: (bytes) => {
+      nextClip = bytes
+    },
     setMode: (value) => {
       mode = value
     },

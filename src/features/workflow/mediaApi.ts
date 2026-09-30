@@ -165,10 +165,19 @@ export interface Composition {
   musicVersionId: string | null
   voiceVersionId: string | null
   voiceStartMs: number
+  effects: TimelineEffects
   musicVolume: number
   subtitleVersionId: string | null
   subtitleFormat: 'none' | 'srt' | 'vtt'
   subtitleText: string
+}
+export interface TimelineEffects {
+  transition: 'none' | 'fade' | 'fadeblack'
+  transitionDurationMs: number
+  musicFadeInMs: number
+  musicFadeOutMs: number
+  voiceFadeInMs: number
+  voiceFadeOutMs: number
 }
 export interface AudioAsset {
   versionId: string
@@ -242,6 +251,8 @@ export interface ExportToolsStatus {
   h264: boolean
   aac: boolean
   subtitles: boolean
+  transitions: boolean
+  audioFades: boolean
   ready: boolean
   message: string
 }

@@ -5,6 +5,12 @@ import * as api from './mediaApi'
 import { AssetImage } from './AssetImage'
 import { AudioPreview } from './AudioPreview'
 import { AudioAlignment } from './AudioAlignment'
+import { TimelineEffectsPanel } from './TimelineEffectsPanel'
+import {
+  defaultEffects,
+  timelineLayout,
+  audioFadeError,
+} from './timelineTiming'
 import { SubtitleStudio } from './SubtitleStudio'
 import { VoiceoverStudio } from './VoiceoverStudio'
 import type { Workflow } from './model'
@@ -20,6 +26,7 @@ function initialDraft(workflowId: string): api.Composition {
     musicVersionId: null,
     voiceVersionId: null,
     voiceStartMs: 0,
+    effects: { ...defaultEffects },
     musicVolume: 35,
     subtitleVersionId: null,
     subtitleFormat: 'none',
@@ -124,9 +131,12 @@ export function TimelineStudio({
     (!boundSubtitle ||
       boundSubtitle.sourceAudioVersionId !== draft.voiceVersionId)
   const active = jobs.find((job) => job.status === 'running')
-  const totalMs = draft.clips.reduce(
-    (sum, clip) => sum + clip.trimEndMs - clip.trimStartMs,
-    0,
+  const layout = timelineLayout(draft)
+  const totalMs = layout.totalMs
+  const fadeError = audioFadeError(
+    draft,
+    totalMs,
+    audio.find((item) => item.versionId === draft.voiceVersionId)?.durationMs,
   )
   const invalidVoiceStart =
     !!draft.voiceVersionId && draft.voiceStartMs >= totalMs
@@ -480,11 +490,29 @@ export function TimelineStudio({
         voice={audio.find((item) => item.versionId === draft.voiceVersionId)}
         music={audio.find((item) => item.versionId === draft.musicVersionId)}
         clips={draft.clips}
+        layout={layout}
+        effects={draft.effects}
         voiceStartMs={draft.voiceStartMs}
         musicVolume={draft.musicVolume}
         busy={busy || !!active || !loaded}
         onOffset={(voiceStartMs) =>
           setDraft((value) => ({ ...value, voiceStartMs }))
+        }
+      />
+      <TimelineEffectsPanel
+        effects={draft.effects}
+        totalMs={totalMs}
+        clipCount={draft.clips.length}
+        invalidTransition={layout.invalid}
+        fadeError={fadeError}
+        hasVoice={!!draft.voiceVersionId}
+        hasMusic={!!draft.musicVersionId}
+        busy={busy || !!active || !loaded}
+        onChange={(patch) =>
+          setDraft((value) => ({
+            ...value,
+            effects: { ...value.effects, ...patch },
+          }))
         }
       />
       {invalidVoiceStart && (
@@ -611,6 +639,8 @@ export function TimelineStudio({
             missing ||
             staleSubtitles ||
             invalidVoiceStart ||
+            layout.invalid ||
+            !!fadeError ||
             draft.clips.some((clip) => clip.trimEndMs <= clip.trimStartMs)
           }
           onClick={() => void exportVideo()}
