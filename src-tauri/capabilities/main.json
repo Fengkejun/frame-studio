@@ -40,6 +40,7 @@
     "allow-list-image-jobs",
     "allow-start-image-job",
     "allow-start-image-batch",
+    "allow-start-video-batch",
     "allow-list-image-batches",
     "allow-pause-image-batch",
     "allow-resume-image-batch",

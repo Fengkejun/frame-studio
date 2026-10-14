@@ -103,6 +103,7 @@ export interface CloudImageJob {
 export type BatchRequest =
   | { kind: 'cloud'; request: CloudImageRequest }
   | { kind: 'comfy'; request: ImageRequest }
+  | { kind: 'video'; request: VideoRequest }
 export interface ImageBatch {
   id: string
   workflowId: string
@@ -121,6 +122,9 @@ export interface ImageBatch {
 export const startImageBatch = (
   requests: BatchRequest[],
 ): Promise<ImageBatch> => invoke('start_image_batch', { requests })
+export const startVideoBatch = (
+  requests: VideoRequest[],
+): Promise<ImageBatch> => invoke('start_video_batch', { requests })
 export const listImageBatches = (workflowId: string): Promise<ImageBatch[]> =>
   isDesktop ? invoke('list_image_batches', { workflowId }) : Promise.resolve([])
 export const pauseImageBatch = (id: string): Promise<void> =>

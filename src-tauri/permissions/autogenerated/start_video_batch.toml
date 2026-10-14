@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-start-video-batch"
+description = "Enables the start_video_batch command without any pre-configured scope."
+commands.allow = ["start_video_batch"]
+
+[[permission]]
+identifier = "deny-start-video-batch"
+description = "Denies the start_video_batch command without any pre-configured scope."
+commands.deny = ["start_video_batch"]

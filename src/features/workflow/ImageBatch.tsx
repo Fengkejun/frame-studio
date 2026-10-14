@@ -7,6 +7,7 @@ export interface BatchTarget {
   context: api.ShotContext
   prompt: string
   label: string
+  video?: { firstFrameVersionId: string; duration: number }
 }
 export function BatchSubmit({
   targets,
@@ -22,13 +23,41 @@ export function BatchSubmit({
   const [selected, setSelected] = useState<string[]>([])
   const key = (target: BatchTarget) =>
     `${target.context.nodeId}/${target.context.artifactId}/${target.context.shotId}`
-  const chosen = targets.filter((t) => selected.includes(key(t)))
+  const chosen = targets.filter(
+    (t) => selected.includes(key(t)) && (request.kind !== 'video' || t.video),
+  )
+  const video = request.kind === 'video'
+  const requests: api.BatchRequest[] = chosen.map((t) => {
+    if (request.kind === 'video' && t.video)
+      return {
+        kind: 'video',
+        request: {
+          ...request.request,
+          context: t.context,
+          firstFrameVersionId: t.video.firstFrameVersionId,
+          duration: t.video.duration,
+          prompt: t.prompt,
+        },
+      }
+    if (request.kind === 'cloud')
+      return {
+        kind: 'cloud',
+        request: { ...request.request, context: t.context, positive: t.prompt },
+      }
+    if (request.kind === 'comfy')
+      return {
+        kind: 'comfy',
+        request: { ...request.request, context: t.context, positive: t.prompt },
+      }
+    throw new Error('视频镜头缺少已确认首帧')
+  })
   return (
     <details className="batch-submit">
-      <summary>批量生成镜头候选</summary>
+      <summary>{video ? '批量生成视频候选' : '批量生成镜头候选'}</summary>
       <p className="field-hint">
-        勾选 1–24
-        个镜头，逐个生成。每个镜头使用自己的分镜提示词，其余参数沿用上方设置；候选保存后仍需手动选择首帧。
+        {video
+          ? '勾选 1–24 个已确认有效首帧的镜头，逐个生成。首帧、视频提示词和时长使用各自分镜（时长取整并限制在 2–15 秒），地区、分辨率和负面提示词沿用上方设置。候选保存后仍需手动选择片段。已有视频任务时队列等待。'
+          : '勾选 1–24 个镜头，逐个生成。每个镜头使用自己的分镜提示词，其余参数沿用上方设置；候选保存后仍需手动选择首帧。'}
       </p>
       <button
         type="button"
@@ -61,7 +90,9 @@ export function BatchSubmit({
         已选 {chosen.length} 个镜头
         {request.kind === 'cloud'
           ? ` · 合计预算预留 ${api.formatUsd(chosen.length * request.request.budgetReservationMicroUsd)}；请求可能计费，实际费用以服务商账单为准。`
-          : ' · 使用本机算力。'}
+          : request.kind === 'video'
+            ? ` · 合计标价预估 ${api.formatUsd(requests.reduce((sum, r) => sum + (r.kind === 'video' ? api.videoEstimateMicroUsd(r.request.region, r.request.resolution, r.request.duration) : 0), 0))}；实际费用以服务商账单为准。`
+            : ' · 使用本机算力。'}
       </p>
       <button
         type="button"
@@ -69,31 +100,9 @@ export function BatchSubmit({
         disabled={
           !isDesktop || disabled || !chosen.length || chosen.length > 24
         }
-        onClick={() =>
-          void onStart(
-            chosen.map((t) =>
-              request.kind === 'cloud'
-                ? {
-                    kind: 'cloud',
-                    request: {
-                      ...request.request,
-                      context: t.context,
-                      positive: t.prompt,
-                    },
-                  }
-                : {
-                    kind: 'comfy',
-                    request: {
-                      ...request.request,
-                      context: t.context,
-                      positive: t.prompt,
-                    },
-                  },
-            ),
-          )
-        }
+        onClick={() => void onStart(requests)}
       >
-        提交批量图片队列
+        {video ? '提交批量视频队列' : '提交批量图片队列'}
       </button>
     </details>
   )
@@ -107,12 +116,19 @@ const labels: Record<string, string> = {
   unknown: '结果未知',
   skipped: '已跳过',
 }
+function filterBatches(batches: api.ImageBatch[], kind: 'image' | 'video') {
+  return batches.filter(
+    (b) => (b.items[0]?.request.kind === 'video') === (kind === 'video'),
+  )
+}
 export function ImageBatchHistory({
+  kind = 'image',
   workflowId,
   revision,
   onError,
   onRefresh,
 }: {
+  kind?: 'image' | 'video'
   workflowId: string
   revision: number
   onError: (error: string) => void
@@ -128,8 +144,9 @@ export function ImageBatchHistory({
         .listImageBatches(workflowId)
         .then((v) => {
           if (alive) {
-            setBatches(v)
-            const signature = JSON.stringify(v)
+            const filtered = filterBatches(v, kind)
+            setBatches(filtered)
+            const signature = JSON.stringify(filtered)
             if (signature !== last.current) {
               last.current = signature
               void onRefresh().catch((e) => onError(errorMessage(e)))
@@ -145,12 +162,12 @@ export function ImageBatchHistory({
       alive = false
       window.clearInterval(timer)
     }
-  }, [workflowId, revision, onError, onRefresh])
+  }, [workflowId, revision, onError, onRefresh, kind])
   async function run(action: () => Promise<void>) {
     setBusy(true)
     try {
       await action()
-      setBatches(await api.listImageBatches(workflowId))
+      setBatches(filterBatches(await api.listImageBatches(workflowId), kind))
     } catch (e) {
       onError(errorMessage(e))
     } finally {
@@ -158,8 +175,11 @@ export function ImageBatchHistory({
     }
   }
   return (
-    <section className="image-batch-history" aria-label="图片批量队列">
-      <h3>图片批量队列</h3>
+    <section
+      className="image-batch-history"
+      aria-label={kind === 'video' ? '视频批量队列' : '图片批量队列'}
+    >
+      <h3>{kind === 'video' ? '视频批量队列' : '图片批量队列'}</h3>
       {!batches.length && (
         <p className="field-hint">在生成表单中勾选多个镜头，提交批量候选。</p>
       )}

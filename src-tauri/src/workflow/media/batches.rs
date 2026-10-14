@@ -17,18 +17,21 @@ use tauri::Manager;
 pub enum BatchRequest {
     Cloud(cloud::CloudImageRequest),
     Comfy(comfy::ImageRequest),
+    Video(video::VideoRequest),
 }
 impl BatchRequest {
     fn context(&self) -> &ShotContext {
         match self {
             Self::Cloud(r) => &r.context,
             Self::Comfy(r) => &r.context,
+            Self::Video(r) => &r.context,
         }
     }
     fn table(&self) -> &str {
         match self {
             Self::Cloud(_) => "cloud_image_jobs",
             Self::Comfy(_) => "image_jobs",
+            Self::Video(_) => "video_jobs",
         }
     }
 }
@@ -109,11 +112,23 @@ fn reconcile(item: &mut BatchItem, value: Option<&serde_json::Value>) {
                         .filter_map(|v| v.as_str().map(str::to_owned))
                         .collect()
                 })
-                .unwrap_or_default();
+                .unwrap_or_else(|| {
+                    value["assetId"]
+                        .as_str()
+                        .map(str::to_owned)
+                        .into_iter()
+                        .collect()
+                });
         }
         None => {
             item.status = "unknown".into();
             item.message = "提交时应用退出，结果待核实；不会自动重发".into();
+        }
+        Some("submitting" | "queued" | "running" | "waiting" | "downloading")
+            if item.status == "paused" =>
+        {
+            // A child may be resumed directly from its individual task history.
+            item.status = "running".into();
         }
         _ => {}
     }
@@ -139,7 +154,11 @@ pub fn recover(state: &WorkflowState) -> AppResult<()> {
         .map_err(|e| e.to_string())?;
     for id in ids {
         let mut batch = read(&db, &id)?;
-        for item in batch.items.iter_mut().filter(|i| i.status == "running") {
+        for item in batch
+            .items
+            .iter_mut()
+            .filter(|i| matches!(i.status.as_str(), "running" | "paused"))
+        {
             let value = child(&db, item)?;
             reconcile(item, value.as_ref());
         }
@@ -171,7 +190,11 @@ pub fn list_image_batches(
     drop(query);
     for batch in batches.iter_mut().filter(|b| b.status != "running") {
         let before = serde_json::to_string(batch).map_err(|e| e.to_string())?;
-        for item in batch.items.iter_mut().filter(|i| i.status == "running") {
+        for item in batch
+            .items
+            .iter_mut()
+            .filter(|i| matches!(i.status.as_str(), "running" | "paused"))
+        {
             if let Some(value) = child(&db, item)? {
                 reconcile(item, Some(&value));
             }
@@ -188,6 +211,19 @@ pub fn start_image_batch(
     app: tauri::AppHandle,
     requests: Vec<BatchRequest>,
 ) -> AppResult<ImageBatch> {
+    if requests.iter().any(|r| matches!(r, BatchRequest::Video(_))) {
+        return Err("请从视频批量入口提交视频任务".into());
+    }
+    start_batch(app, requests)
+}
+#[tauri::command]
+pub fn start_video_batch(
+    app: tauri::AppHandle,
+    requests: Vec<video::VideoRequest>,
+) -> AppResult<ImageBatch> {
+    start_batch(app, requests.into_iter().map(BatchRequest::Video).collect())
+}
+fn start_batch(app: tauri::AppHandle, requests: Vec<BatchRequest>) -> AppResult<ImageBatch> {
     if requests.is_empty()
         || requests.len() > 24
         || serde_json::to_vec(&requests)
@@ -213,13 +249,21 @@ pub fn start_image_batch(
             return Err("批量镜头须属于同一项目，且不能重复".into());
         }
         validate_context(&state, context)?;
-        match request {
+        let amount = match request {
             BatchRequest::Cloud(r) => {
                 cloud::validate(r)?;
-                estimate += r.budget_reservation_micro_usd;
+                r.budget_reservation_micro_usd
             }
-            BatchRequest::Comfy(r) => comfy::validate(r)?,
-        }
+            BatchRequest::Comfy(r) => {
+                comfy::validate(r)?;
+                0
+            }
+            BatchRequest::Video(r) => {
+                video::validate_request(&state, r)?;
+                budget::video_estimate_micro_usd(&r.region, r.duration, &r.resolution)?
+            }
+        };
+        estimate = estimate.checked_add(amount).ok_or("批量预算金额溢出")?;
     }
     let budget = budget::get_media_budget(app.state(), workflow_id.clone())?;
     if budget
@@ -275,7 +319,11 @@ pub fn resume_image_batch(app: tauri::AppHandle, id: String) -> AppResult<()> {
             return Err("已有批量队列运行".into());
         }
         let mut batch = read(&db, &id)?;
-        for item in batch.items.iter_mut().filter(|i| i.status == "running") {
+        for item in batch
+            .items
+            .iter_mut()
+            .filter(|i| matches!(i.status.as_str(), "running" | "paused"))
+        {
             let value = child(&db, item)?;
             reconcile(item, value.as_ref());
         }
@@ -290,8 +338,14 @@ pub fn resume_image_batch(app: tauri::AppHandle, id: String) -> AppResult<()> {
     .filter(|i| i.status == "paused")
     .collect::<Vec<_>>();
     for item in paused {
-        if let BatchRequest::Comfy(_) = item.request {
-            comfy::resume_image_job(app.clone(), app.state(), item.job_id)?;
+        match item.request {
+            BatchRequest::Comfy(_) => {
+                comfy::resume_image_job(app.clone(), app.state(), item.job_id)?
+            }
+            BatchRequest::Video(_) => {
+                video::resume_video_job(app.clone(), app.state(), item.job_id)?
+            }
+            BatchRequest::Cloud(_) => return Err("云端图片暂停结果须先核对".into()),
         }
     }
     {
@@ -365,7 +419,7 @@ fn kick(app: tauri::AppHandle) {
                 Ok(true) => tokio::time::sleep(Duration::from_millis(700)).await,
                 Err(error) => {
                     failed = true;
-                    eprintln!("Image batch stopped: {error}");
+                    eprintln!("Media batch stopped: {error}");
                     break;
                 }
                 Ok(false) => break,
@@ -398,6 +452,14 @@ fn tick(app: &tauri::AppHandle) -> AppResult<bool> {
         .lock()
         .map_err(|_| "图片任务锁不可用")?
         .is_some();
+    // Sample provider locks before taking the store lock, matching provider start order.
+    let video_ids: HashSet<String> = state
+        .video_active
+        .lock()
+        .map_err(|_| "视频任务锁不可用")?
+        .keys()
+        .cloned()
+        .collect();
     update(&state, &id, |db, batch| {
         if batch.status != "running" {
             return Ok(());
@@ -409,19 +471,50 @@ fn tick(app: &tauri::AppHandle) -> AppResult<bool> {
         {
             let value = child(db, item)?;
             reconcile(item, value.as_ref());
-            if item.status == "running" && !media_busy {
-                item.status = "unknown".into();
+            let active = match item.request {
+                BatchRequest::Video(_) => video_ids.contains(&item.job_id),
+                _ => media_busy,
+            };
+            if item.status == "running" && !active {
+                item.status = if matches!(item.request, BatchRequest::Video(_))
+                    && value.as_ref().and_then(|v| v["taskId"].as_str()).is_some()
+                {
+                    "paused"
+                } else {
+                    "unknown"
+                }
+                .into();
                 item.message = "本地任务已停止但结果未确认，请核对后再继续".into();
+                if item.status == "paused" {
+                    // Persist the pollable child state as well, so the provider's resume gate agrees.
+                    if let Some(mut value) = value {
+                        value["status"] = "paused".into();
+                        value["message"] = item.message.clone().into();
+                        value["updatedAt"] = now().into();
+                        db.execute(
+                            "UPDATE video_jobs SET json=?1 WHERE id=?2",
+                            params![
+                                serde_json::to_string(&value).map_err(|e| e.to_string())?,
+                                item.job_id
+                            ],
+                        )
+                        .map_err(|e| e.to_string())?;
+                    }
+                }
             }
             if matches!(item.status.as_str(), "unknown" | "paused") {
                 batch.status = "paused".into();
             }
             return Ok(());
         }
-        if media_busy {
-            return Ok(());
-        }
         if let Some(item) = batch.items.iter_mut().find(|i| i.status == "queued") {
+            let busy = match item.request {
+                BatchRequest::Video(_) => !video_ids.is_empty(),
+                _ => media_busy,
+            };
+            if busy {
+                return Ok(());
+            }
             item.status = "running".into();
             item.message = "正在提交".into();
             dispatch = Some((item.job_id.clone(), item.request.clone()));
@@ -442,6 +535,9 @@ fn tick(app: &tauri::AppHandle) -> AppResult<bool> {
             }
             BatchRequest::Comfy(r) => {
                 comfy::start_with_id(app.clone(), app.state(), r, job_id.clone()).map(|_| ())
+            }
+            BatchRequest::Video(r) => {
+                video::start_with_id(app.clone(), app.state(), r, job_id.clone()).map(|_| ())
             }
         };
         if let Err(error) = result {
@@ -505,10 +601,23 @@ mod tests {
         waiting.status = "queued".into();
         let mut saved = item.clone();
         saved.job_id = "saved".into();
+        let mut video_item = saved.clone();
+        video_item.job_id = "video-saved".into();
+        video_item.request = BatchRequest::Video(video::VideoRequest {
+            context: video_item.request.context().clone(),
+            first_frame_version_id: "frame-v1".into(),
+            region: "singapore".into(),
+            prompt: "camera pans".into(),
+            negative_prompt: String::new(),
+            duration: 5,
+            resolution: "720P".into(),
+        });
+        let mut paused_video = video_item.clone();
+        paused_video.job_id = "video-paused".into();
         let batch = ImageBatch {
             id: "batch".into(),
             workflow_id: "w".into(),
-            items: vec![item, waiting, saved],
+            items: vec![item, waiting, saved, video_item, paused_video],
             status: "running".into(),
             created_at: now(),
             updated_at: now(),
@@ -521,6 +630,16 @@ mod tests {
                 [r#"{"status":"succeeded","message":"saved","assetIds":["image"]}"#],
             )
             .unwrap();
+            db.execute(
+                "INSERT INTO video_jobs VALUES ('video-saved','w',?1,1)",
+                [r#"{"status":"succeeded","message":"saved","assetId":"video"}"#],
+            )
+            .unwrap();
+            db.execute(
+                "INSERT INTO video_jobs VALUES ('video-paused','w',?1,1)",
+                [r#"{"status":"paused","message":"resume original","taskId":"remote-1"}"#],
+            )
+            .unwrap();
         }
         recover(&state).unwrap();
         let mut recovered = read(&state.store.db().unwrap(), "batch").unwrap();
@@ -531,6 +650,24 @@ mod tests {
         assert_eq!(recovered.items[1].status, "queued");
         assert_eq!(recovered.items[1].job_id, "not-dispatched");
         assert_eq!(recovered.items[2].asset_ids, ["image"]);
+        assert_eq!(recovered.items[3].asset_ids, ["video"]);
+        assert_eq!(recovered.items[4].status, "paused");
+        assert_eq!(recovered.items[4].job_id, "video-paused");
+        assert!(retry(&mut recovered.items[4]).is_err());
+        let child = child(&state.store.db().unwrap(), &recovered.items[4])
+            .unwrap()
+            .unwrap();
+        assert_eq!(child["taskId"], "remote-1");
+        reconcile(
+            &mut recovered.items[4],
+            Some(&serde_json::json!({"status":"running"})),
+        );
+        assert_eq!(recovered.items[4].status, "running");
+        reconcile(
+            &mut recovered.items[4],
+            Some(&serde_json::json!({"status":"succeeded","assetId":"resumed-video"})),
+        );
+        assert_eq!(recovered.items[4].asset_ids, ["resumed-video"]);
         recovered.items[2].status = "failed".into();
         retry(&mut recovered.items[2]).unwrap();
         assert_ne!(recovered.items[2].job_id, "saved");

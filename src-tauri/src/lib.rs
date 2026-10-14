@@ -39,6 +39,7 @@ pub fn run() {
             workflow::media::comfy::list_image_jobs,
             workflow::media::comfy::start_image_job,
             workflow::media::batches::start_image_batch,
+            workflow::media::batches::start_video_batch,
             workflow::media::batches::list_image_batches,
             workflow::media::batches::pause_image_batch,
             workflow::media::batches::resume_image_batch,

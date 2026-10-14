@@ -35,6 +35,7 @@ fn main() {
             "list_image_jobs",
             "start_image_job",
             "start_image_batch",
+            "start_video_batch",
             "list_image_batches",
             "pause_image_batch",
             "resume_image_batch",

@@ -3,6 +3,7 @@ import { isDesktop } from '@/shared/lib/desktop'
 import { errorMessage } from './api'
 import * as api from './mediaApi'
 import { MediaBudgetPanel } from './MediaBudgetPanel'
+import { BatchSubmit, ImageBatchHistory, type BatchTarget } from './ImageBatch'
 import type { Shot, Workflow } from './model'
 import type { useMedia } from './useMedia'
 import { AssetImage } from './AssetImage'
@@ -78,6 +79,31 @@ export function VideoStudio({
       api.sameShot(job.request.context, context) && api.isVideoRunning(job),
   )
   const [working, setWorking] = useState(false)
+  const [batchRevision, setBatchRevision] = useState(0)
+  const batchTargets: BatchTarget[] = shots.flatMap(
+    ({ node, artifactId, shot }) => {
+      const context = {
+        workflowId: workflow.id,
+        nodeId: node.id,
+        artifactId,
+        shotId: shot.id,
+      }
+      const frame = media.frames.find((f) => api.sameShot(f.context, context))
+      const asset = media.assets.find((a) => a.versionId === frame?.versionId)
+      if (node.stale || !frame || !asset || !validVideoFrame(asset)) return []
+      return [
+        {
+          context,
+          prompt: shot.videoPrompt,
+          label: `${node.label} · ${shot.id} ${shot.title}`,
+          video: {
+            firstFrameVersionId: frame.versionId,
+            duration: Math.min(15, Math.max(2, Math.round(shot.duration))),
+          },
+        },
+      ]
+    },
+  )
   const [preview, setPreview] = useState<{
     versionId: string
     data: string
@@ -98,12 +124,7 @@ export function VideoStudio({
     !!context &&
     !!firstFrame &&
     !!image &&
-    image.width >= 240 &&
-    image.height >= 240 &&
-    image.width <= 8000 &&
-    image.height <= 8000 &&
-    image.width <= image.height * 8 &&
-    image.height <= image.width * 8 &&
+    validVideoFrame(image) &&
     !selected?.node.stale
   return (
     <div className="image-studio video-studio">
@@ -207,6 +228,19 @@ export function VideoStudio({
               firstFrameVersionId={firstFrame.versionId}
               shot={selected.shot}
               disabled={!ready || busy || working || shotRunning}
+              batchTargets={batchTargets}
+              onBatch={(requests) =>
+                action(async () => {
+                  await save(workflow)
+                  await api.startVideoBatch(
+                    requests.map((r) => {
+                      if (r.kind !== 'video') throw new Error('请选择视频任务')
+                      return r.request
+                    }),
+                  )
+                  setBatchRevision((v) => v + 1)
+                })
+              }
               onStart={(request) =>
                 action(async () => {
                   await save(workflow)
@@ -218,6 +252,13 @@ export function VideoStudio({
           )}
         </aside>
         <div className="image-results">
+          <ImageBatchHistory
+            kind="video"
+            workflowId={workflow.id}
+            revision={batchRevision}
+            onError={media.setError}
+            onRefresh={media.refresh}
+          />
           <section className="video-candidates">
             <h3>镜头候选 · {candidates.length}</h3>
             {chosen && (
@@ -386,6 +427,16 @@ export function VideoStudio({
   )
 }
 
+function validVideoFrame(image: { width: number; height: number }) {
+  return (
+    image.width >= 240 &&
+    image.height >= 240 &&
+    image.width <= 8000 &&
+    image.height <= 8000 &&
+    image.width <= image.height * 8 &&
+    image.height <= image.width * 8
+  )
+}
 function VideoForm({
   context,
   firstFrameVersionId,
@@ -393,6 +444,8 @@ function VideoForm({
   disabled,
   onStart,
   onError,
+  batchTargets,
+  onBatch,
 }: {
   context: api.ShotContext
   firstFrameVersionId: string
@@ -400,6 +453,8 @@ function VideoForm({
   disabled: boolean
   onStart: (request: api.VideoRequest) => Promise<void>
   onError: (message: string) => void
+  batchTargets: BatchTarget[]
+  onBatch: (requests: api.BatchRequest[]) => Promise<void>
 }) {
   const [request, setRequest] = useState<api.VideoRequest>({
     context,
@@ -663,6 +718,14 @@ function VideoForm({
           停止只结束本地查询，不会取消远程生成。拿到任务 ID
           后可继续查询；提交结果未知时请先核对服务商用量。
         </p>
+        <BatchSubmit
+          targets={batchTargets}
+          request={{ kind: 'video', request }}
+          disabled={!hasKey}
+          onStart={(requests) =>
+            onBatch(requests).finally(() => setBudgetRevision((v) => v + 1))
+          }
+        />
       </fieldset>
     </form>
   )

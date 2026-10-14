@@ -191,7 +191,10 @@ pub async fn check_video_connection(region: String) -> AppResult<ConnectionCheck
         .append_pair("page_size", "1");
     check_catalog(url, &key, MODEL, "wan").await
 }
-fn validate_request(state: &WorkflowState, request: &VideoRequest) -> AppResult<ImageAsset> {
+pub(super) fn validate_request(
+    state: &WorkflowState,
+    request: &VideoRequest,
+) -> AppResult<ImageAsset> {
     valid_region(&request.region)?;
     validate_context(state, &request.context)?;
     if request.prompt.trim().is_empty()
@@ -635,12 +638,20 @@ pub fn start_video_job(
     state: tauri::State<WorkflowState>,
     request: VideoRequest,
 ) -> AppResult<VideoJob> {
+    start_with_id(app, state, request, uid())
+}
+pub(super) fn start_with_id(
+    app: tauri::AppHandle,
+    state: tauri::State<WorkflowState>,
+    request: VideoRequest,
+    id: String,
+) -> AppResult<VideoJob> {
     validate_request(&state, &request)?;
     let key = get_key(&request.region)?.ok_or("请先保存对应地区的万相 API Key")?;
     let estimate =
         video_estimate_micro_usd(&request.region, request.duration, &request.resolution)?;
     let mut job = VideoJob {
-        id: uid(),
+        id,
         request,
         task_id: None,
         status: "submitting".into(),
