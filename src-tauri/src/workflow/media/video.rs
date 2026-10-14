@@ -402,7 +402,9 @@ pub fn select_video(
     {
         return Err("视频版本不属于当前分镜或文件已丢失".into());
     }
-    state.store.db()?.execute(
+    let db = state.store.db()?;
+    super::cleanup::require_version(&db, "video_assets", &version_id)?;
+    db.execute(
         "INSERT INTO selected_videos VALUES (?1,?2,?3,?4,?5) ON CONFLICT(workflow_id,node_id,artifact_id,shot_id) DO UPDATE SET version_id=excluded.version_id",
         params![context.workflow_id,context.node_id,context.artifact_id,context.shot_id,version_id],
     ).map_err(|e| e.to_string())?;

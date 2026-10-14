@@ -133,19 +133,18 @@ pub(super) fn store(
         cues,
         created_at: now(),
     };
-    state
-        .store
-        .db()?
-        .execute(
-            "INSERT INTO subtitle_assets VALUES (?1,?2,?3,?4)",
-            params![
-                result.version_id,
-                result.workflow_id,
-                serde_json::to_string(&result).map_err(|e| e.to_string())?,
-                result.created_at
-            ],
-        )
-        .map_err(|e| e.to_string())?;
+    let db = state.store.db()?;
+    super::cleanup::require_version(&db, "audio_assets", &result.source_audio_version_id)?;
+    db.execute(
+        "INSERT INTO subtitle_assets VALUES (?1,?2,?3,?4)",
+        params![
+            result.version_id,
+            result.workflow_id,
+            serde_json::to_string(&result).map_err(|e| e.to_string())?,
+            result.created_at
+        ],
+    )
+    .map_err(|e| e.to_string())?;
     Ok(result)
 }
 

@@ -1,6 +1,7 @@
 //! Immutable local image versions and explicit, version-scoped shot selections.
 pub mod batches;
 pub mod budget;
+pub mod cleanup;
 pub mod cloud;
 pub mod comfy;
 pub mod composition;
@@ -115,7 +116,9 @@ pub fn set_role_reference(
     {
         return Err("原图文件已丢失，请重新导入".into());
     }
-    state.store.db()?.execute(
+    let db = state.store.db()?;
+    cleanup::require_version(&db, "image_assets", &version_id)?;
+    db.execute(
         "INSERT INTO role_references VALUES (?1,?2,?3) ON CONFLICT(workflow_id,role_name) DO UPDATE SET version_id=excluded.version_id",
         params![workflow_id, role_name, version_id],
     ).map_err(|e| e.to_string())?;
@@ -388,7 +391,9 @@ pub fn select_first_frame(
     {
         return Err("原图文件已丢失，请重新导入".into());
     }
-    state.store.db()?.execute("INSERT INTO first_frames VALUES (?1,?2,?3,?4,?5) ON CONFLICT(workflow_id,node_id,artifact_id,shot_id) DO UPDATE SET version_id=excluded.version_id", params![context.workflow_id,context.node_id,context.artifact_id,context.shot_id,version_id]).map_err(|e| e.to_string())?;
+    let db = state.store.db()?;
+    cleanup::require_version(&db, "image_assets", &version_id)?;
+    db.execute("INSERT INTO first_frames VALUES (?1,?2,?3,?4,?5) ON CONFLICT(workflow_id,node_id,artifact_id,shot_id) DO UPDATE SET version_id=excluded.version_id", params![context.workflow_id,context.node_id,context.artifact_id,context.shot_id,version_id]).map_err(|e| e.to_string())?;
     Ok(())
 }
 #[tauri::command]

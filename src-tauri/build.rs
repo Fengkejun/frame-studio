@@ -2,6 +2,10 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "get_app_info",
+            "get_storage_report",
+            "trash_assets",
+            "restore_trash",
+            "purge_trash",
             "list_workflows",
             "save_workflow",
             "export_project_bundle",

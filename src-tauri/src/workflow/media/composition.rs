@@ -248,7 +248,17 @@ fn validate_draft(draft: &Composition) -> AppResult<()> {
 }
 
 fn save_draft(state: &WorkflowState, draft: &Composition) -> AppResult<()> {
-    state.store.db()?.execute(
+    let db = state.store.db()?;
+    for clip in &draft.clips {
+        super::cleanup::require_version(&db, "video_assets", &clip.version_id)?;
+    }
+    for id in [&draft.voice_version_id, &draft.music_version_id]
+        .into_iter()
+        .flatten()
+    {
+        super::cleanup::require_version(&db, "audio_assets", id)?;
+    }
+    db.execute(
         "INSERT INTO compositions VALUES (?1,?2,?3) ON CONFLICT(workflow_id) DO UPDATE SET json=excluded.json,updated_at=excluded.updated_at",
         params![draft.workflow_id, serde_json::to_string(draft).map_err(|e|e.to_string())?, now()],
     ).map_err(|e|e.to_string())?;

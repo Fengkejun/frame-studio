@@ -6,6 +6,10 @@ pub fn run() {
         .setup(workflow::init)
         .invoke_handler(tauri::generate_handler![
             commands::get_app_info,
+            workflow::media::cleanup::get_storage_report,
+            workflow::media::cleanup::trash_assets,
+            workflow::media::cleanup::restore_trash,
+            workflow::media::cleanup::purge_trash,
             workflow::list_workflows,
             workflow::save_workflow,
             workflow::package::export_project_bundle,

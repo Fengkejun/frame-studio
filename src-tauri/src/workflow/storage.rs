@@ -17,7 +17,7 @@ impl Store {
         let version: u32 = c
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .map_err(|e| e.to_string())?;
-        if version > 9 {
+        if version > 10 {
             return Err("项目数据库版本较新，请升级应用".into());
         }
         if version < 2 {
@@ -71,6 +71,16 @@ impl Store {
             store.db()?.execute_batch("BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS image_batches(id TEXT PRIMARY KEY, workflow_id TEXT NOT NULL, json TEXT NOT NULL, created_at INTEGER NOT NULL);
                 PRAGMA user_version=9; COMMIT;").map_err(|e| e.to_string())?;
+        }
+        if version < 10 {
+            store
+                .db()?
+                .execute_batch(
+                    "BEGIN IMMEDIATE;
+                CREATE TABLE IF NOT EXISTS asset_trash(id TEXT PRIMARY KEY, json TEXT NOT NULL);
+                PRAGMA user_version=10; COMMIT;",
+                )
+                .map_err(|e| e.to_string())?;
         }
         // A text request has no pollable provider task ID. Never resubmit after a crash.
         for mut run in store.runs(None)? {
@@ -180,7 +190,7 @@ mod tests {
         assert_eq!(
             db.pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
                 .unwrap(),
-            9
+            10
         );
         assert_eq!(
             db.query_row("SELECT count(*) FROM cloud_image_jobs", [], |r| r
@@ -214,7 +224,7 @@ mod tests {
                     .unwrap()
                     .pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
                     .unwrap(),
-                9
+                10
             );
         }
         assert_eq!(Store::open(&path).unwrap().providers().unwrap().len(), 1);
@@ -242,7 +252,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!((count, version, cloud_table), (1, 9, 1));
+        assert_eq!((count, version, cloud_table), (1, 10, 1));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();
@@ -266,7 +276,7 @@ mod tests {
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!((version, table), (9, 1));
+        assert_eq!((version, table), (10, 1));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();
@@ -284,7 +294,7 @@ mod tests {
             .pragma_query_value(None, "user_version", |r| r.get(0))
             .unwrap();
         let count: u32 = db.query_row("SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('video_jobs','video_assets','selected_videos')", [], |r| r.get(0)).unwrap();
-        assert_eq!((version, count), (9, 3));
+        assert_eq!((version, count), (10, 3));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();
@@ -302,7 +312,7 @@ mod tests {
             .pragma_query_value(None, "user_version", |row| row.get(0))
             .unwrap();
         let count: u32 = db.query_row("SELECT count(*) FROM sqlite_master WHERE type='table' AND name IN ('compositions','audio_assets','export_jobs')",[],|row|row.get(0)).unwrap();
-        assert_eq!((version, count), (9, 3));
+        assert_eq!((version, count), (10, 3));
         drop(db);
         drop(store);
         std::fs::remove_file(path).unwrap();
@@ -328,7 +338,7 @@ mod tests {
             assert_eq!(
                 db.pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
                     .unwrap(),
-                9
+                10
             );
             assert_eq!(
                 db.query_row("SELECT count(*) FROM speech_jobs", [], |r| r
@@ -380,7 +390,7 @@ mod tests {
                     |r| r.get(0),
                 )
                 .unwrap();
-            assert_eq!((version, count), (9, 2));
+            assert_eq!((version, count), (10, 2));
             assert_eq!(
                 db.query_row("SELECT count(*) FROM speech_jobs", [], |r| r
                     .get::<_, u32>(0))
