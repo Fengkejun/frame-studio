@@ -8,6 +8,6 @@
 - 备份专项使用真实 Rust 命令与原生页面，在隔离目录中备份含图片、视频、配音、字幕、转场和成片的项目。第二次备份复用 75,248,940 字节，新增素材字节为 0，共享素材文件列表保持一致。
 - 篡改备份素材后，恢复校验失败且项目数量保持不变；恢复完整素材后，界面成功切换到新项目副本。原项目时间线不变，副本保留首帧、所选视频、配音起点、转场、字幕与实际媒体文件。
 - 页面重载后仍可读取备份位置和两个备份点。备份清单中的模型连接 ID 为空，成片路径为可迁移的相对路径。
-- [CI](https://github.com/Fengkejun/frame-studio/actions/runs/38541001554) 与 [macOS 安装包](https://github.com/Fengkejun/frame-studio/actions/runs/38541001405) 对应本轮功能提交，最终状态以流水线为准。
+- [CI](https://github.com/Fengkejun/frame-studio/actions/runs/38541001554) 的前端、Windows/Linux/macOS 检查全部通过；[macOS 安装包](https://github.com/Fengkejun/frame-studio/actions/runs/38541001405) 对应本轮功能提交，最终构建与启动检查状态以流水线为准。
 
 Windows 原生验收使用内嵌生产页面的调试程序，通过本次命令的临时参数采用单代码生成单元、优化级别 0、无调试符号；项目默认编译配置保持。Windows 测试安装包由该程序单独打包，输出位于 `src-tauri/target/debug/bundle/nsis/`。本轮使用本机媒体和接口假服务，没有执行真实云端 AI 推理。
