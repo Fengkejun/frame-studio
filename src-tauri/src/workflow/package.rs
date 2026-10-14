@@ -1,5 +1,6 @@
 //! Portable, integrity-checked project bundles. Provider credentials and remote
 //! task state stay on the original device; immutable media versions travel.
+pub mod backups;
 use super::{
     media::{
         composition::{AudioAsset, Composition, ExportJob},
@@ -727,77 +728,86 @@ fn restore_archive(store: &Store, directory: &Path, source: &Path) -> AppResult<
                 return Err(format!("项目包素材文件校验失败：{}", file.name));
             }
         }
-        // Export paths from the source machine are replaced with app-owned paths.
-        let export_paths: HashMap<_, _> = manifest
-            .snapshot
-            .exports
-            .iter_mut()
-            .map(|job| {
-                job.output_path = directory
-                    .join("exports")
-                    .join(format!("{}.mp4", job.id))
-                    .to_string_lossy()
-                    .into_owned();
-                job.cover_path = job.cover_path.as_ref().map(|_| {
-                    directory
-                        .join("exports")
-                        .join(format!("{}.cover.jpg", job.id))
-                        .to_string_lossy()
-                        .into_owned()
-                });
-                (job.id.clone(), job.output_path.clone())
-            })
-            .collect();
-        rewrite_canvas_paths(&mut manifest.snapshot.workflow, &export_paths);
-        let mut db = store.db()?;
-        let transaction = db.transaction().map_err(|e| e.to_string())?;
-        let already_exists: bool = transaction
-            .query_row(
-                "SELECT EXISTS(SELECT 1 FROM workflows WHERE id=?1)",
-                [&workflow_id],
-                |row| row.get(0),
-            )
-            .map_err(|e| e.to_string())?;
-        if already_exists {
-            return Err("此项目已存在".into());
-        }
-        for image in &manifest.snapshot.images {
-            ensure_free(&transaction, "image_assets", &image.version_id)?;
-        }
-        for video in &manifest.snapshot.videos {
-            ensure_free(&transaction, "video_assets", &video.version_id)?;
-        }
-        for audio in &manifest.snapshot.audios {
-            ensure_free(&transaction, "audio_assets", &audio.version_id)?;
-        }
-        for job in &manifest.snapshot.exports {
-            ensure_free(&transaction, "export_jobs", &job.id)?;
-        }
-        let mut moved = Vec::new();
-        let applied = (|| {
-            for file in &manifest.files {
-                let destination = directory.join(&file.name);
-                fs::create_dir_all(destination.parent().ok_or("项目包路径无效")?)
-                    .map_err(|e| e.to_string())?;
-                if destination.exists() {
-                    return Err("目标素材文件已存在，恢复已取消".into());
-                }
-                fs::rename(staging.join(&file.name), &destination)
-                    .map_err(|e| format!("无法恢复素材：{e}"))?;
-                moved.push(destination);
-            }
-            insert_snapshot(&transaction, &manifest.snapshot)?;
-            transaction.commit().map_err(|e| e.to_string())
-        })();
-        if applied.is_err() {
-            for path in moved {
-                let _ = fs::remove_file(path);
-            }
-        }
-        applied
+        apply_staged(store, directory, &staging, &mut manifest)
     })();
     let _ = fs::remove_dir_all(&staging);
     result.map(|_| manifest.snapshot.workflow)
+}
+
+fn apply_staged(
+    store: &Store,
+    directory: &Path,
+    staging: &Path,
+    manifest: &mut Manifest,
+) -> AppResult<()> {
+    // Export paths from the source machine are replaced with app-owned paths.
+    let export_paths: HashMap<_, _> = manifest
+        .snapshot
+        .exports
+        .iter_mut()
+        .map(|job| {
+            job.output_path = directory
+                .join("exports")
+                .join(format!("{}.mp4", job.id))
+                .to_string_lossy()
+                .into_owned();
+            job.cover_path = job.cover_path.as_ref().map(|_| {
+                directory
+                    .join("exports")
+                    .join(format!("{}.cover.jpg", job.id))
+                    .to_string_lossy()
+                    .into_owned()
+            });
+            (job.id.clone(), job.output_path.clone())
+        })
+        .collect();
+    rewrite_canvas_paths(&mut manifest.snapshot.workflow, &export_paths);
+    let mut db = store.db()?;
+    let transaction = db.transaction().map_err(|e| e.to_string())?;
+    let already_exists: bool = transaction
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM workflows WHERE id=?1)",
+            [&manifest.snapshot.workflow.id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if already_exists {
+        return Err("此项目已存在".into());
+    }
+    for image in &manifest.snapshot.images {
+        ensure_free(&transaction, "image_assets", &image.version_id)?;
+    }
+    for video in &manifest.snapshot.videos {
+        ensure_free(&transaction, "video_assets", &video.version_id)?;
+    }
+    for audio in &manifest.snapshot.audios {
+        ensure_free(&transaction, "audio_assets", &audio.version_id)?;
+    }
+    for job in &manifest.snapshot.exports {
+        ensure_free(&transaction, "export_jobs", &job.id)?;
+    }
+    let mut moved = Vec::new();
+    let applied = (|| {
+        for file in &manifest.files {
+            let destination = directory.join(&file.name);
+            fs::create_dir_all(destination.parent().ok_or("项目包路径无效")?)
+                .map_err(|e| e.to_string())?;
+            if destination.exists() {
+                return Err("目标素材文件已存在，恢复已取消".into());
+            }
+            fs::rename(staging.join(&file.name), &destination)
+                .map_err(|e| format!("无法恢复素材：{e}"))?;
+            moved.push(destination);
+        }
+        insert_snapshot(&transaction, &manifest.snapshot)?;
+        transaction.commit().map_err(|e| e.to_string())
+    })();
+    if applied.is_err() {
+        for path in moved {
+            let _ = fs::remove_file(path);
+        }
+    }
+    applied
 }
 
 fn ensure_free(db: &rusqlite::Transaction<'_>, table: &str, id: &str) -> AppResult<()> {
@@ -1042,7 +1052,7 @@ mod tests {
     use super::*;
     use crate::workflow::types::{NodeConfig, Position, Viewport, WorkflowNode};
 
-    fn fixture() -> (PathBuf, Store, Workflow) {
+    pub(super) fn fixture() -> (PathBuf, Store, Workflow) {
         let directory = std::env::temp_dir().join(format!("frame-studio-package-{}", uid()));
         fs::create_dir_all(directory.join("assets")).unwrap();
         let store = Store::open(&directory.join("studio.sqlite")).unwrap();
@@ -1227,6 +1237,7 @@ mod tests {
         .unwrap();
         fs::write(source.join("assets").join(&video.file_name), b"mp4").unwrap();
         fs::write(source.join("assets").join(&audio.file_name), b"mp3").unwrap();
+        backups::tests::check_full_media_copy(&store, &source, &workflow);
         let bundle = source.join("project.framepack");
         write_archive(&store, &source, &workflow.id, &bundle).unwrap();
         let mut archived = ZipArchive::new(File::open(&bundle).unwrap()).unwrap();
