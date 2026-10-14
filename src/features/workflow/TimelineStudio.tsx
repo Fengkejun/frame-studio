@@ -204,6 +204,19 @@ export function TimelineStudio({
       setBusy(false)
     }
   }
+  if (!loaded)
+    return (
+      <div className="timeline-studio">
+        <h2>成片合成</h2>
+        {error ? (
+          <p className="workflow-error" role="alert">
+            {error}
+          </p>
+        ) : (
+          <p role="status">正在加载时间线…</p>
+        )}
+      </div>
+    )
   return (
     <div className="timeline-studio">
       <div className="image-studio-top">

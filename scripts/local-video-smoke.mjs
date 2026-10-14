@@ -165,6 +165,7 @@ export async function testLocalVideo(page, root, profile) {
     .locator('.video-candidates')
     .screenshot({ path: path.join(root, 'artifacts/local-video-import.png') })
   await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
+  await expect(page.locator('.timeline-clip')).toHaveCount(3)
   // Replace the previous timeline through visible controls, then use the imported version.
   while (await page.locator('.timeline-clip').count())
     await page
