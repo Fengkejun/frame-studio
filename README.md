@@ -104,6 +104,8 @@ docs/architecture.md         # 当前边界与后续扩展约定
 
 侧栏中的“模型连接”管理文本模型。图片服务在「首帧与素材」中配置，其密钥与文本连接分开保存。镜头视频和成片时间线分别在专属页面配置。画布 JSON 导出保存资产引用，不打包大文件。
 
+多镜头可使用[图片批量队列](docs/image-batch-queue.md)和[视频批量队列](docs/video-batch-queue.md)顺序生成，支持合计预算校验、暂停、原任务查询恢复和已知失败单项重跑；生成候选后仍需手动选择版本。
+
 ## 官方参考
 
 - [Tauri 环境要求](https://v2.tauri.app/start/prerequisites/)

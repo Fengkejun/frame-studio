@@ -18,6 +18,7 @@ import { createTranscriptionFixture } from './subtitle-media-smoke.mjs'
 import { testTransitions } from './transitions-media-smoke.mjs'
 import { testLocalVideo } from './local-video-smoke.mjs'
 import { testImageBatches } from './image-batch-smoke.mjs'
+import { testVideoBatches } from './video-batch-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -177,6 +178,10 @@ try {
   await testTransitions(page, root, profile, videoFixture)
   await testLocalVideo(page, root, profile)
   await testImageBatches(page, root)
+  const videoBatches = await testVideoBatches(page, root, videoFixture)
+  console.log(
+    `Video batches verified: ${videoBatches.batches} queues, ${videoBatches.submissions} submissions`,
+  )
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '导出项目包' }).click()
   await expect

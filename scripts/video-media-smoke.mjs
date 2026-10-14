@@ -12,6 +12,7 @@ export async function createVideoFixture(root) {
   let mode = 'success'
   let catalogMode = 'success'
   let nextClip = mp4
+  let plannedModes = []
   const taskClips = new Map()
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost')
@@ -44,15 +45,16 @@ export async function createVideoFixture(root) {
       for await (const chunk of req) body += chunk
       const payload = JSON.parse(body)
       const id = `video-${requests.length + 1}`
+      const submitMode = plannedModes.shift() ?? mode
       taskClips.set(id, nextClip)
       requests.push({
         payload,
         authorization: req.headers.authorization,
         asyncHeader: req.headers['x-dashscope-async'],
         id,
-        mode,
+        mode: submitMode,
       })
-      if (mode === 'lost') {
+      if (submitMode === 'lost') {
         req.socket.destroy()
         return
       }
@@ -105,6 +107,9 @@ export async function createVideoFixture(root) {
     },
     setMode: (value) => {
       mode = value
+    },
+    setModes: (values) => {
+      plannedModes = [...values]
     },
     setCatalogMode: (value) => {
       catalogMode = value
