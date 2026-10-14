@@ -1,0 +1,70 @@
+.storage-panel details {
+  margin-top: 18px;
+}
+.storage-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.storage-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 20px 0;
+}
+.storage-totals > div {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.storage-totals dt {
+  font-size: 13px;
+  color: var(--muted);
+}
+.storage-totals dd {
+  margin: 7px 0 0;
+  font-weight: 600;
+}
+.storage-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-left: 18px;
+}
+.storage-list {
+  max-height: 360px;
+  overflow: auto;
+  margin: 12px 0;
+}
+.storage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.storage-row > span:first-of-type {
+  flex: 1;
+  min-width: 0;
+}
+.storage-row strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.storage-row small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.storage-row input,
+.storage-confirm input {
+  accent-color: var(--accent);
+}
+.storage-confirm {
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.storage-confirm .form-actions {
+  margin-top: 12px;
+}

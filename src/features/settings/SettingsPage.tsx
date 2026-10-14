@@ -1,6 +1,7 @@
 import { Icon, type IconName } from '@/shared/ui/Icon'
 import type { Theme } from './useTheme'
 import packageInfo from '../../../package.json'
+import { StoragePanel } from './StoragePanel'
 
 const themes: {
   value: Theme
@@ -36,7 +37,9 @@ export function SettingsPage({
     <div className="settings-page">
       <p className="eyebrow">PREFERENCES</p>
       <h1>让工作台更适合你。</h1>
-      <p className="section-description">调整外观，建立舒适的创作环境。</p>
+      <p className="section-description">
+        调整外观，查看素材占用与管理回收区。
+      </p>
       <section className="settings-section">
         <h2>界面外观</h2>
         <p>选择你喜欢的主题，偏好会保存在当前设备。</p>
@@ -80,6 +83,7 @@ export function SettingsPage({
           </p>
         )}
       </section>
+      <StoragePanel />
       <section className="settings-section about-section">
         <div>
           <p className="eyebrow">ABOUT FRAME</p>
@@ -89,7 +93,7 @@ export function SettingsPage({
         <span className="version-badge">v{packageInfo.version}</span>
       </section>
       <p className="footnote">
-        当前版本支持工作流画布、文本模型连接和分镜首帧制作。视频生成与成片合成将在后续接入。
+        当前版本支持文本工作流、图片与视频生成、素材版本、配音字幕和本地成片合成。
       </p>
     </div>
   )

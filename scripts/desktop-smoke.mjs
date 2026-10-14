@@ -19,6 +19,7 @@ import { testTransitions } from './transitions-media-smoke.mjs'
 import { testLocalVideo } from './local-video-smoke.mjs'
 import { testImageBatches } from './image-batch-smoke.mjs'
 import { testVideoBatches } from './video-batch-smoke.mjs'
+import { testStorage } from './storage-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -182,6 +183,7 @@ try {
   console.log(
     `Video batches verified: ${videoBatches.batches} queues, ${videoBatches.submissions} submissions`,
   )
+  await testStorage(page, root, profile)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '导出项目包' }).click()
   await expect

@@ -106,6 +106,8 @@ docs/architecture.md         # 当前边界与后续扩展约定
 
 多镜头可使用[图片批量队列](docs/image-batch-queue.md)和[视频批量队列](docs/video-batch-queue.md)顺序生成，支持合计预算校验、暂停、原任务查询恢复和已知失败单项重跑；生成候选后仍需手动选择版本。
 
+在设置中查看[素材占用与安全清理](docs/asset-storage-cleanup.md)，预览未引用版本并移入可恢复的回收区；再次确认永久删除后释放空间。跨项目引用和任务输入均受保护。
+
 ## 官方参考
 
 - [Tauri 环境要求](https://v2.tauri.app/start/prerequisites/)
