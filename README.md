@@ -108,6 +108,8 @@ docs/architecture.md         # 当前边界与后续扩展约定
 
 在设置中查看[素材占用与安全清理](docs/asset-storage-cleanup.md)，预览未引用版本并移入可恢复的回收区；再次确认永久删除后释放空间。跨项目引用和任务输入均受保护。
 
+工作流画布中的[项目备份与恢复](docs/incremental-backups.md)支持外部文件夹、重复素材复用、备份记录和校验后恢复为新项目。恢复副本保留首帧、字幕与时间线关系，原项目保持原样。
+
 ## 官方参考
 
 - [Tauri 环境要求](https://v2.tauri.app/start/prerequisites/)

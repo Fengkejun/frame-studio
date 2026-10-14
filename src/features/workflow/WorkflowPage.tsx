@@ -41,6 +41,7 @@ import { ImageStudio, type ShotTarget } from './ImageStudio'
 import { VideoStudio } from './VideoStudio'
 import { TimelineStudio } from './TimelineStudio'
 import { AssetImage } from './AssetImage'
+import { BackupPanel } from './BackupPanel'
 import './workflow.css'
 
 const nodeTypes = { agent: FlowNode }
@@ -532,6 +533,20 @@ function WorkflowEditor({
           </button>
         )}
       </div>
+      {isDesktop && (
+        <BackupPanel
+          key={w.id}
+          workflow={w}
+          disabled={busy || bundleBusy}
+          onSave={c.save}
+          onRestore={async (restored) => {
+            await c.selectProject(restored)
+            setSelected([])
+            setMediaTarget(null)
+            setBundleNotice(`已恢复项目：${restored.name}`)
+          }}
+        />
+      )}
       {!isDesktop && (
         <div className="preview-strip">
           浏览器画布预览 · 支持编辑和本机保存。真实模型调用请在桌面应用中运行。
