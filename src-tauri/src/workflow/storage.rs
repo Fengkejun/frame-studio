@@ -163,6 +163,42 @@ impl Store {
 mod tests {
     use super::*;
     #[test]
+    fn upgrades_v8_preserving_media_and_adding_batch_storage() {
+        let path = std::env::temp_dir().join(format!("frame-studio-v8-{}.sqlite", uid()));
+        let store = Store::open(&path).unwrap();
+        store
+            .db()
+            .unwrap()
+            .execute_batch(
+                "INSERT INTO cloud_image_jobs VALUES ('old','project','{}',1);
+            DROP TABLE image_batches; PRAGMA user_version=8;",
+            )
+            .unwrap();
+        drop(store);
+        let store = Store::open(&path).unwrap();
+        let db = store.db().unwrap();
+        assert_eq!(
+            db.pragma_query_value(None, "user_version", |r| r.get::<_, u32>(0))
+                .unwrap(),
+            9
+        );
+        assert_eq!(
+            db.query_row("SELECT count(*) FROM cloud_image_jobs", [], |r| r
+                .get::<_, u32>(0))
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            db.query_row("SELECT count(*) FROM image_batches", [], |r| r
+                .get::<_, u32>(0))
+                .unwrap(),
+            0
+        );
+        drop(db);
+        drop(store);
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
     fn upgrades_v1_without_losing_existing_data() {
         let path = std::env::temp_dir().join(format!("frame-studio-migration-{}.sqlite", uid()));
         {

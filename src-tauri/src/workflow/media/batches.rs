@@ -165,8 +165,23 @@ pub fn list_image_batches(
     let rows = query
         .query_map([workflow_id], |r| r.get::<_, String>(0))
         .map_err(|e| e.to_string())?;
-    rows.map(|r| serde_json::from_str(&r.map_err(|e| e.to_string())?).map_err(|e| e.to_string()))
-        .collect()
+    let mut batches: Vec<ImageBatch> = rows
+        .map(|r| serde_json::from_str(&r.map_err(|e| e.to_string())?).map_err(|e| e.to_string()))
+        .collect::<AppResult<_>>()?;
+    drop(query);
+    for batch in batches.iter_mut().filter(|b| b.status != "running") {
+        let before = serde_json::to_string(batch).map_err(|e| e.to_string())?;
+        for item in batch.items.iter_mut().filter(|i| i.status == "running") {
+            if let Some(value) = child(&db, item)? {
+                reconcile(item, Some(&value));
+            }
+        }
+        if serde_json::to_string(batch).map_err(|e| e.to_string())? != before {
+            batch.updated_at = now();
+            write(&db, batch)?;
+        }
+    }
+    Ok(batches)
 }
 #[tauri::command]
 pub fn start_image_batch(

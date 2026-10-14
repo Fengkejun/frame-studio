@@ -24,6 +24,7 @@ export async function testTransitions(page, root, profile, fixture) {
     ...shot,
     id: `transition-${i}`,
     title: color,
+    imagePrompt: `${shot.imagePrompt} ${color}`,
   }))
   for (const node of workflow.nodes.filter((n) =>
     ['image', 'video', 'timeline'].includes(n.kind),

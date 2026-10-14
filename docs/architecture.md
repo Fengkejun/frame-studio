@@ -51,6 +51,7 @@ SubtitleStudio.tsx、SubtitleEditor.tsx 与 media/transcription.rs、media/subti
 工作台已加入[首次使用清单](getting-started.md)，汇总文本与 ComfyUI 的主动连接检测、云端密钥保存状态和本机 FFmpeg 能力检测。密钥存在不代表服务权限已验证。
 
 1. 扩展更多云端媒体适配器；角色参考图、文生图、图生图及本机 ComfyUI API 格式工作流已接入。复杂工作流仍需实际节点与模型验证。
+   多镜头图片顺序调度、暂停、恢复与失败重跑见[图片批量队列](image-batch-queue.md)，视频批量调度待接入。
 2. 本地 H.264 MP4 导入、实际视频信息读取及大文件片段预览已接入；后续扩展视频编码转换与生成参数。
 3. 扩展多轨音频编辑与成片预览。交叉溶解、黑场切换和配音/音乐淡化已接入，详见 [转场与音频淡入淡出](transitions-audio-fades.md)。配音起点、可视化波形和自动字幕同步见 [音频时间对齐](audio-alignment-workflow.md)、[AI 配音](voiceover-workflow.md) 与 [配音自动字幕](subtitle-workflow.md)。
 4. 增加磁盘清理与增量备份；含媒体、绑定、时间线和成片的 [项目素材包](project-bundles.md) 已实现。
