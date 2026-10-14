@@ -237,6 +237,7 @@ fn create(
             files,
         },
     };
+    validate_backup(&backup, &backup.id)?;
     let data = serde_json::to_vec(&backup).map_err(|e| e.to_string())?;
     if data.len() as u64 > MAX_MANIFEST {
         return Err("备份项目元数据过大".into());
@@ -274,6 +275,11 @@ fn read(root: &Path, id: &str) -> AppResult<Backup> {
     let data = File::open(&path).map_err(|e| e.to_string())?;
     let backup: Backup =
         serde_json::from_reader(data.take(MAX_MANIFEST + 1)).map_err(|_| "备份记录格式错误")?;
+    validate_backup(&backup, id)?;
+    Ok(backup)
+}
+
+fn validate_backup(backup: &Backup, id: &str) -> AppResult<()> {
     if backup.id != id || backup.manifest.schema_version != 2 {
         return Err("备份记录版本或标识错误".into());
     }
@@ -323,7 +329,7 @@ fn read(root: &Path, id: &str) -> AppResult<Backup> {
             return Err("备份素材大小与版本记录不符".into());
         }
     }
-    Ok(backup)
+    Ok(())
 }
 
 fn list(root: &Path) -> AppResult<BackupReport> {

@@ -153,6 +153,11 @@ fn corruption_and_untrusted_manifests_leave_current_project_untouched() {
     assert_eq!(list(&root).unwrap().points.len(), 1);
     assert!(restore(&store, &directory, &root, "../../outside").is_err());
     let mut malicious = data;
+    malicious.manifest.snapshot.images[0].bytes += 1;
+    assert!(validate_backup(&malicious, &point.id)
+        .unwrap_err()
+        .contains("大小"));
+    malicious.manifest.snapshot.images[0].bytes -= 1;
     malicious.manifest.files[0].name = "../outside".into();
     fs::write(
         root.join("snapshots").join(format!("{}.json", point.id)),
