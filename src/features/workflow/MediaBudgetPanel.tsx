@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { errorMessage } from './api'
 import * as api from './mediaApi'
 
@@ -13,19 +13,23 @@ export function MediaBudgetPanel({
   const [limitText, setLimitText] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const edited = useRef(false)
+  const revision = useRef(0)
 
   useEffect(() => {
     let alive = true
+    const current = ++revision.current
     void api
       .getMediaBudget(workflowId)
       .then((value) => {
-        if (!alive) return
+        if (!alive || current !== revision.current) return
         setBudget(value)
-        setLimitText(
-          value.limitMicroUsd === null
-            ? ''
-            : (value.limitMicroUsd / 1_000_000).toFixed(2),
-        )
+        if (!edited.current)
+          setLimitText(
+            value.limitMicroUsd === null
+              ? ''
+              : (value.limitMicroUsd / 1_000_000).toFixed(2),
+          )
       })
       .catch((reason: unknown) => {
         if (alive) setError(errorMessage(reason))
@@ -46,6 +50,7 @@ export function MediaBudgetPanel({
       return
     }
     setSaving(true)
+    ++revision.current
     setError('')
     try {
       setBudget(
@@ -54,6 +59,7 @@ export function MediaBudgetPanel({
           value ? Math.round(Number(value) * 1_000_000) : null,
         ),
       )
+      edited.current = false
     } catch (reason) {
       setError(errorMessage(reason))
     } finally {
@@ -81,7 +87,11 @@ export function MediaBudgetPanel({
             step="0.01"
             value={limitText}
             placeholder="留空表示不限制"
-            onChange={(event) => setLimitText(event.target.value)}
+            disabled={saving}
+            onChange={(event) => {
+              edited.current = true
+              setLimitText(event.target.value)
+            }}
           />
         </label>
         <button
