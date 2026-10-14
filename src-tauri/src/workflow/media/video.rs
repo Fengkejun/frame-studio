@@ -67,6 +67,10 @@ pub struct VideoAsset {
     pub file_name: String,
     #[serde(default)]
     pub metadata: Option<video_metadata::VideoMetadata>,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub name: Option<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -441,6 +445,144 @@ pub async fn video_preview(app: tauri::AppHandle, version_id: String) -> AppResu
         .allow_file(&path)
         .map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
+}
+
+fn validate_import_frame(
+    state: &WorkflowState,
+    context: &ShotContext,
+    frame: &str,
+) -> AppResult<()> {
+    validate_context(state, context)?;
+    let selected: Option<String> = state.store.db()?.query_row(
+        "SELECT version_id FROM first_frames WHERE workflow_id=?1 AND node_id=?2 AND artifact_id=?3 AND shot_id=?4",
+        params![context.workflow_id,context.node_id,context.artifact_id,context.shot_id], |row| row.get(0),
+    ).optional().map_err(|e| e.to_string())?;
+    if selected.as_deref() != Some(frame) {
+        return Err("镜头首帧已变化，请重新选择镜头后导入".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn import_video(
+    app: tauri::AppHandle,
+    context: ShotContext,
+    first_frame_version_id: String,
+) -> AppResult<Option<VideoAsset>> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    const IMPORT_LIMIT: u64 = 2 * 1024 * 1024 * 1024;
+    static IMPORTS: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+    let _permit = IMPORTS
+        .try_acquire()
+        .map_err(|_| "正在导入视频，请等待完成")?;
+    validate_import_frame(
+        &app.state::<WorkflowState>(),
+        &context,
+        &first_frame_version_id,
+    )?;
+    // Tests only bypass the dialog in an isolated debug profile; release builds always prompt.
+    let source =
+        if cfg!(debug_assertions) && std::env::var_os("FRAME_STUDIO_TEST_DATA_DIR").is_some() {
+            std::env::var_os("FRAME_STUDIO_TEST_VIDEO_PATH").map(std::path::PathBuf::from)
+        } else {
+            let window = app.get_webview_window("main").ok_or("窗口不可用")?;
+            tauri::async_runtime::spawn_blocking(move || {
+                rfd::FileDialog::new()
+                    .set_parent(&window)
+                    .add_filter("H.264 MP4 视频", &["mp4"])
+                    .pick_file()
+            })
+            .await
+            .map_err(|_| "文件选择对话框异常")?
+        };
+    let Some(source) = source else {
+        return Ok(None);
+    };
+    if !source
+        .extension()
+        .is_some_and(|v| v.eq_ignore_ascii_case("mp4"))
+    {
+        return Err("请选择 H.264 编码的 MP4 视频".into());
+    }
+    let mut input = tokio::fs::File::open(&source)
+        .await
+        .map_err(|_| "源视频读取失败")?;
+    let source_info = input.metadata().await.map_err(|_| "源视频读取失败")?;
+    if !source_info.is_file() || !(12..=IMPORT_LIMIT).contains(&source_info.len()) {
+        return Err("视频须为有效文件，大小不超过 2 GB".into());
+    }
+    let directory = app.state::<WorkflowState>().directory.join("assets");
+    tokio::fs::create_dir_all(&directory)
+        .await
+        .map_err(|_| "素材目录创建失败")?;
+    let id = uid();
+    let temporary = directory.join(format!("{id}.partial"));
+    let target = directory.join(format!("{id}.mp4"));
+    let result: AppResult<VideoAsset> = async {
+        let mut output = tokio::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .await
+            .map_err(|_| "视频临时文件创建失败")?;
+        let copied = tokio::io::copy(&mut (&mut input).take(IMPORT_LIMIT + 1), &mut output)
+            .await
+            .map_err(|_| "视频复制失败")?;
+        output.flush().await.map_err(|_| "视频复制失败")?;
+        drop(output);
+        if copied != source_info.len() || copied > IMPORT_LIMIT {
+            return Err("源视频在复制时发生变化或超过 2 GB".into());
+        }
+        let mut header = [0u8; 12];
+        tokio::fs::File::open(&temporary)
+            .await
+            .map_err(|_| "视频读取失败")?
+            .read_exact(&mut header)
+            .await
+            .map_err(|_| "视频读取失败")?;
+        if &header[4..8] != b"ftyp" {
+            return Err("文件不是有效 MP4 视频".into());
+        }
+        let metadata = video_metadata::probe(&temporary).await?;
+        if metadata.codec != "h264" {
+            return Err("请选择 H.264 编码的 MP4；其他编码请先转换后导入".into());
+        }
+        let state = app.state::<WorkflowState>();
+        validate_import_frame(&state, &context, &first_frame_version_id)?;
+        let entry = VideoAsset {
+            asset_id: format!(
+                "{}:{}:{}",
+                context.workflow_id, context.node_id, context.shot_id
+            ),
+            version_id: id.clone(),
+            context: context.clone(),
+            first_frame_version_id: first_frame_version_id.clone(),
+            job_id: String::new(),
+            duration: (metadata.duration_ms.div_ceil(1000)).min(255) as u8,
+            resolution: format!("{}x{}", metadata.width, metadata.height),
+            bytes: copied,
+            created_at: now(),
+            file_name: format!("{id}.mp4"),
+            metadata: Some(metadata),
+            source: "import".into(),
+            name: source
+                .file_name()
+                .map(|name| name.to_string_lossy().chars().take(256).collect()),
+        };
+        tokio::fs::rename(&temporary, &target)
+            .await
+            .map_err(|_| "视频保存失败")?;
+        if let Err(error) = save_asset(&state, &entry) {
+            let _ = tokio::fs::remove_file(&target).await;
+            return Err(error);
+        }
+        Ok(entry)
+    }
+    .await;
+    if result.is_err() {
+        let _ = tokio::fs::remove_file(&temporary).await;
+    }
+    result.map(Some)
 }
 fn reserve(state: &WorkflowState, job: &VideoJob) -> AppResult<Arc<AtomicBool>> {
     let mut active = state.video_active.lock().map_err(|_| "视频任务锁不可用")?;
@@ -914,6 +1056,8 @@ async fn download(
         created_at: now(),
         file_name,
         metadata: Some(metadata),
+        source: "wan".into(),
+        name: None,
     };
     save_asset(state, &entry)?;
     Ok(entry)

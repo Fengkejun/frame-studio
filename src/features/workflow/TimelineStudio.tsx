@@ -147,6 +147,19 @@ export function TimelineStudio({
     (clip) =>
       !candidates.some(({ asset }) => asset.versionId === clip.versionId),
   )
+  const invalidClip = draft.clips.some((clip) => {
+    const duration = media.videoAssets.find(
+      (asset) => asset.versionId === clip.versionId,
+    )?.metadata?.durationMs
+    return (
+      !Number.isInteger(clip.trimStartMs) ||
+      !Number.isInteger(clip.trimEndMs) ||
+      clip.trimStartMs < 0 ||
+      clip.trimEndMs <= clip.trimStartMs ||
+      clip.trimEndMs - clip.trimStartMs > 60000 ||
+      (duration !== undefined && clip.trimEndMs > duration + 50)
+    )
+  })
   function patchClip(index: number, patch: Partial<api.TimelineClip>) {
     setDraft((value) => ({
       ...value,
@@ -309,7 +322,11 @@ export function TimelineStudio({
                       aria-label={`片段 ${index + 1} 开始`}
                       type="number"
                       min={0}
-                      max={60}
+                      max={
+                        asset?.metadata
+                          ? asset.metadata.durationMs / 1000
+                          : 3600
+                      }
                       step={0.1}
                       value={clip.trimStartMs / 1000}
                       onChange={(event) =>
@@ -327,7 +344,11 @@ export function TimelineStudio({
                       aria-label={`片段 ${index + 1} 结束`}
                       type="number"
                       min={0.1}
-                      max={60}
+                      max={
+                        asset?.metadata
+                          ? asset.metadata.durationMs / 1000
+                          : 3600
+                      }
                       step={0.1}
                       value={clip.trimEndMs / 1000}
                       onChange={(event) =>
@@ -672,7 +693,7 @@ export function TimelineStudio({
             invalidVoiceStart ||
             layout.invalid ||
             !!fadeError ||
-            draft.clips.some((clip) => clip.trimEndMs <= clip.trimStartMs)
+            invalidClip
           }
           onClick={() => void exportVideo()}
         >
@@ -680,6 +701,11 @@ export function TimelineStudio({
         </button>
         {missing && (
           <p className="workflow-error">时间线中有失效的视频版本，请替换。</p>
+        )}
+        {invalidClip && (
+          <p className="workflow-error" role="alert">
+            裁剪须在素材时长内，结束晚于开始，单段长度不超过 60 秒。
+          </p>
         )}
         {saving && <p className="field-hint">正在保存时间线…</p>}
       </section>

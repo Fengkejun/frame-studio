@@ -154,6 +154,31 @@ export function VideoStudio({
               ))}
             </select>
           </label>
+          <button
+            className="small-button"
+            disabled={
+              !isDesktop ||
+              working ||
+              busy ||
+              !context ||
+              !firstFrame ||
+              !!selected?.node.stale
+            }
+            onClick={() =>
+              void action(async () => {
+                if (!context || !firstFrame) return
+                await save(workflow)
+                await api.importVideo(context, firstFrame.versionId)
+              })
+            }
+          >
+            {working ? '处理中…' : '导入本地视频'}
+          </button>
+          <p className="field-hint">
+            支持 H.264 MP4，最大 2 GB、1
+            小时。导入后关联当前镜头与首帧，再播放并选择片段版本。
+            原片声音可在预览中播放；成片音轨使用时间线选择的配音和音乐。
+          </p>
           {firstFrame ? (
             <div className="video-source">
               <AssetImage versionId={firstFrame.versionId} alt="视频首帧" />
@@ -216,6 +241,11 @@ export function VideoStudio({
                     alt={`${asset.context.shotId} 首帧`}
                   />
                   <div className="asset-card-info">
+                    <small>
+                      {asset.source === 'import'
+                        ? `本地导入 · ${asset.name ?? 'MP4 视频'}`
+                        : '云端生成'}
+                    </small>
                     <strong>
                       {asset.context.shotId} ·{' '}
                       {(asset.metadata

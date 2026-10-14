@@ -59,6 +59,7 @@
     "allow-pause-video-job",
     "allow-list-video-assets",
     "allow-video-preview",
+    "allow-import-video",
     "allow-list-selected-videos",
     "allow-select-video",
     "allow-get-composition",

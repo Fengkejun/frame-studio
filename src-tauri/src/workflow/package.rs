@@ -1115,7 +1115,15 @@ mod tests {
             bytes: 3,
             created_at: now(),
             file_name: format!("{video_id}.mp4"),
-            metadata: None,
+            metadata: Some(super::super::media::video_metadata::VideoMetadata {
+                duration_ms: 5000,
+                width: 640,
+                height: 360,
+                fps: 30.0,
+                codec: "h264".into(),
+            }),
+            source: "import".into(),
+            name: Some("local-clip.mp4".into()),
         };
         let audio = AudioAsset {
             version_id: audio_id.clone(),
@@ -1267,6 +1275,12 @@ mod tests {
             b"mp4"
         );
         let recovered = snapshot(&restored_store, &workflow.id).unwrap();
+        assert_eq!(recovered.videos[0].source, "import");
+        assert_eq!(recovered.videos[0].name.as_deref(), Some("local-clip.mp4"));
+        assert_eq!(
+            recovered.videos[0].metadata.as_ref().unwrap().duration_ms,
+            5000
+        );
         assert_eq!(recovered.subtitles.len(), 1);
         assert_eq!(recovered.subtitles[0].source_audio_version_id, audio_id);
         assert_eq!(recovered.subtitles[0].cues, subtitle.cues);

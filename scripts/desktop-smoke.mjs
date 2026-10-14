@@ -16,6 +16,7 @@ import { testTimelineMedia } from './timeline-media-smoke.mjs'
 import { createSpeechFixture } from './speech-media-smoke.mjs'
 import { createTranscriptionFixture } from './subtitle-media-smoke.mjs'
 import { testTransitions } from './transitions-media-smoke.mjs'
+import { testLocalVideo } from './local-video-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -85,6 +86,7 @@ const app = spawn(executable, [], {
     FRAME_STUDIO_TEST_COMFY_MODELS_DIR: comfyModelsDir,
     FRAME_STUDIO_TEST_WAN_URL: videoFixture.url,
     FRAME_STUDIO_TEST_EXPORT_PATH: path.join(profile, 'finished.mp4'),
+    FRAME_STUDIO_TEST_VIDEO_PATH: path.join(profile, 'import-video.mp4'),
     FRAME_STUDIO_TEST_PROJECT_BUNDLE_PATH: path.join(
       profile,
       'project.framepack',
@@ -172,6 +174,7 @@ try {
     transcriptionFixture,
   )
   await testTransitions(page, root, profile, videoFixture)
+  await testLocalVideo(page, root, profile)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '导出项目包' }).click()
   await expect

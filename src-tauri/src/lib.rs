@@ -58,6 +58,7 @@ pub fn run() {
             workflow::media::video::pause_video_job,
             workflow::media::video::list_video_assets,
             workflow::media::video::video_preview,
+            workflow::media::video::import_video,
             workflow::media::video::list_selected_videos,
             workflow::media::video::select_video,
             workflow::media::composition::get_composition,

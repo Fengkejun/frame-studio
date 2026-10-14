@@ -153,6 +153,8 @@ export interface VideoAsset {
     fps: number
     codec: string
   } | null
+  source: string
+  name: string | null
 }
 export interface SelectedVideo {
   context: ShotContext
@@ -402,6 +404,11 @@ export const listVideoAssets = (workflowId: string): Promise<VideoAsset[]> =>
   isDesktop ? invoke('list_video_assets', { workflowId }) : Promise.resolve([])
 export const videoPreview = (versionId: string): Promise<string> =>
   invoke<string>('video_preview', { versionId }).then(convertFileSrc)
+export const importVideo = (
+  context: ShotContext,
+  firstFrameVersionId: string,
+): Promise<VideoAsset | null> =>
+  invoke('import_video', { context, firstFrameVersionId })
 export const listSelectedVideos = (
   workflowId: string,
 ): Promise<SelectedVideo[]> =>

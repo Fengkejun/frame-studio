@@ -54,6 +54,7 @@ fn main() {
             "pause_video_job",
             "list_video_assets",
             "video_preview",
+            "import_video",
             "list_selected_videos",
             "select_video",
             "get_composition",
