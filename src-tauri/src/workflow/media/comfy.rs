@@ -112,7 +112,7 @@ async fn get_json(client: &Client, url: Url) -> AppResult<Value> {
     serde_json::from_slice(&limited(response, 4_000_000).await?)
         .map_err(|_| "ComfyUI 响应格式无效".into())
 }
-fn validate(request: &ImageRequest) -> AppResult<()> {
+pub(super) fn validate(request: &ImageRequest) -> AppResult<()> {
     endpoint(&request.base_url, "/")?;
     if request.checkpoint.len() > 500
         || request.positive.trim().is_empty()
@@ -362,6 +362,15 @@ pub fn start_image_job(
     state: tauri::State<WorkflowState>,
     request: ImageRequest,
 ) -> AppResult<ImageJob> {
+    start_with_id(app, state, request, uid())
+}
+
+pub(super) fn start_with_id(
+    app: tauri::AppHandle,
+    state: tauri::State<WorkflowState>,
+    request: ImageRequest,
+    id: String,
+) -> AppResult<ImageJob> {
     validate(&request)?;
     validate_context(&state, &request.context)?;
     if let Some(version_id) = &request.reference_version_id {
@@ -380,7 +389,7 @@ pub fn start_image_job(
         return Err("已有图片任务正在执行，请等待或停止等待".into());
     }
     let job = ImageJob {
-        id: uid(),
+        id,
         request,
         prompt_id: None,
         status: "submitting".into(),

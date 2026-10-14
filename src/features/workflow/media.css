@@ -524,6 +524,25 @@
   display: block;
   overflow-wrap: anywhere;
 }
+.batch-targets {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow: auto;
+  margin: 12px 0;
+}
+.batch-targets label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.image-batch {
+  border-top: 1px solid var(--border);
+  padding: 16px 0;
+}
+.image-batch li {
+  margin: 12px 0;
+}
 .export-preview {
   display: grid;
   gap: 12px;

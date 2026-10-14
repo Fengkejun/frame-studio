@@ -4,6 +4,7 @@ import { errorMessage } from './api'
 import { MediaBudgetPanel } from './MediaBudgetPanel'
 import * as api from './mediaApi'
 import type { Shot } from './model'
+import { BatchSubmit, type BatchTarget } from './ImageBatch'
 
 export function CloudImageForm({
   context,
@@ -13,6 +14,8 @@ export function CloudImageForm({
   onError,
   roleReferences,
   assets,
+  batchTargets,
+  onBatch,
 }: {
   context: api.ShotContext
   shot: Shot
@@ -21,6 +24,8 @@ export function CloudImageForm({
   onError: (message: string) => void
   roleReferences: api.RoleReference[]
   assets: api.ImageAsset[]
+  batchTargets: BatchTarget[]
+  onBatch: (requests: api.BatchRequest[]) => Promise<void>
 }) {
   const [request, setRequest] = useState<api.CloudImageRequest>({
     context,
@@ -374,6 +379,12 @@ export function CloudImageForm({
         <p className="field-hint">
           请求提交后无法远程取消。网络超时或应用关闭时会标记结果未知，请先核对服务商用量再重试。
         </p>
+        <BatchSubmit
+          targets={batchTargets}
+          request={{ kind: 'cloud', request }}
+          disabled={disabled || !hasKey || checking}
+          onStart={onBatch}
+        />
       </fieldset>
     </form>
   )

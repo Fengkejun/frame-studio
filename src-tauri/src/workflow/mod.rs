@@ -63,6 +63,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     media::composition::recover(&app.state::<WorkflowState>())?;
     media::speech::recover(&app.state::<WorkflowState>())?;
     media::transcription::recover(&app.state::<WorkflowState>())?;
+    media::batches::recover(&app.state::<WorkflowState>())?;
     Ok(())
 }
 fn idle(state: &WorkflowState) -> AppResult<()> {

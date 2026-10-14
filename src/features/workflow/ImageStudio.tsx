@@ -7,6 +7,7 @@ import type { useMedia } from './useMedia'
 import { AssetImage } from './AssetImage'
 import { CloudImageForm } from './CloudImageForm'
 import { ComfyModelManager } from './ComfyModelManager'
+import { BatchSubmit, ImageBatchHistory, type BatchTarget } from './ImageBatch'
 import './media.css'
 
 export interface ShotTarget {
@@ -74,6 +75,25 @@ export function ImageStudio({
   const [generator, setGenerator] = useState<'cloud' | 'local'>('cloud')
   const [limit, setLimit] = useState(40)
   const [roleName, setRoleName] = useState('')
+  const [batchRevision, setBatchRevision] = useState(0)
+  const batchTargets = shots
+    .filter((item) => !item.node.stale)
+    .map((item) => ({
+      context: {
+        workflowId: workflow.id,
+        nodeId: item.node.id,
+        artifactId: item.artifactId,
+        shotId: item.shot.id,
+      },
+      prompt: item.shot.imagePrompt,
+      label: `${item.shot.id} · ${item.shot.title}`,
+    }))
+  const startBatch = (requests: api.BatchRequest[]) =>
+    action(async () => {
+      await save(workflow)
+      await api.startImageBatch(requests)
+      setBatchRevision((value) => value + 1)
+    })
   const fileInput = useRef<HTMLInputElement>(null)
   const library =
     filter === 'all'
@@ -198,6 +218,8 @@ export function ImageStudio({
               </div>
               {generator === 'cloud' ? (
                 <CloudImageForm
+                  batchTargets={batchTargets}
+                  onBatch={startBatch}
                   key={`${workflow.id}/${context.artifactId}/${context.shotId}`}
                   context={context}
                   shot={selected.shot}
@@ -216,6 +238,8 @@ export function ImageStudio({
                 />
               ) : (
                 <ImageForm
+                  batchTargets={batchTargets}
+                  onBatch={startBatch}
                   key={`${workflow.id}/${context.artifactId}/${context.shotId}`}
                   context={context}
                   shot={selected.shot}
@@ -528,6 +552,12 @@ export function ImageStudio({
           </details>
         </div>
       </div>
+      <ImageBatchHistory
+        workflowId={workflow.id}
+        revision={batchRevision}
+        onError={media.setError}
+        onRefresh={media.refresh}
+      />
       {pending && (
         <SelectionDialog onClose={() => setPending(null)}>
           <h3 id="frame-selection-title">确认镜头首帧</h3>
@@ -613,6 +643,8 @@ function ImageForm({
   onError,
   roleReferences,
   assets,
+  batchTargets,
+  onBatch,
 }: {
   context: api.ShotContext
   shot: Shot
@@ -621,6 +653,8 @@ function ImageForm({
   onError: (message: string) => void
   roleReferences: api.RoleReference[]
   assets: api.ImageAsset[]
+  batchTargets: BatchTarget[]
+  onBatch: (requests: api.BatchRequest[]) => Promise<void>
 }) {
   const [request, setRequest] = useState<api.ImageRequest>(() => ({
     context,
@@ -737,6 +771,16 @@ function ImageForm({
     } catch (error) {
       onError(errorMessage(error))
     }
+  }
+  const batchRequest: api.ImageRequest = {
+    ...request,
+    checkpoint:
+      mode === 'flux' ? 'flux1-dev-fp8.safetensors' : request.checkpoint,
+    negative: mode === 'flux' ? '' : request.negative,
+    preset: mode === 'flux' ? 'flux1-dev-fp8' : 'sd',
+    workflowJson: mode === 'custom' ? request.workflowJson : '',
+    outputNodeId: mode === 'custom' ? request.outputNodeId : '',
+    referenceVersionId: mode === 'custom' ? request.referenceVersionId : null,
   }
   return (
     <form
@@ -991,6 +1035,12 @@ function ImageForm({
           使用本机算力。相同参数与种子通常得到相同画面；探索新版本时可换种子。停止等待不会中断
           ComfyUI。
         </p>
+        <BatchSubmit
+          targets={batchTargets}
+          request={{ kind: 'comfy', request: batchRequest }}
+          disabled={disabled || !loaded || testing}
+          onStart={onBatch}
+        />
       </fieldset>
     </form>
   )

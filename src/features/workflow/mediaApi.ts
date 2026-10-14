@@ -100,6 +100,39 @@ export interface CloudImageJob {
   assetIds: string[]
   estimatedCostMicroUsd: number
 }
+export type BatchRequest =
+  | { kind: 'cloud'; request: CloudImageRequest }
+  | { kind: 'comfy'; request: ImageRequest }
+export interface ImageBatch {
+  id: string
+  workflowId: string
+  status: string
+  createdAt: number
+  updatedAt: number
+  items: {
+    request: BatchRequest
+    jobId: string
+    previousJobIds: string[]
+    status: string
+    message: string
+    assetIds: string[]
+  }[]
+}
+export const startImageBatch = (
+  requests: BatchRequest[],
+): Promise<ImageBatch> => invoke('start_image_batch', { requests })
+export const listImageBatches = (workflowId: string): Promise<ImageBatch[]> =>
+  isDesktop ? invoke('list_image_batches', { workflowId }) : Promise.resolve([])
+export const pauseImageBatch = (id: string): Promise<void> =>
+  invoke('pause_image_batch', { id })
+export const resumeImageBatch = (id: string): Promise<void> =>
+  invoke('resume_image_batch', { id })
+export const retryImageBatchItem = (id: string, index: number): Promise<void> =>
+  invoke('retry_image_batch_item', { id, index })
+export const skipUnknownImageBatchItem = (
+  id: string,
+  index: number,
+): Promise<void> => invoke('skip_unknown_image_batch_item', { id, index })
 export interface MediaBudget {
   limitMicroUsd: number | null
   reservedMicroUsd: number

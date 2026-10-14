@@ -50,7 +50,7 @@ pub struct CloudImageJob {
     pub estimated_cost_micro_usd: u64,
 }
 
-fn validate(request: &CloudImageRequest) -> AppResult<()> {
+pub(super) fn validate(request: &CloudImageRequest) -> AppResult<()> {
     api_base(&request.base_url)?;
     if ![
         "gpt-image-2",
@@ -231,6 +231,15 @@ pub fn start_cloud_image_job(
     state: tauri::State<WorkflowState>,
     request: CloudImageRequest,
 ) -> AppResult<CloudImageJob> {
+    start_with_id(app, state, request, uid())
+}
+
+pub(super) fn start_with_id(
+    app: tauri::AppHandle,
+    state: tauri::State<WorkflowState>,
+    request: CloudImageRequest,
+    id: String,
+) -> AppResult<CloudImageJob> {
     validate(&request)?;
     validate_context(&state, &request.context)?;
     if let Some(version_id) = &request.reference_version_id {
@@ -259,7 +268,7 @@ pub fn start_cloud_image_job(
     }
     let estimate = request.budget_reservation_micro_usd;
     let job = CloudImageJob {
-        id: uid(),
+        id,
         request,
         status: "submitting".into(),
         message: "正在提交云端图片请求".into(),
