@@ -146,6 +146,13 @@ export interface VideoAsset {
   bytes: number
   createdAt: number
   fileName: string
+  metadata: {
+    durationMs: number
+    width: number
+    height: number
+    fps: number
+    codec: string
+  } | null
 }
 export interface SelectedVideo {
   context: ShotContext
@@ -394,7 +401,7 @@ export const pauseVideoJob = (id: string): Promise<void> =>
 export const listVideoAssets = (workflowId: string): Promise<VideoAsset[]> =>
   isDesktop ? invoke('list_video_assets', { workflowId }) : Promise.resolve([])
 export const videoPreview = (versionId: string): Promise<string> =>
-  invoke('video_preview', { versionId })
+  invoke<string>('video_preview', { versionId }).then(convertFileSrc)
 export const listSelectedVideos = (
   workflowId: string,
 ): Promise<SelectedVideo[]> =>

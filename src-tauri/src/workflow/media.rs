@@ -10,6 +10,7 @@ pub mod speech;
 pub mod subtitles;
 pub mod transcription;
 pub mod video;
+pub mod video_metadata;
 pub mod waveform;
 use super::{types::*, WorkflowState};
 use base64::{engine::general_purpose::STANDARD, Engine};

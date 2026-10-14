@@ -20,7 +20,6 @@ use tokio::io::AsyncWriteExt;
 
 const MODEL: &str = "wan2.7-i2v-2026-04-25";
 const MAX_VIDEO_BYTES: u64 = 256 * 1024 * 1024;
-const MAX_PREVIEW_BYTES: u64 = 64 * 1024 * 1024;
 const API_LIMIT: usize = 128 * 1024;
 
 pub struct ActiveVideo {
@@ -66,6 +65,8 @@ pub struct VideoAsset {
     pub bytes: u64,
     pub created_at: u64,
     pub file_name: String,
+    #[serde(default)]
+    pub metadata: Option<video_metadata::VideoMetadata>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -113,8 +114,8 @@ pub fn collect_video_clips(
                         "assetId": entry.asset_id,
                         "versionId": entry.version_id,
                         "firstFrameVersionId": entry.first_frame_version_id,
-                        "duration": entry.duration,
-                        "resolution": entry.resolution,
+                        "duration": entry.metadata.as_ref().map(|m| m.duration_ms as f64 / 1000.0).unwrap_or(entry.duration as f64),
+                        "resolution": entry.metadata.as_ref().map(|m| format!("{}x{}", m.width, m.height)).unwrap_or(entry.resolution.clone()),
                     }));
                     continue;
                 }
@@ -402,28 +403,44 @@ pub fn select_video(
 }
 #[tauri::command]
 pub async fn video_preview(app: tauri::AppHandle, version_id: String) -> AppResult<String> {
-    tauri::async_runtime::spawn_blocking(move || {
+    let (mut entry, path) = {
         let state = app.state::<WorkflowState>();
         let entry = load_asset(&state, &version_id)?;
-        if entry.bytes > MAX_PREVIEW_BYTES {
-            return Err("片段超过 64 MB，当前预览上限无法播放".into());
+        let root = state
+            .directory
+            .join("assets")
+            .canonicalize()
+            .map_err(|_| "视频文件已丢失")?;
+        let path = root
+            .join(&entry.file_name)
+            .canonicalize()
+            .map_err(|_| "视频文件已丢失")?;
+        if !path.starts_with(&root) || !path.is_file() {
+            return Err("视频文件路径无效".into());
         }
-        let path = state.directory.join("assets").join(entry.file_name);
-        if std::fs::metadata(&path)
-            .map_err(|_| "视频文件已丢失")?
-            .len()
-            > MAX_PREVIEW_BYTES
-        {
-            return Err("片段超过 64 MB 预览上限".into());
-        }
-        let bytes = std::fs::read(path).map_err(|_| "视频文件已丢失")?;
-        if bytes.len() as u64 > MAX_PREVIEW_BYTES {
-            return Err("片段超过 64 MB，当前预览上限无法播放".into());
-        }
-        Ok(format!("data:video/mp4;base64,{}", STANDARD.encode(bytes)))
-    })
-    .await
-    .map_err(|_| "无法读取视频预览")?
+        (entry, path)
+    };
+    let metadata = video_metadata::probe(&path).await?;
+    if metadata.codec != "h264" {
+        return Err("当前播放器支持 H.264 MP4，请转换编码后导入".into());
+    }
+    entry.metadata = Some(metadata);
+    let state = app.state::<WorkflowState>();
+    state
+        .store
+        .db()?
+        .execute(
+            "UPDATE video_assets SET json=?1 WHERE id=?2",
+            params![
+                serde_json::to_string(&entry).map_err(|e| e.to_string())?,
+                version_id
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    app.asset_protocol_scope()
+        .allow_file(&path)
+        .map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
 }
 fn reserve(state: &WorkflowState, job: &VideoJob) -> AppResult<Arc<AtomicBool>> {
     let mut active = state.video_active.lock().map_err(|_| "视频任务锁不可用")?;
@@ -870,6 +887,13 @@ async fn download(
         let _ = tokio::fs::remove_file(&temporary).await;
         return Err(error);
     }
+    let metadata = match video_metadata::probe(&temporary).await {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            let _ = tokio::fs::remove_file(&temporary).await;
+            return Err(error);
+        }
+    };
     tokio::fs::rename(&temporary, directory.join(&file_name))
         .await
         .map_err(|_| "无法保存视频原件")?;
@@ -889,6 +913,7 @@ async fn download(
         bytes: length,
         created_at: now(),
         file_name,
+        metadata: Some(metadata),
     };
     save_asset(state, &entry)?;
     Ok(entry)

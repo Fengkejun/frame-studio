@@ -247,7 +247,10 @@ export function TimelineStudio({
                         {
                           versionId: asset.versionId,
                           trimStartMs: 0,
-                          trimEndMs: asset.duration * 1000,
+                          trimEndMs: Math.min(
+                            60000,
+                            asset.metadata?.durationMs ?? asset.duration * 1000,
+                          ),
                           caption: shot?.dialogue ?? '',
                         },
                       ],

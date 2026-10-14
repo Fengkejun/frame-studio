@@ -294,9 +294,18 @@ pub fn validate_output(kind: &NodeKind, value: &Value) -> AppResult<()> {
                                 && required_text(clip, "versionId")
                                 && required_text(clip, "firstFrameVersionId")
                                 && clip["duration"]
-                                    .as_u64()
-                                    .is_some_and(|n| (2..=15).contains(&n))
-                                && matches!(clip["resolution"].as_str(), Some("720P" | "1080P"))
+                                    .as_f64()
+                                    .is_some_and(|n| n.is_finite() && (0.1..=3600.0).contains(&n))
+                                && clip["resolution"].as_str().is_some_and(|resolution| {
+                                    matches!(resolution, "720P" | "1080P")
+                                        || resolution.split_once('x').is_some_and(|(w, h)| {
+                                            [w, h].iter().all(|value| {
+                                                value
+                                                    .parse::<u32>()
+                                                    .is_ok_and(|n| (1..=8192).contains(&n))
+                                            })
+                                        })
+                                })
                                 && ids.insert(clip["shotId"].as_str().unwrap_or_default())
                         })
                 })

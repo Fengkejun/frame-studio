@@ -1115,6 +1115,7 @@ mod tests {
             bytes: 3,
             created_at: now(),
             file_name: format!("{video_id}.mp4"),
+            metadata: None,
         };
         let audio = AudioAsset {
             version_id: audio_id.clone(),

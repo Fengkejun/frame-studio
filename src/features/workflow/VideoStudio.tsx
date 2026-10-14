@@ -217,11 +217,18 @@ export function VideoStudio({
                   />
                   <div className="asset-card-info">
                     <strong>
-                      {asset.context.shotId} · {asset.duration} 秒
+                      {asset.context.shotId} ·{' '}
+                      {(asset.metadata
+                        ? asset.metadata.durationMs / 1000
+                        : asset.duration
+                      ).toFixed(2)}{' '}
+                      秒
                     </strong>
                     <small>
-                      {asset.resolution} ·{' '}
-                      {(asset.bytes / 1024 / 1024).toFixed(1)} MB
+                      {asset.metadata
+                        ? `${asset.metadata.width} × ${asset.metadata.height} · ${asset.metadata.fps.toFixed(2)} fps`
+                        : `${asset.resolution}（提交参数）`}{' '}
+                      · {(asset.bytes / 1024 / 1024).toFixed(1)} MB
                     </small>
                     <small>
                       版本 {asset.versionId.slice(0, 8)} ·{' '}
@@ -280,6 +287,9 @@ export function VideoStudio({
                 <video
                   controls
                   playsInline
+                  onError={() =>
+                    media.setError('片段播放失败，请检查视频编码或文件完整性。')
+                  }
                   src={preview.data}
                   aria-label="镜头视频预览"
                 />

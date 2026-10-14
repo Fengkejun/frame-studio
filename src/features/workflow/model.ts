@@ -88,8 +88,15 @@ export const outputSchemas = {
           assetId: required,
           versionId: required,
           firstFrameVersionId: required,
-          duration: z.number().int().min(2).max(15),
-          resolution: z.enum(['720P', '1080P']),
+          duration: z.number().min(0.1).max(3600),
+          resolution: z
+            .string()
+            .refine(
+              (value) =>
+                ['720P', '1080P'].includes(value) ||
+                (/^[1-9]\d{0,3}x[1-9]\d{0,3}$/.test(value) &&
+                  value.split('x').every((part) => Number(part) <= 8192)),
+            ),
         }),
       )
       .min(1)

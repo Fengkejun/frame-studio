@@ -191,7 +191,7 @@ export async function testVideoMedia(page, root, fixture) {
   await cards.first().getByRole('button', { name: '播放片段' }).click()
   await expect(page.getByLabel('镜头视频预览')).toHaveAttribute(
     'src',
-    /^data:video\/mp4;base64,/,
+    /^(http:\/\/asset\.localhost\/|asset:)/,
   )
   const video = page.getByLabel('镜头视频预览')
   await expect
