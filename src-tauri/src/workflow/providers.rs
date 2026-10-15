@@ -197,7 +197,7 @@ async fn response_json(mut response: reqwest::Response) -> AppResult<Value> {
     if !response.status().is_success() {
         let status = response.status().as_u16();
         return Err(match status {
-            401 | 403 => "认证失败，请检查 API Key 与模型权限".into(),
+            401 | 403 => format!("认证失败（HTTP {status}），请检查 API Key 与模型权限"),
             429 => "服务限流或额度不足，请稍后手动重试".into(),
             300..=399 => "服务发生重定向，请填写最终 API 地址".into(),
             _ => format!("模型服务返回 HTTP {status}，请检查服务地址与模型配置"),
@@ -217,6 +217,7 @@ async fn response_json(mut response: reqwest::Response) -> AppResult<Value> {
     serde_json::from_slice(&data).map_err(|_| "服务返回的内容不是有效 JSON".into())
 }
 pub async fn test(p: &Provider) -> AppResult<String> {
+    let started = std::time::Instant::now();
     validate_provider(p)?;
     let suffix = if p.kind == "ollama" { "tags" } else { "models" };
     let mut request = client(15)?.get(endpoint(p, suffix));
@@ -247,11 +248,59 @@ pub async fn test(p: &Provider) -> AppResult<String> {
     let found = models
         .iter()
         .any(|m| *m == p.model || (p.kind == "ollama" && *m == format!("{}:latest", p.model)));
-    Ok(if found {
+    let message: String = if found {
         "连接正常，已找到配置的模型。此检查未发起生成请求。".into()
     } else {
         "服务可连接，但列表未包含该模型；请核对模型 ID 或服务商文档。".into()
-    })
+    };
+    Ok(format!(
+        "{message} 耗时 {} 毫秒。",
+        started.elapsed().as_millis()
+    ))
+}
+
+pub async fn probe(p: &Provider) -> AppResult<String> {
+    validate_provider(p)?;
+    let started = std::time::Instant::now();
+    let messages = json!([{"role":"user","content":"Reply with OK only."}]);
+    let (suffix, body) = if p.kind == "ollama" {
+        (
+            "chat",
+            json!({"model":p.model,"messages":messages,"stream":false,"options":{"num_predict":16}}),
+        )
+    } else {
+        (
+            "chat/completions",
+            json!({"model":p.model,"messages":messages,"stream":false,"max_tokens":32}),
+        )
+    };
+    let mut request = client(90)?.post(endpoint(p, suffix)).json(&body);
+    if let Some(key) = get_key(p)? {
+        request = request.bearer_auth(key);
+    }
+    let response = request.send().await.map_err(|error| {
+        if error.is_timeout() {
+            "模型回复测试超时；本地模型首次加载可能较慢。未自动重试，请核实服务端记录。"
+        } else {
+            "模型回复测试连接中断；请核实地址、网络和服务端记录。未自动重试。"
+        }
+    })?;
+    let data = response_json(response).await?;
+    let content = if p.kind == "ollama" {
+        data.pointer("/message/content")
+    } else {
+        data.pointer("/choices/0/message/content")
+    };
+    if !content
+        .and_then(Value::as_str)
+        .is_some_and(|text| !text.trim().is_empty())
+    {
+        return Err("服务未返回有效文本，请核对模型是否支持聊天协议；未自动重试。".into());
+    }
+    Ok(format!(
+        "模型回复验证通过，耗时 {} 毫秒。本次发送了极短测试文本。",
+        started.elapsed().as_millis()
+    ))
 }
 
 pub fn system_prompt(node: &WorkflowNode) -> String {
@@ -373,6 +422,79 @@ pub async fn generate(p: &Provider, node: &WorkflowNode, input: &Value) -> AppRe
 mod tests {
     use super::*;
     use std::io::{Read, Write};
+
+    fn reply_fixture(status: &str, body: &str) -> (Provider, std::thread::JoinHandle<()>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let status = status.to_owned();
+        let body = body.to_owned();
+        let server = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut bytes = Vec::new();
+            loop {
+                let mut chunk = [0; 4096];
+                let count = stream.read(&mut chunk).unwrap();
+                assert!(count > 0);
+                bytes.extend_from_slice(&chunk[..count]);
+                if let Some(end) = bytes.windows(4).position(|s| s == b"\r\n\r\n") {
+                    let headers = String::from_utf8_lossy(&bytes[..end]);
+                    let length: usize = headers
+                        .lines()
+                        .find_map(|line| {
+                            let (name, value) = line.split_once(':')?;
+                            name.eq_ignore_ascii_case("content-length")
+                                .then(|| value.trim().parse().unwrap())
+                        })
+                        .unwrap();
+                    if bytes.len() < end + 4 + length {
+                        continue;
+                    }
+                    assert!(headers.starts_with("POST /v1/chat/completions "));
+                    let request: Value = serde_json::from_slice(&bytes[end + 4..]).unwrap();
+                    assert_eq!(request["model"], "fixture-chat");
+                    assert_eq!(request["stream"], false);
+                    assert_eq!(request["max_tokens"], 32);
+                    assert_eq!(request["messages"].as_array().unwrap().len(), 1);
+                    break;
+                }
+            }
+            write!(stream, "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+        });
+        (
+            Provider {
+                id: "probe-fixture".into(),
+                name: "probe".into(),
+                kind: "openai".into(),
+                base_url: format!("http://127.0.0.1:{port}/v1"),
+                model: "fixture-chat".into(),
+                has_key: false,
+            },
+            server,
+        )
+    }
+
+    #[tokio::test]
+    async fn reply_probe_requires_actual_text_from_configured_chat_model() {
+        let (provider, server) =
+            reply_fixture("200 OK", r#"{"choices":[{"message":{"content":"OK"}}]}"#);
+        assert!(probe(&provider).await.unwrap().contains("模型回复验证通过"));
+        server.join().unwrap();
+        for (status, body) in [
+            ("200 OK", r#"{"choices":[]}"#),
+            ("200 OK", r#"{"choices":[{"message":{"content":"  "}}]}"#),
+            (
+                "401 Unauthorized",
+                r#"{"error":{"message":"bad credential"}}"#,
+            ),
+        ] {
+            let (provider, server) = reply_fixture(status, body);
+            assert!(probe(&provider).await.is_err());
+            server.join().unwrap();
+        }
+    }
 
     #[test]
     fn ollama_schema_constrains_requested_storyboard_count() {

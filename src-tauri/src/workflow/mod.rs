@@ -203,8 +203,14 @@ pub fn remove_provider(state: tauri::State<WorkflowState>, id: String) -> AppRes
 pub async fn test_provider(
     state: tauri::State<'_, WorkflowState>,
     id: String,
+    mode: Option<String>,
 ) -> AppResult<String> {
-    providers::test(&state.store.provider(&id)?).await
+    let provider = state.store.provider(&id)?;
+    match mode.as_deref().unwrap_or("catalog") {
+        "catalog" => providers::test(&provider).await,
+        "reply" => providers::probe(&provider).await,
+        _ => Err("连接检测方式无效".into()),
+    }
 }
 #[tauri::command]
 pub fn list_runs(

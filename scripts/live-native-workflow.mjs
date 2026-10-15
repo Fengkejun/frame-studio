@@ -8,6 +8,7 @@ import { chromium, expect } from '@playwright/test'
 import { testLiveWorkflow } from './live-workflow-smoke.mjs'
 import { testLiveVideoRelay } from './live-video-relay-smoke.mjs'
 import { testLiveFilm } from './live-film-smoke.mjs'
+import { testConnections } from './connections-smoke.mjs'
 
 if (process.platform !== 'win32') {
   throw new Error('The live native workflow check requires Windows / WebView2.')
@@ -15,7 +16,8 @@ if (process.platform !== 'win32') {
 if (
   process.env.FRAME_STUDIO_LIVE_WORKFLOW !== '1' &&
   process.env.FRAME_STUDIO_LIVE_VIDEO !== '1' &&
-  !process.env.FRAME_STUDIO_LIVE_FILM_REPORTS
+  !process.env.FRAME_STUDIO_LIVE_FILM_REPORTS &&
+  process.env.FRAME_STUDIO_CONNECTION_SMOKE !== '1'
 ) {
   throw new Error(
     'Set FRAME_STUDIO_LIVE_WORKFLOW=1 or FRAME_STUDIO_LIVE_VIDEO=1 to opt in.',
@@ -93,6 +95,7 @@ try {
     await expect(page.getByText('已保存到本机', { exact: true })).toBeVisible()
   }
   await testLiveWorkflow(page)
+  await testConnections(page)
   await testLiveVideoRelay(page, root, profile)
   await testLiveFilm(page, root, profile)
 } catch (error) {

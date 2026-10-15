@@ -55,8 +55,10 @@ export const saveProvider = (
   invoke('save_provider', { provider, apiKey: apiKey.trim() || null, clearKey })
 export const removeProvider = (id: string): Promise<void> =>
   invoke('remove_provider', { id })
-export const testProvider = (id: string): Promise<string> =>
-  invoke('test_provider', { id })
+export const testProvider = (
+  id: string,
+  mode: 'catalog' | 'reply' = 'catalog',
+): Promise<string> => invoke('test_provider', { id, mode })
 export interface OllamaModel {
   name: string
   size: number

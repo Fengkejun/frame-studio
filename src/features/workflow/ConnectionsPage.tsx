@@ -26,6 +26,7 @@ export function ConnectionsPage({
   const [key, setKey] = useState('')
   const [clearKey, setClearKey] = useState(false)
   const [pending, setPending] = useState(false)
+  const [testing, setTesting] = useState<'catalog' | 'reply' | null>(null)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [deleting, setDeleting] = useState(false)
@@ -122,20 +123,30 @@ export function ConnectionsPage({
       setPulling(false)
     }
   }
+  async function persist() {
+    const saved = await api.saveProvider(
+      {
+        ...form,
+        name: form.name.trim(),
+        baseUrl: form.baseUrl.trim().replace(/\/+$/, ''),
+        model: form.model.trim(),
+      },
+      key,
+      clearKey,
+    )
+    setProviders((items) => [...items.filter((p) => p.id !== saved.id), saved])
+    setForm(saved)
+    setKey('')
+    setClearKey(false)
+    onChanged()
+    return saved
+  }
   async function save() {
     setPending(true)
     setError('')
     setMessage('')
     try {
-      const saved = await api.saveProvider(form, key, clearKey)
-      setProviders((items) => [
-        ...items.filter((p) => p.id !== saved.id),
-        saved,
-      ])
-      setForm(saved)
-      setKey('')
-      setClearKey(false)
-      onChanged()
+      await persist()
       setMessage('连接已保存。可测试连接，再到画布为 Agent 选择模型。')
     } catch (e) {
       setError(api.errorMessage(e))
@@ -143,16 +154,20 @@ export function ConnectionsPage({
       setPending(false)
     }
   }
-  async function test() {
+  async function test(mode: 'catalog' | 'reply') {
     setPending(true)
+    setTesting(mode)
     setError('')
     setMessage('')
     try {
-      setMessage(await api.testProvider(form.id))
+      const saved = !exists || dirty || key || clearKey ? await persist() : form
+      const result = await api.testProvider(saved.id, mode)
+      setMessage(`${result} 检测模型：${saved.model}；地址：${saved.baseUrl}`)
     } catch (e) {
       setError(api.errorMessage(e))
     } finally {
       setPending(false)
+      setTesting(null)
     }
   }
   async function remove() {
@@ -382,7 +397,8 @@ export function ConnectionsPage({
                 </label>
               )}
               <p className="field-hint">
-                密钥只存入系统凭据库，不会随工作流导出。连接测试读取模型列表，不发起生成。
+                密钥只存入系统凭据库，不会随工作流导出。检测前会保存当前配置。
+                「测试连接」只读取模型目录；「测试模型回复」会发送一条极短文本，可能产生少量费用。
               </p>
               <div className="form-actions">
                 <button className="button primary" type="submit">
@@ -391,10 +407,26 @@ export function ConnectionsPage({
                 <button
                   className="button secondary"
                   type="button"
-                  disabled={!exists || dirty || !!key || clearKey}
-                  onClick={() => void test()}
+                  disabled={
+                    !form.name.trim() ||
+                    !form.baseUrl.trim() ||
+                    !form.model.trim()
+                  }
+                  onClick={() => void test('catalog')}
                 >
-                  测试连接
+                  {testing === 'catalog' ? '检测连接中…' : '测试连接'}
+                </button>
+                <button
+                  className="button secondary"
+                  type="button"
+                  disabled={
+                    !form.name.trim() ||
+                    !form.baseUrl.trim() ||
+                    !form.model.trim()
+                  }
+                  onClick={() => void test('reply')}
+                >
+                  {testing === 'reply' ? '等待模型回复…' : '测试模型回复'}
                 </button>
                 {exists && (
                   <button
