@@ -80,6 +80,20 @@ pub(super) fn validate(settings: &Settings, request: &VideoRequest) -> AppResult
     Ok(())
 }
 
+pub(super) fn submitted_task_id(settings: &Settings, data: &Value) -> AppResult<String> {
+    let field = match settings.profile()?.protocol {
+        Protocol::RelayVideosV1 => "id",
+        Protocol::RelayContentV2 => "task_id",
+        Protocol::Wan => return Err("视频协议与当前服务不匹配".into()),
+    };
+    let id = data
+        .get(field)
+        .and_then(Value::as_str)
+        .ok_or("响应未返回任务 ID，请核对服务商用量")?;
+    super::valid_task_id(id)?;
+    Ok(id.to_owned())
+}
+
 pub(super) fn body(
     settings: &Settings,
     request: &VideoRequest,
@@ -277,6 +291,11 @@ mod tests {
     fn endpoints_and_downloads_keep_credentials_on_the_selected_service() {
         let settings = settings();
         assert_eq!(
+            submitted_task_id(&settings, &json!({"task_id":"minimax-task"})).unwrap(),
+            "minimax-task"
+        );
+        assert!(submitted_task_id(&settings, &json!({"id":"wrong-protocol"})).is_err());
+        assert_eq!(
             endpoint(&settings, None).unwrap().as_str(),
             "https://api.wulusai.com/v2/video_generation"
         );
@@ -331,6 +350,12 @@ mod tests {
     fn grok_frame_uses_json_reference_and_its_own_limits_and_endpoints() {
         let mut settings = settings();
         settings.model = "grok-imagine-video-1.5-lite".into();
+        assert_eq!(
+            submitted_task_id(&settings, &json!({"id":"grok-task"})).unwrap(),
+            "grok-task"
+        );
+        assert!(submitted_task_id(&settings, &json!({"task_id":"wrong-protocol"})).is_err());
+        assert!(submitted_task_id(&settings, &json!({"id":"../tasks"})).is_err());
         settings.mode = Mode::Frame;
         let mut request: VideoRequest = serde_json::from_value(json!({
             "context":{"workflowId":"w","nodeId":"n","artifactId":"a","shotId":"s"},

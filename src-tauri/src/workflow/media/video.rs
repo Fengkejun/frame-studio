@@ -916,27 +916,16 @@ async fn execute(
                     .collect::<String>()
             ));
         }
-        let task_id = (if job.request.wulusai.is_some() {
-            if job
-                .request
-                .wulusai
-                .as_ref()
-                .ok_or("视频服务配置丢失")?
-                .profile()?
-                .protocol
-                == models::Protocol::RelayVideosV1
-            {
-                data.get("id")
-            } else {
-                data.get("task_id")
-            }
+        let task_id = if let Some(settings) = &job.request.wulusai {
+            wulusai::submitted_task_id(settings, &data)?
         } else {
             data.pointer("/output/task_id")
-        })
-        .and_then(Value::as_str)
-        .ok_or("提交响应缺少任务 ID；结果未知，请核对服务商用量")?;
-        service_url(&job.request, Some(task_id))?;
-        job.task_id = Some(task_id.to_owned());
+                .and_then(Value::as_str)
+                .ok_or("提交响应缺少任务 ID；结果未知，请核对服务商用量")?
+                .to_owned()
+        };
+        service_url(&job.request, Some(&task_id))?;
+        job.task_id = Some(task_id);
         job.status = "queued".into();
         job.message = "远程任务已创建，正在等待结果".into();
         job.updated_at = now();

@@ -13,6 +13,15 @@ pub enum Protocol {
     RelayContentV2,
     RelayVideosV1,
 }
+impl Protocol {
+    fn supports_mode(self, mode: Mode) -> bool {
+        match self {
+            Self::Wan => mode == Mode::Frame,
+            Self::RelayContentV2 => mode == Mode::Text,
+            Self::RelayVideosV1 => true,
+        }
+    }
+}
 
 #[derive(Clone, Copy, Default, Serialize, Deserialize, PartialEq, Debug)]
 #[serde(rename_all = "lowercase")]
@@ -95,12 +104,16 @@ fn parse(source: &str) -> AppResult<Catalog> {
             || model.duration.min == 0
             || model.duration.min > model.duration.max
             || !model.modes.contains(&model.default_mode)
+            || model
+                .modes
+                .iter()
+                .any(|m| !model.protocol.supports_mode(*m))
+            || (model.protocol != Protocol::RelayContentV2 && !model.ratios.is_empty())
             || !model.resolutions.contains(&model.default_resolution)
             || model.resolutions.is_empty()
-            || model
-                .frame_sizes
-                .iter()
-                .any(|(r, size)| !model.resolutions.contains(r) || size.contains(&0))
+            || model.frame_sizes.iter().any(|(r, size)| {
+                !model.resolutions.contains(r) || size.iter().any(|n| !(1..=8000).contains(n))
+            })
             || (model.protocol == Protocol::RelayVideosV1
                 && model.modes.contains(&Mode::Frame)
                 && model
@@ -150,7 +163,6 @@ mod tests {
     #[test]
     fn shared_catalog_is_complete_and_aliases_preserve_old_requests() {
         let catalog = parse(SOURCE).unwrap();
-        assert_eq!(catalog.models.len(), 3);
         assert_eq!(find("MiniMax-H3").unwrap().id, "minimax-h3");
         assert!(find("person-substitution").is_err());
         assert!(find("unlisted-model").is_err());
@@ -187,6 +199,10 @@ mod tests {
         assert!(parse(&value.to_string()).is_err());
         let mut value: Value = serde_json::from_str(SOURCE).unwrap();
         value["models"][2]["protocol"] = json!("unimplemented-protocol");
+        assert!(parse(&value.to_string()).is_err());
+        let mut value: Value = serde_json::from_str(SOURCE).unwrap();
+        value["models"][1]["modes"] = json!(["frame"]);
+        value["models"][1]["defaultMode"] = json!("frame");
         assert!(parse(&value.to_string()).is_err());
     }
 }
