@@ -1,4 +1,4 @@
-//! Relay v2 MiniMax and v1 Grok protocols. Settings travel with a job; credentials stay in
+//! Relay content v2, videos v1 and Ark v3 protocols. Settings travel with a job; credentials stay in
 //! the system vault. This module only accepts documented generation modes.
 pub use super::models::Mode;
 use super::models::{Model, Protocol};
@@ -38,9 +38,9 @@ fn base(value: &str) -> AppResult<Url> {
         || url.password().is_some()
         || url.query().is_some()
         || url.fragment().is_some()
-        || !["", "/v1", "/v2"].contains(&url.path().trim_end_matches('/'))
+        || !["", "/v1", "/v2", "/api/v3"].contains(&url.path().trim_end_matches('/'))
     {
-        return Err("视频 API 根地址须为 HTTPS 服务根地址、/v1 或 /v2 地址".into());
+        return Err("视频 API 根地址须为 HTTPS 服务根地址、/v1、/v2 或 /api/v3 地址".into());
     }
     url.set_path("/");
     Ok(url)
@@ -49,19 +49,23 @@ fn base(value: &str) -> AppResult<Url> {
 pub(super) fn endpoint(settings: &Settings, task_id: Option<&str>) -> AppResult<Url> {
     let mut url = base(&settings.base_url)?;
     let protocol = settings.profile()?.protocol;
+    let path = match protocol {
+        Protocol::RelayVideosV1 => "/v1/videos",
+        Protocol::RelayContentV2 => {
+            if task_id.is_some() {
+                "/v2/query/video_generation"
+            } else {
+                "/v2/video_generation"
+            }
+        }
+        Protocol::RelayArkV3 => "/api/v3/contents/generations/tasks",
+        Protocol::Wan => return Err("视频协议与当前服务不匹配".into()),
+    };
     if let Some(id) = task_id {
         super::valid_task_id(id)?;
-        url.set_path(&if protocol == Protocol::RelayVideosV1 {
-            format!("/v1/videos/{id}")
-        } else {
-            format!("/v2/query/video_generation/{id}")
-        });
+        url.set_path(&format!("{path}/{id}"));
     } else {
-        url.set_path(if protocol == Protocol::RelayVideosV1 {
-            "/v1/videos"
-        } else {
-            "/v2/video_generation"
-        });
+        url.set_path(path);
     }
     Ok(url)
 }
@@ -74,6 +78,9 @@ pub(super) fn validate(settings: &Settings, request: &VideoRequest) -> AppResult
         settings.mode,
         settings.ratio.as_deref(),
     )?;
+    if settings.profile()?.prompt_required(settings.mode) && request.prompt.trim().is_empty() {
+        return Err("当前生成方式需要视频提示词".into());
+    }
     if !(10_000..=1_000_000_000).contains(&settings.budget_reservation_micro_usd) {
         return Err("请检查本次视频预算预留（0.01–1000 美元）".into());
     }
@@ -82,7 +89,7 @@ pub(super) fn validate(settings: &Settings, request: &VideoRequest) -> AppResult
 
 pub(super) fn submitted_task_id(settings: &Settings, data: &Value) -> AppResult<String> {
     let field = match settings.profile()?.protocol {
-        Protocol::RelayVideosV1 => "id",
+        Protocol::RelayVideosV1 | Protocol::RelayArkV3 => "id",
         Protocol::RelayContentV2 => "task_id",
         Protocol::Wan => return Err("视频协议与当前服务不匹配".into()),
     };
@@ -99,6 +106,7 @@ pub(super) fn body(
     request: &VideoRequest,
     reference: Option<&str>,
 ) -> AppResult<Value> {
+    validate(settings, request)?;
     let prompt = if request.negative_prompt.trim().is_empty() {
         request.prompt.clone()
     } else {
@@ -107,7 +115,22 @@ pub(super) fn body(
             request.prompt, request.negative_prompt
         )
     };
-    if settings.profile()?.protocol == Protocol::RelayVideosV1 {
+    let protocol = settings.profile()?.protocol;
+    if protocol == Protocol::RelayArkV3 {
+        let mut content = Vec::new();
+        if !prompt.trim().is_empty() {
+            content.push(json!({"type":"text", "text": prompt}));
+        }
+        if settings.mode == Mode::Frame {
+            content.push(json!({"type":"image_url", "image_url":{"url":reference.ok_or("图生视频缺少首帧图片")?}, "role":"first_frame"}));
+        }
+        let mut payload = json!({"model":settings.model, "content":content, "duration":request.duration, "resolution":request.resolution.to_ascii_lowercase()});
+        if let Some(ratio) = &settings.ratio {
+            payload["ratio"] = json!(ratio);
+        }
+        return Ok(payload);
+    }
+    if protocol == Protocol::RelayVideosV1 {
         let mut body = json!({"model":settings.model,"prompt":prompt,"seconds":request.duration.to_string(),"size":request.resolution.to_ascii_lowercase()});
         if settings.mode == Mode::Frame {
             // The relay's observed JSON schema uses a string, unlike OpenAI's object.
@@ -147,11 +170,15 @@ pub(super) fn output(data: &Value, expected_id: &str) -> AppResult<Value> {
         "expired" => "UNKNOWN",
         _ => return Err("Wulusai 视频状态暂未识别，可继续查询原任务".into()),
     };
-    let url = task
-        .pointer("/content/url")
-        .or_else(|| task.get("file_url"))
-        .or_else(|| task.pointer("/metadata/url"))
-        .filter(|value| value.as_str().is_some_and(|s| !s.is_empty()));
+    let url = [
+        task.pointer("/content/video_url"),
+        task.pointer("/content/url"),
+        task.get("file_url"),
+        task.pointer("/metadata/url"),
+    ]
+    .into_iter()
+    .flatten()
+    .find(|value| value.as_str().is_some_and(|s| !s.is_empty()));
     if status == "SUCCEEDED" && url.and_then(Value::as_str).is_none() {
         return Err("视频任务已完成但未返回下载地址，可继续查询原任务".into());
     }
@@ -419,5 +446,77 @@ mod tests {
             "video-test"
         )
         .is_err());
+    }
+
+    #[test]
+    fn sd_models_use_ark_fields_and_only_returned_download_addresses() {
+        let mut settings = settings();
+        settings.base_url = "https://api.wulusai.com/api/v3".into();
+        let mut request: VideoRequest = serde_json::from_value(json!({
+            "context":{"workflowId":"w","nodeId":"n","artifactId":"a","shotId":"s"},
+            "firstFrameVersionId":"frame","region":"singapore","prompt":"a red circle", "negativePrompt":"",
+            "duration":4,"resolution":"720P"
+        })).unwrap();
+        for model in ["sd2.0", "sd2.0-fast", "sd2.0-mini", "sd2.5"] {
+            settings.model = model.into();
+            assert!(validate(&settings, &request).is_ok());
+            assert_eq!(
+                body(&settings, &request, None).unwrap(),
+                json!({
+                    "model":model, "content":[{"type":"text","text":"a red circle"}], "duration":4,"resolution":"720p"
+                })
+            );
+            assert_eq!(
+                endpoint(&settings, None).unwrap().path(),
+                "/api/v3/contents/generations/tasks"
+            );
+            assert_eq!(
+                endpoint(&settings, Some("task_test")).unwrap().path(),
+                "/api/v3/contents/generations/tasks/task_test"
+            );
+            assert_eq!(
+                submitted_task_id(&settings, &json!({"id":"task_test"})).unwrap(),
+                "task_test"
+            );
+            request.duration = 3;
+            assert!(validate(&settings, &request).is_err());
+            request.duration = 16;
+            assert!(validate(&settings, &request).is_err());
+            request.duration = 4;
+            for resolution in ["480P", "720P", "1080P", "4K"] {
+                request.resolution = resolution.into();
+                assert!(validate(&settings, &request).is_ok());
+                assert_eq!(
+                    body(&settings, &request, None).unwrap()["resolution"],
+                    resolution.to_ascii_lowercase()
+                );
+            }
+            request.resolution = "720P".into();
+            assert!(parse_output(
+                &settings,
+                &json!({"id":"task_test","status":"succeeded"}),
+                "task_test"
+            )
+            .is_err());
+            assert_eq!(parse_output(&settings, &json!({"id":"task_test","status":"succeeded","content":{"video_url":"https://ai.wulusai.com/workflow/files/actual.mp4"},"file_url":null}), "task_test").unwrap()["video_url"], "https://ai.wulusai.com/workflow/files/actual.mp4");
+        }
+        settings.mode = Mode::Frame;
+        settings.ratio = Some("16:9".into());
+        assert!(validate(&settings, &request).is_err());
+        settings.ratio = None;
+        request.prompt.clear();
+        assert!(validate(&settings, &request).is_ok());
+        assert!(body(&settings, &request, None).is_err());
+        let payload = body(&settings, &request, Some("data:image/jpeg;base64,image")).unwrap();
+        assert_eq!(
+            payload,
+            json!({"model":"sd2.5", "duration":4,"resolution":"720p", "content":[
+                {"type":"image_url","image_url":{"url":"data:image/jpeg;base64,image"},"role":"first_frame"}
+            ]})
+        );
+        settings.ratio = Some("adaptive".into());
+        assert!(validate(&settings, &request).is_ok());
+        settings.mode = Mode::Text;
+        assert!(validate(&settings, &request).is_err());
     }
 }

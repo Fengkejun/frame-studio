@@ -12,13 +12,14 @@ pub enum Protocol {
     Wan,
     RelayContentV2,
     RelayVideosV1,
+    RelayArkV3,
 }
 impl Protocol {
     fn supports_mode(self, mode: Mode) -> bool {
         match self {
             Self::Wan => mode == Mode::Frame,
             Self::RelayContentV2 => mode == Mode::Text,
-            Self::RelayVideosV1 => true,
+            Self::RelayVideosV1 | Self::RelayArkV3 => true,
         }
     }
 }
@@ -52,8 +53,22 @@ pub struct Model {
     pub default_resolution: String,
     pub ratios: Vec<String>,
     pub frame_sizes: HashMap<String, [u32; 2]>,
+    #[serde(default)]
+    pub frame_ratios: Option<Vec<String>>,
+    #[serde(default)]
+    pub frame_prompt_optional: bool,
 }
 impl Model {
+    pub fn ratios_for(&self, mode: Mode) -> &[String] {
+        if mode == Mode::Frame {
+            self.frame_ratios.as_deref().unwrap_or(&self.ratios)
+        } else {
+            &self.ratios
+        }
+    }
+    pub fn prompt_required(&self, mode: Mode) -> bool {
+        mode != Mode::Frame || !self.frame_prompt_optional
+    }
     pub fn validate(
         &self,
         duration: u8,
@@ -64,7 +79,7 @@ impl Model {
         if !(self.duration.min..=self.duration.max).contains(&duration)
             || !self.resolutions.iter().any(|r| r == resolution)
             || !self.modes.contains(&mode)
-            || ratio.is_some_and(|r| !self.ratios.iter().any(|v| v == r))
+            || ratio.is_some_and(|r| !self.ratios_for(mode).iter().any(|v| v == r))
         {
             return Err(format!(
                 "请检查 {} 的生成方式、时长、分辨率和比例",
@@ -108,7 +123,16 @@ fn parse(source: &str) -> AppResult<Catalog> {
                 .modes
                 .iter()
                 .any(|m| !model.protocol.supports_mode(*m))
-            || (model.protocol != Protocol::RelayContentV2 && !model.ratios.is_empty())
+            || (!matches!(
+                model.protocol,
+                Protocol::RelayContentV2 | Protocol::RelayArkV3
+            ) && !model.ratios.is_empty())
+            || model
+                .frame_ratios
+                .as_ref()
+                .is_some_and(|ratios| ratios.iter().any(|r| !model.ratios.contains(r)))
+            || (model.frame_prompt_optional
+                && (model.protocol != Protocol::RelayArkV3 || !model.modes.contains(&Mode::Frame)))
             || !model.resolutions.contains(&model.default_resolution)
             || model.resolutions.is_empty()
             || model.frame_sizes.iter().any(|(r, size)| {

@@ -210,7 +210,7 @@ pub(super) fn validate_request(
         )?;
     }
     validate_context(state, &request.context)?;
-    if request.prompt.trim().is_empty()
+    if (request.wulusai.is_none() && request.prompt.trim().is_empty())
         || request.prompt.chars().count() > 5000
         || request.negative_prompt.chars().count() > 500
     {
