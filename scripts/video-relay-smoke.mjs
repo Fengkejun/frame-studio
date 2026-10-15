@@ -24,14 +24,25 @@ export async function createVideoRelayFixture(root) {
           data:
             mode === 'empty'
               ? []
-              : [{ id: 'minimax-h3' }, { id: 'grok-imagine-video-1.5-lite' }],
+              : [
+                  'minimax-h3',
+                  'grok-imagine-video-1.5-lite',
+                  'sd2.0',
+                  'sd2.0-fast',
+                  'sd2.0-mini',
+                  'sd2.5',
+                ].map((id) => ({ id })),
         }),
       )
       return
     }
     if (
       req.method === 'POST' &&
-      ['/v2/video_generation', '/v1/videos'].includes(url.pathname)
+      [
+        '/v2/video_generation',
+        '/v1/videos',
+        '/api/v3/contents/generations/tasks',
+      ].includes(url.pathname)
     ) {
       let raw = ''
       for await (const chunk of req) raw += chunk
@@ -58,7 +69,7 @@ export async function createVideoRelayFixture(root) {
       }
       res.end(
         JSON.stringify(
-          url.pathname === '/v1/videos'
+          url.pathname !== '/v2/video_generation'
             ? { id, status: 'queued' }
             : { task_id: id },
         ),
@@ -68,11 +79,28 @@ export async function createVideoRelayFixture(root) {
     if (
       req.method === 'GET' &&
       (url.pathname.startsWith('/v2/query/video_generation/') ||
-        url.pathname.startsWith('/v1/videos/'))
+        url.pathname.startsWith('/v1/videos/') ||
+        url.pathname.startsWith('/api/v3/contents/generations/tasks/'))
     ) {
       const id = url.pathname.split('/').at(-1)
       const count = (polls.get(id) ?? 0) + 1
       polls.set(id, count)
+      if (url.pathname.startsWith('/api/v3/contents/generations/tasks/')) {
+        res.end(
+          JSON.stringify({
+            id,
+            status: count === 1 ? 'running' : 'succeeded',
+            ...(count === 1 || mode === 'no-url'
+              ? {}
+              : {
+                  content: {
+                    video_url: `http://127.0.0.1:${server.address().port}/clip.mp4`,
+                  },
+                }),
+          }),
+        )
+        return
+      }
       if (url.pathname.startsWith('/v1/videos/')) {
         res.end(
           JSON.stringify({
@@ -330,9 +358,103 @@ export async function testVideoRelay(page, fixture) {
   expect(frameAssets.find((a) => a.jobId === grok.id).source).toBe(
     'wulusai-frame',
   )
+  const statusOf = async (id) =>
+    (await invoke(page, 'list_video_jobs', { workflowId: workflow.id })).find(
+      (j) => j.id === id,
+    )?.status
+  // Fund five extra local fixture jobs while retaining later tests' headroom.
+  const sdBudget = await invoke(page, 'get_media_budget', {
+    workflowId: workflow.id,
+  })
+  if (sdBudget.limitMicroUsd !== null)
+    await invoke(page, 'set_media_budget', {
+      workflowId: workflow.id,
+      limitMicroUsd:
+        sdBudget.limitMicroUsd +
+        5 * latest.request.wulusai.budgetReservationMicroUsd,
+    })
+  for (const model of ['sd2.0', 'sd2.0-fast', 'sd2.0-mini', 'sd2.5']) {
+    const job = await invoke(page, 'start_video_job', {
+      request: {
+        ...latest.request,
+        duration: 4,
+        resolution: '720P',
+        prompt: 'a red circle',
+        negativePrompt: '',
+        wulusai: {
+          ...latest.request.wulusai,
+          model,
+          mode: 'text',
+          ratio: null,
+        },
+      },
+    })
+    await expect
+      .poll(() => statusOf(job.id), { timeout: 20000 })
+      .toBe('succeeded')
+    expect(fixture.requests.at(-1).path).toBe(
+      '/api/v3/contents/generations/tasks',
+    )
+    expect(fixture.requests.at(-1).payload).toEqual({
+      model,
+      duration: 4,
+      resolution: '720p',
+      content: [{ type: 'text', text: 'a red circle' }],
+    })
+  }
+  const sdRequest = {
+    ...latest.request,
+    duration: 4,
+    resolution: '4K',
+    prompt: '',
+    negativePrompt: '',
+    wulusai: {
+      ...latest.request.wulusai,
+      model: 'sd2.5',
+      mode: 'frame',
+      ratio: null,
+    },
+  }
+  const beforeSdFrame = fixture.requests.length
+  const invalidRatio = await invoke(page, 'start_video_job', {
+    request: { ...sdRequest, wulusai: { ...sdRequest.wulusai, ratio: '16:9' } },
+  }).then(() => '', String)
+  expect(invalidRatio).toContain('请检查')
+  expect(fixture.requests).toHaveLength(beforeSdFrame)
+  fixture.setMode('no-url')
+  const sdFrame = await invoke(page, 'start_video_job', { request: sdRequest })
+  await expect
+    .poll(() => statusOf(sdFrame.id), { timeout: 20000 })
+    .toBe('paused')
+  const sdPayload = fixture.requests.at(-1).payload
+  expect(sdPayload).toMatchObject({
+    model: 'sd2.5',
+    duration: 4,
+    resolution: '4k',
+  })
+  expect(sdPayload.content).toHaveLength(1)
+  expect(sdPayload.content[0]).toMatchObject({
+    type: 'image_url',
+    role: 'first_frame',
+  })
+  expect(sdPayload.content[0].image_url.url).toMatch(
+    /^data:image\/jpeg;base64,/,
+  )
+  expect(Object.keys(sdPayload).sort()).toEqual([
+    'content',
+    'duration',
+    'model',
+    'resolution',
+  ])
+  fixture.setMode('success')
+  await invoke(page, 'resume_video_job', { id: sdFrame.id })
+  await expect
+    .poll(() => statusOf(sdFrame.id), { timeout: 20000 })
+    .toBe('succeeded')
+  expect(fixture.requests).toHaveLength(beforeSdFrame + 1)
   await invoke(page, 'clear_wulusai_video_key', { baseUrl: fixture.baseUrl })
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   console.log(
-    'PASS: MiniMax/Grok native protocols, resized JPEG first frame, empty model directory, budget, downloads, resume without resubmission, rejected and unknown outcomes. Local fixture only.',
+    'PASS: MiniMax/Grok and four SD models; native Ark text/first-frame, 4K, adaptive guard, exact fields, no invented download URL, original-task recovery, budgets and credential isolation. Local fixture only.',
   )
 }

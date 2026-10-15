@@ -4,19 +4,21 @@
 
 已适配模型统一登记在 `src/shared/video-models.json`。前端直接导入该文件，Rust 在编译时嵌入同一份内容；界面选项、后端参数校验和首帧尺寸均从中读取。
 
-当前登记万相 Wan 2.7、MiniMax-H3、Grok Imagine Video 1.5 Lite。其他模型需要先核对各自接口，再登记能力或扩展协议处理。中转站 `/v1/models` 的发现结果不直接成为已适配模型。
+当前登记万相 Wan 2.7、MiniMax-H3、Grok Imagine Video 1.5 Lite，以及 [SD 系列四个型号](sd-video-workflow.md)。其他模型需要先核对各自接口，再登记能力或扩展协议处理。中转站 `/v1/models` 的发现结果不直接成为已适配模型。
 
 ## 能力配置
 
-| 字段                                | 作用                                           |
-| ----------------------------------- | ---------------------------------------------- |
-| `id` / `name` / `aliases`           | 请求模型 ID、显示名称及旧 ID 别名              |
-| `protocol`                          | 选择已实现的协议处理                           |
-| `modes` / `defaultMode`             | 支持的文生/首帧模式及切换后的默认模式          |
-| `duration.min` / `duration.max`     | 单个模型的时长范围                             |
-| `resolutions` / `defaultResolution` | 分辨率列表及默认值                             |
-| `ratios`                            | 可提交的比例；空数组表示隐藏比例选项并省略参数 |
-| `frameSizes`                        | 按分辨率指定首帧编码尺寸；原始图片保留         |
+| 字段                                | 作用                                              |
+| ----------------------------------- | ------------------------------------------------- |
+| `id` / `name` / `aliases`           | 请求模型 ID、显示名称及旧 ID 别名                 |
+| `protocol`                          | 选择已实现的协议处理                              |
+| `modes` / `defaultMode`             | 支持的文生/首帧模式及切换后的默认模式             |
+| `duration.min` / `duration.max`     | 单个模型的时长范围                                |
+| `resolutions` / `defaultResolution` | 分辨率列表及默认值                                |
+| `ratios`                            | 可提交的比例；空数组表示隐藏比例选项并省略参数    |
+| `frameSizes`                        | 按分辨率指定首帧编码尺寸；原始图片保留            |
+| `frameRatios`                       | 可选，首帧模式单独的比例列表；未设置时沿用 ratios |
+| `framePromptOptional`               | 可选，首帧是否允许省略提示词；默认为 false        |
 
 切换模型后，界面显示支持的模式、时长和分辨率。不受新模型支持的分辨率回到该模型默认值，时长限制到对应范围，比例清空；模式使用新模型默认值。批量任务使用相同的能力规则。
 
@@ -27,6 +29,8 @@
 | `wan`              | 首帧图生视频       | 现有万相地区接口与异步任务查询                                   |
 | `relay-content-v2` | 文生视频           | `/v2/video_generation` 与 `/v2/query/video_generation/{task_id}` |
 | `relay-videos-v1`  | 文生、首帧图生视频 | `/v1/videos` 与 `/v1/videos/{id}`                                |
+
+SD 系列使用 `relay-ark-v3`，创建和查询路径为 `/api/v3/contents/generations/tasks` 及同路径加 `/{id}`。
 
 协议处理负责字段格式、远程 ID 提取、查询响应及下载地址解析。共用执行器负责任务持久化、预算、轮询、暂停恢复、下载入库和素材版本。
 
