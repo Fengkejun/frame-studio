@@ -111,7 +111,7 @@ export async function createVideoRelayFixture(root) {
                   ? 'unknown'
                   : 'in_progress'
                 : 'completed',
-            ...(count === 1
+            ...(count === 1 || mode === 'no-url'
               ? {}
               : {
                   metadata: {
@@ -392,14 +392,12 @@ export async function testVideoRelay(page, fixture) {
     await expect
       .poll(() => statusOf(job.id), { timeout: 20000 })
       .toBe('succeeded')
-    expect(fixture.requests.at(-1).path).toBe(
-      '/api/v3/contents/generations/tasks',
-    )
+    expect(fixture.requests.at(-1).path).toBe('/v1/videos')
     expect(fixture.requests.at(-1).payload).toEqual({
       model,
-      duration: 4,
-      resolution: '720p',
-      content: [{ type: 'text', text: 'a red circle' }],
+      seconds: '4',
+      size: '720p',
+      prompt: 'a red circle',
     })
   }
   const sdRequest = {
@@ -429,8 +427,8 @@ export async function testVideoRelay(page, fixture) {
   const sdPayload = fixture.requests.at(-1).payload
   expect(sdPayload).toMatchObject({
     model: 'sd2.5',
-    duration: 4,
-    resolution: '4k',
+    seconds: '4',
+    size: '4k',
   })
   expect(sdPayload.content).toHaveLength(1)
   expect(sdPayload.content[0]).toMatchObject({
@@ -442,9 +440,9 @@ export async function testVideoRelay(page, fixture) {
   )
   expect(Object.keys(sdPayload).sort()).toEqual([
     'content',
-    'duration',
     'model',
-    'resolution',
+    'seconds',
+    'size',
   ])
   fixture.setMode('success')
   await invoke(page, 'resume_video_job', { id: sdFrame.id })
@@ -455,6 +453,6 @@ export async function testVideoRelay(page, fixture) {
   await invoke(page, 'clear_wulusai_video_key', { baseUrl: fixture.baseUrl })
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   console.log(
-    'PASS: MiniMax/Grok and four SD models; native Ark text/first-frame, 4K, adaptive guard, exact fields, no invented download URL, original-task recovery, budgets and credential isolation. Local fixture only.',
+    'PASS: MiniMax/Grok and four SD models; native SD v1 text/first-frame, 4K, adaptive guard, exact fields, no invented download URL, original-task recovery, budgets and credential isolation. Local fixture only.',
   )
 }

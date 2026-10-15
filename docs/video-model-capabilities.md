@@ -30,7 +30,7 @@
 | `relay-content-v2` | 文生视频           | `/v2/video_generation` 与 `/v2/query/video_generation/{task_id}` |
 | `relay-videos-v1`  | 文生、首帧图生视频 | `/v1/videos` 与 `/v1/videos/{id}`                                |
 
-SD 系列使用 `relay-ark-v3`，创建和查询路径为 `/api/v3/contents/generations/tasks` 及同路径加 `/{id}`。
+SD 系列使用独立的 `relay-sd-videos-v1`，创建和查询路径为 `/v1/videos` 及同路径加 `/{id}`；文字使用 `prompt`，首帧使用 Ark 格式的 `content` 图片项。原 Ark 入口在真实测试中返回 HTTP 404，详见 [SD 接入记录](sd-video-workflow.md)。
 
 协议处理负责字段格式、远程 ID 提取、查询响应及下载地址解析。共用执行器负责任务持久化、预算、轮询、暂停恢复、下载入库和素材版本。
 

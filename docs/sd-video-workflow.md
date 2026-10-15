@@ -13,16 +13,16 @@
 
 先为镜头确认首帧。文生模式只发送文字，该首帧用于镜头关联和候选封面；首帧模式发送所选图片的 JPEG data URL，保留原图版本。下载后读取实际视频时长、尺寸和帧率。
 
-## Ark 入口
+## OpenAI 视频入口
 
-两条等价入口中，本次选择 Ark：
+使用中转站提供的 OpenAI 视频入口：
 
 ```text
-POST /api/v3/contents/generations/tasks
-GET  /api/v3/contents/generations/tasks/{id}
+POST /v1/videos
+GET  /v1/videos/{id}
 ```
 
-文生请求把文字放在 `content` 的 `text` 项，首帧请求增加：
+文生请求使用 `prompt`、字符串 `seconds` 和小写 `size`。首帧请求增加 `content` 数组，其中图片项为：
 
 ```json
 {
@@ -32,7 +32,9 @@ GET  /api/v3/contents/generations/tasks/{id}
 }
 ```
 
-请求包含整数 `duration` 和必填 `resolution`。比例未选时省略；不发送 tools、回调地址或其他未配置字段。完成状态为 `succeeded`，从响应的 `content.video_url` 读取成片地址；缺少地址时保留原任务供继续查询，不拼接下载地址，也不重新提交生成。
+比例未选时省略；不发送 tools、回调地址或其他未配置字段。完成状态为 `completed`，从响应的 `metadata.url` 读取成片地址；缺少地址时保留原任务供继续查询，不拼接下载地址，也不重新提交生成。
+
+2026-10-15 真实测试发现：`api.wulusai.com` 的 Ark 路径返回 HTTP 404，未创建远程任务。应用因此将 SD 能力登记为独立的 `relay-sd-videos-v1` 协议，使用用户提供的等价 `/v1/videos` 入口。它与 Grok 的 `input_reference` 字符串协议分开；SD 的已完成任务缺少地址时保持可查询状态，不套用 Grok 的下载地址规则。切换入口不会自动重试收费提交。
 
 路径、模型 ID、时长、分辨率及收费说明依据用户提供的中转站契约。图片对象、首帧 role 和 data URL 格式参考 [Ark 创建视频任务文档](https://docs.volcengine.com/docs/ark/create-video-generation-task-api?lang=zh)。上游文档不代表第三方中转站已通过真实调用验收。
 
@@ -48,6 +50,6 @@ Rust 测试覆盖四个模型的路径、字段、响应地址、时长/分辨�
 
 Windows 原生测试使用本机固定 MP4 协议服务，验证四个型号文生提交、SD 2.5 首帧、缺少成片地址后的原任务恢复及素材入库。4K 在此指请求参数验证，不代表真实服务已生成 4K 媒体。
 
-本次不调用付费 SD 生成。真实出片质量、输出尺寸、账户权限及账单需在真实服务验收中确认。
+下列本地测试记录来自最初的 Ark 适配阶段；真实服务验收进展另记于 [商业化推进计划](commercialization-plan.md)。本地测试通过不代表账户已开通 SD 权限，也不代表已经生成真实 4K 视频。
 
 2026-10-15：60 项 Rust 测试、13 项浏览器测试、类型/Lint/格式检查、Rust Clippy 和 Windows 完整原生回归通过。新增模拟任务按其预留金额补足隔离测试项目预算，生产预算校验保持启用。

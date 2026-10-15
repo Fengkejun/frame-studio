@@ -50,7 +50,7 @@ pub(super) fn endpoint(settings: &Settings, task_id: Option<&str>) -> AppResult<
     let mut url = base(&settings.base_url)?;
     let protocol = settings.profile()?.protocol;
     let path = match protocol {
-        Protocol::RelayVideosV1 => "/v1/videos",
+        Protocol::RelayVideosV1 | Protocol::RelaySdVideosV1 => "/v1/videos",
         Protocol::RelayContentV2 => {
             if task_id.is_some() {
                 "/v2/query/video_generation"
@@ -89,7 +89,7 @@ pub(super) fn validate(settings: &Settings, request: &VideoRequest) -> AppResult
 
 pub(super) fn submitted_task_id(settings: &Settings, data: &Value) -> AppResult<String> {
     let field = match settings.profile()?.protocol {
-        Protocol::RelayVideosV1 | Protocol::RelayArkV3 => "id",
+        Protocol::RelayVideosV1 | Protocol::RelayArkV3 | Protocol::RelaySdVideosV1 => "id",
         Protocol::RelayContentV2 => "task_id",
         Protocol::Wan => return Err("视频协议与当前服务不匹配".into()),
     };
@@ -116,6 +116,19 @@ pub(super) fn body(
         )
     };
     let protocol = settings.profile()?.protocol;
+    if protocol == Protocol::RelaySdVideosV1 {
+        let mut payload = json!({"model":settings.model,"seconds":request.duration.to_string(),"size":request.resolution.to_ascii_lowercase()});
+        if !prompt.trim().is_empty() {
+            payload["prompt"] = json!(prompt);
+        }
+        if settings.mode == Mode::Frame {
+            payload["content"] = json!([{"type":"image_url","image_url":{"url":reference.ok_or("图生视频缺少首帧图片")?},"role":"first_frame"}]);
+        }
+        if let Some(ratio) = &settings.ratio {
+            payload["ratio"] = json!(ratio);
+        }
+        return Ok(payload);
+    }
     if protocol == Protocol::RelayArkV3 {
         let mut content = Vec::new();
         if !prompt.trim().is_empty() {
@@ -449,7 +462,7 @@ mod tests {
     }
 
     #[test]
-    fn sd_models_use_ark_fields_and_only_returned_download_addresses() {
+    fn sd_models_use_available_v1_route_and_only_returned_download_addresses() {
         let mut settings = settings();
         settings.base_url = "https://api.wulusai.com/api/v3".into();
         let mut request: VideoRequest = serde_json::from_value(json!({
@@ -463,16 +476,13 @@ mod tests {
             assert_eq!(
                 body(&settings, &request, None).unwrap(),
                 json!({
-                    "model":model, "content":[{"type":"text","text":"a red circle"}], "duration":4,"resolution":"720p"
+                    "model":model, "prompt":"a red circle", "seconds":"4","size":"720p"
                 })
             );
-            assert_eq!(
-                endpoint(&settings, None).unwrap().path(),
-                "/api/v3/contents/generations/tasks"
-            );
+            assert_eq!(endpoint(&settings, None).unwrap().path(), "/v1/videos");
             assert_eq!(
                 endpoint(&settings, Some("task_test")).unwrap().path(),
-                "/api/v3/contents/generations/tasks/task_test"
+                "/v1/videos/task_test"
             );
             assert_eq!(
                 submitted_task_id(&settings, &json!({"id":"task_test"})).unwrap(),
@@ -487,7 +497,7 @@ mod tests {
                 request.resolution = resolution.into();
                 assert!(validate(&settings, &request).is_ok());
                 assert_eq!(
-                    body(&settings, &request, None).unwrap()["resolution"],
+                    body(&settings, &request, None).unwrap()["size"],
                     resolution.to_ascii_lowercase()
                 );
             }
@@ -510,7 +520,7 @@ mod tests {
         let payload = body(&settings, &request, Some("data:image/jpeg;base64,image")).unwrap();
         assert_eq!(
             payload,
-            json!({"model":"sd2.5", "duration":4,"resolution":"720p", "content":[
+            json!({"model":"sd2.5", "seconds":"4","size":"720p", "content":[
                 {"type":"image_url","image_url":{"url":"data:image/jpeg;base64,image"},"role":"first_frame"}
             ]})
         );

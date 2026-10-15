@@ -13,6 +13,7 @@ const modelSchema = z
       'relay-content-v2',
       'relay-videos-v1',
       'relay-ark-v3',
+      'relay-sd-videos-v1',
     ]),
     modes: z.array(mode).min(1),
     defaultMode: mode,

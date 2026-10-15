@@ -13,13 +13,14 @@ pub enum Protocol {
     RelayContentV2,
     RelayVideosV1,
     RelayArkV3,
+    RelaySdVideosV1,
 }
 impl Protocol {
     fn supports_mode(self, mode: Mode) -> bool {
         match self {
             Self::Wan => mode == Mode::Frame,
             Self::RelayContentV2 => mode == Mode::Text,
-            Self::RelayVideosV1 | Self::RelayArkV3 => true,
+            Self::RelayVideosV1 | Self::RelayArkV3 | Self::RelaySdVideosV1 => true,
         }
     }
 }
@@ -125,14 +126,17 @@ fn parse(source: &str) -> AppResult<Catalog> {
                 .any(|m| !model.protocol.supports_mode(*m))
             || (!matches!(
                 model.protocol,
-                Protocol::RelayContentV2 | Protocol::RelayArkV3
+                Protocol::RelayContentV2 | Protocol::RelayArkV3 | Protocol::RelaySdVideosV1
             ) && !model.ratios.is_empty())
             || model
                 .frame_ratios
                 .as_ref()
                 .is_some_and(|ratios| ratios.iter().any(|r| !model.ratios.contains(r)))
             || (model.frame_prompt_optional
-                && (model.protocol != Protocol::RelayArkV3 || !model.modes.contains(&Mode::Frame)))
+                && (!matches!(
+                    model.protocol,
+                    Protocol::RelayArkV3 | Protocol::RelaySdVideosV1
+                ) || !model.modes.contains(&Mode::Frame)))
             || !model.resolutions.contains(&model.default_resolution)
             || model.resolutions.is_empty()
             || model.frame_sizes.iter().any(|(r, size)| {
