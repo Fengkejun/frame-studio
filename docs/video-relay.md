@@ -42,6 +42,6 @@
 - `FRAME_STUDIO_LIVE_VIDEO_IMAGE`：本机首帧完整路径
 - `FRAME_STUDIO_LIVE_VIDEO_BASE_URL`：可选，默认上述中转站
 
-该测试只提交一次 1 秒、480P Grok 首帧请求，之后仅查询原任务，报告保存在 `artifacts/live-video-relay-*.json`；测试凭据在退出前清理。超时、失败或未知结果后，先检查报告和服务商任务记录，再决定下一步，避免直接重复运行造成额外扣费。
+该测试默认只提交一次 1 秒、480P Grok 首帧请求。可以用 `FRAME_STUDIO_LIVE_VIDEO_MODEL` 选择已登记的中转模型、`FRAME_STUDIO_LIVE_VIDEO_MODE` 选择 `text` 或 `frame`；新请求固定使用该模型最短时长和首项分辨率，SD 为 4 秒、480P。每次提交均可能收费。报告保存在 `artifacts/live-video-relay-*.json`，包含隔离配置目录和提交尝试时间；测试凭据在退出前清理。超时、失败或未知结果后，先检查报告和服务商任务记录，再决定下一步，避免直接重复运行造成额外扣费。恢复时使用报告记录的原目录和 `FRAME_STUDIO_LIVE_VIDEO_RESUME_REPORT`，只恢复已知任务 ID，不再次提交生成。
 
 恢复已有测试任务时设置 `FRAME_STUDIO_LIVE_VIDEO_RESUME_REPORT` 为原报告路径，并设置 `FRAME_STUDIO_LIVE_VIDEO_PROFILE` 为该次运行的原 `artifacts/live-workflow-*` 目录。恢复分支只调用查询恢复，不创建新任务；无需再提供首帧路径。

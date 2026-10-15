@@ -3,8 +3,8 @@ import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { expect } from '@playwright/test'
 
-// Billable, opt-in: one 1-second 480P first-frame request. Never resubmit on error.
-export async function testLiveVideoRelay(page, root) {
+// Billable, opt-in: exactly one request. Resume reports never submit another job.
+export async function testLiveVideoRelay(page, root, profile) {
   if (process.env.FRAME_STUDIO_LIVE_VIDEO !== '1') return
   const apiKey = process.env.FRAME_STUDIO_LIVE_VIDEO_KEY
   const imagePath = process.env.FRAME_STUDIO_LIVE_VIDEO_IMAGE
@@ -13,6 +13,18 @@ export async function testLiveVideoRelay(page, root) {
     throw new Error('Set live video key and image path.')
   const baseUrl =
     process.env.FRAME_STUDIO_LIVE_VIDEO_BASE_URL || 'https://api.wulusai.com'
+  const catalog = JSON.parse(
+    await readFile(path.join(root, 'src/shared/video-models.json'), 'utf8'),
+  )
+  const modelId =
+    process.env.FRAME_STUDIO_LIVE_VIDEO_MODEL || 'grok-imagine-video-1.5-lite'
+  const model = catalog.models.find((item) => item.id === modelId)
+  const mode = process.env.FRAME_STUDIO_LIVE_VIDEO_MODE || 'frame'
+  if (!model || !model.modes.includes(mode) || model.protocol === 'wan')
+    throw new Error('Choose a registered relay model and supported mode.')
+  // Use the shortest supported duration and lowest listed resolution.
+  const duration = model.duration.min
+  const resolution = model.resolutions[0]
   const invoke = (command, args = {}) =>
     page.evaluate(
       ({ command, args }) =>
@@ -29,17 +41,25 @@ export async function testLiveVideoRelay(page, root) {
     if (!process.env.FRAME_STUDIO_LIVE_VIDEO_PROFILE)
       throw new Error('Resume requires the original test profile.')
     const report = JSON.parse(await readFile(resumeReport, 'utf8'))
-    if (!report.job?.taskId || report.job.request.wulusai.baseUrl !== baseUrl)
+    if (report.profile && report.profile !== profile)
+      throw new Error('Resume must use the original native profile.')
+    const savedJobs = await invoke('list_video_jobs', {
+      workflowId: report.workflowId,
+    })
+    const current = savedJobs.find((j) =>
+      report.job
+        ? j.id === report.job.id
+        : j.request.context.shotId === report.context?.shotId,
+    )
+    if (!current?.taskId || current.request.wulusai.baseUrl !== baseUrl)
       throw new Error('Resume requires a known task on the selected service.')
+    report.job = current
     report.generationPosts = 0
     report.resumedFrom = path.basename(resumeReport)
     report.error = null
     const save = () => writeFile(reportPath, JSON.stringify(report, null, 2))
     await invoke('save_wulusai_video_key', { baseUrl, apiKey })
     try {
-      const current = (
-        await invoke('list_video_jobs', { workflowId: report.workflowId })
-      ).find((j) => j.id === report.job.id)
       if (current?.status !== 'succeeded')
         await invoke('resume_video_job', { id: report.job.id })
       await waitForVideo(invoke, report, save)
@@ -52,7 +72,7 @@ export async function testLiveVideoRelay(page, root) {
     }
     return
   }
-  const workflow = {
+  let workflow = {
     schemaVersion: 1,
     id: '',
     name: '',
@@ -71,7 +91,7 @@ export async function testLiveVideoRelay(page, root) {
           instructions: '',
           temperature: 0.3,
           shotCount: 1,
-          duration: 1,
+          duration,
         },
         stale: false,
         output: null,
@@ -80,7 +100,7 @@ export async function testLiveVideoRelay(page, root) {
   }
   workflow.id = `live-video-${Date.now()}`
   workflow.name = '真实首帧视频验证'
-  const board = workflow.nodes.find((n) => n.kind === 'storyboard')
+  let board = workflow.nodes.find((n) => n.kind === 'storyboard')
   board.stale = false
   board.output = {
     id: 'live-board',
@@ -93,7 +113,7 @@ export async function testLiveVideoRelay(page, root) {
           id: 'boat',
           title: '红纸船',
           description: '安静的湖面',
-          duration: 1,
+          duration,
           camera: '静止',
           characters: [],
           dialogue: '',
@@ -104,22 +124,69 @@ export async function testLiveVideoRelay(page, root) {
       ],
     },
   }
+  let shot = board.output.value.shots[0]
+  const projectReport = process.env.FRAME_STUDIO_LIVE_VIDEO_PROJECT_REPORT
+  if (projectReport) {
+    const previous = JSON.parse(await readFile(projectReport, 'utf8'))
+    if (previous.profile !== profile || previous.job?.status !== 'succeeded')
+      throw new Error(
+        'Extending a live film requires its successful original report and profile.',
+      )
+    const workflows = await invoke('list_workflows')
+    workflow = workflows.find((item) => item.id === previous.workflowId)
+    board = workflow?.nodes.find((node) => node.id === previous.context.nodeId)
+    if (!board || board.output?.id !== previous.context.artifactId)
+      throw new Error(
+        'The original storyboard changed; inspect it before another submission.',
+      )
+    const frames = await invoke('list_first_frames', {
+      workflowId: workflow.id,
+    })
+    const unbound = board.output.value.shots.find(
+      (item) => !frames.some((frame) => frame.context.shotId === item.id),
+    )
+    if (unbound) {
+      Object.assign(unbound, shot, { id: unbound.id })
+      shot = unbound
+    } else {
+      if (board.output.value.shots.length >= 3)
+        throw new Error(
+          'This acceptance film already has three shots; review existing jobs.',
+        )
+      shot = { ...shot, id: `boat-${Date.now()}` }
+      board.output.value.shots.push(shot)
+    }
+    board.config.shotCount = board.output.value.shots.length
+  }
+  shot.videoPrompt =
+    process.env.FRAME_STUDIO_LIVE_VIDEO_PROMPT || shot.videoPrompt
   workflow.updatedAt = Date.now()
-  await invoke('save_workflow', { workflow })
   const context = {
     workflowId: workflow.id,
     nodeId: board.id,
     artifactId: board.output.id,
-    shotId: 'boat',
+    shotId: shot.id,
   }
   const image = await invoke('import_image', {
-    name: 'red-boat-first-frame.png',
+    name: path.basename(imagePath),
     bytes: [...(await readFile(imagePath))],
   })
+  await invoke('save_workflow', { workflow })
+  // Reload the controller after this fixture's direct IPC edits so its queued
+  // autosave cannot restore an older storyboard while the cloud job is checked.
+  await page.reload()
+  await page.getByRole('button', { name: '工作流', exact: true }).click()
+  await expect(page.getByText('已保存到本机', { exact: true })).toBeVisible()
   await invoke('select_first_frame', { context, versionId: image.versionId })
   const report = {
     submittedAt: new Date().toISOString(),
-    protocol: 'POST /v1/videos',
+    protocol: model.protocol,
+    profile,
+    context,
+    model: modelId,
+    mode,
+    duration,
+    resolution,
     generationPosts: 0,
     workflowId: workflow.id,
     job: null,
@@ -132,34 +199,39 @@ export async function testLiveVideoRelay(page, root) {
     await invoke('save_wulusai_video_key', { baseUrl, apiKey })
     report.connection = await invoke('check_wulusai_video_connection', {
       baseUrl,
-      model: 'grok-imagine-video-1.5-lite',
+      model: modelId,
     })
     await save()
     const request = {
       context,
       firstFrameVersionId: image.versionId,
       region: 'singapore',
-      prompt: board.output.value.shots[0].videoPrompt,
+      prompt: shot.videoPrompt,
       negativePrompt: '',
-      duration: 1,
-      resolution: '480P',
+      duration,
+      resolution,
       wulusai: {
         baseUrl,
-        model: 'grok-imagine-video-1.5-lite',
-        mode: 'frame',
+        model: modelId,
+        mode,
         ratio: null,
         budgetReservationMicroUsd: 1000000,
       },
     }
     report.generationPosts = 1
+    report.submissionAttemptedAt = new Date().toISOString()
+    // Persist intent before IPC: a lost response must never cause an automatic retry.
+    await save()
     const started = await invoke('start_video_job', { request })
     report.job = started
     await save()
-    console.log(`Live first-frame task submitted once: local job ${started.id}`)
+    console.log(
+      `Live ${modelId} ${mode} submitted once: local job ${started.id}`,
+    )
     await waitForVideo(invoke, report, save)
     await checkPlayback(page, report, save)
     console.log(
-      `PASS: live Grok first-frame video saved. Report: ${reportPath}`,
+      `PASS: live ${modelId} ${mode} video saved. Report: ${reportPath}`,
     )
   } catch (error) {
     report.error = String(error).replaceAll(apiKey, '[REDACTED_SECRET]')
@@ -209,7 +281,10 @@ async function waitForVideo(invoke, report, save) {
     workflowId,
   })
   report.asset = assets.find((a) => a.versionId === report.job.assetId)
-  if (!report.asset || report.asset.source !== 'wulusai-frame')
+  if (
+    !report.asset ||
+    report.asset.source !== `wulusai-${report.job.request.wulusai.mode}`
+  )
     throw new Error('Generated frame video asset was not saved.')
   await save()
 }
@@ -218,6 +293,11 @@ async function checkPlayback(page, report, save) {
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByLabel('切换工作流').selectOption(report.workflowId)
   await page.getByRole('button', { name: '镜头视频', exact: true }).click()
+  await page
+    .getByLabel('视频目标镜头')
+    .selectOption(
+      `${report.job.request.context.nodeId}/${report.job.request.context.shotId}`,
+    )
   await page
     .getByRole('button', { name: '播放片段', exact: true })
     .first()

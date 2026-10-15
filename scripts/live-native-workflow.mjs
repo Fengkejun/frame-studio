@@ -7,13 +7,15 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { chromium, expect } from '@playwright/test'
 import { testLiveWorkflow } from './live-workflow-smoke.mjs'
 import { testLiveVideoRelay } from './live-video-relay-smoke.mjs'
+import { testLiveFilm } from './live-film-smoke.mjs'
 
 if (process.platform !== 'win32') {
   throw new Error('The live native workflow check requires Windows / WebView2.')
 }
 if (
   process.env.FRAME_STUDIO_LIVE_WORKFLOW !== '1' &&
-  process.env.FRAME_STUDIO_LIVE_VIDEO !== '1'
+  process.env.FRAME_STUDIO_LIVE_VIDEO !== '1' &&
+  !process.env.FRAME_STUDIO_LIVE_FILM_REPORTS
 ) {
   throw new Error(
     'Set FRAME_STUDIO_LIVE_WORKFLOW=1 or FRAME_STUDIO_LIVE_VIDEO=1 to opt in.',
@@ -83,8 +85,16 @@ try {
   await expect(page.getByRole('status')).toHaveText('桌面连接正常', {
     timeout: 15000,
   })
+  if (
+    process.env.FRAME_STUDIO_LIVE_VIDEO === '1' ||
+    process.env.FRAME_STUDIO_LIVE_FILM_REPORTS
+  ) {
+    await page.getByRole('button', { name: '工作流', exact: true }).click()
+    await expect(page.getByText('已保存到本机', { exact: true })).toBeVisible()
+  }
   await testLiveWorkflow(page)
-  await testLiveVideoRelay(page, root)
+  await testLiveVideoRelay(page, root, profile)
+  await testLiveFilm(page, root, profile)
 } catch (error) {
   console.error(
     `Native app exit=${app.exitCode}; stderr=${stderr || '(empty)'}`,
