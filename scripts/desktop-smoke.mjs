@@ -21,6 +21,10 @@ import { testImageBatches } from './image-batch-smoke.mjs'
 import { testVideoBatches } from './video-batch-smoke.mjs'
 import { testStorage } from './storage-smoke.mjs'
 import { testBackups } from './backups-smoke.mjs'
+import {
+  createVideoRelayFixture,
+  testVideoRelay,
+} from './video-relay-smoke.mjs'
 
 // Exercise the built app and real IPC, using an isolated WebView2 profile.
 if (process.platform !== 'win32') {
@@ -48,6 +52,7 @@ const port = await new Promise((resolve, reject) => {
 const endpoint = `http://127.0.0.1:${port}`
 const cloudFixture = await createCloudFixture(root)
 const videoFixture = await createVideoFixture(root)
+const videoRelayFixture = await createVideoRelayFixture(root)
 const speechFixture = await createSpeechFixture(root)
 const transcriptionFixture = await createTranscriptionFixture(root)
 const installedModels = new Set(['fixture-model:latest'])
@@ -172,6 +177,7 @@ try {
   await testCloudMedia(page, cloudFixture)
   await testLiveCloud(page, root)
   await testVideoMedia(page, root, videoFixture)
+  await testVideoRelay(page, videoRelayFixture)
   await testTimelineMedia(
     page,
     root,
@@ -299,6 +305,7 @@ try {
   await browser?.close()
   await cloudFixture.close()
   await videoFixture.close()
+  await videoRelayFixture.close()
   await speechFixture.close()
   await transcriptionFixture.close()
   await new Promise((resolve) => textServer.close(resolve))

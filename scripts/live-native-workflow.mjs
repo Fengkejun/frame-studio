@@ -6,19 +6,27 @@ import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 import { chromium, expect } from '@playwright/test'
 import { testLiveWorkflow } from './live-workflow-smoke.mjs'
+import { testLiveVideoRelay } from './live-video-relay-smoke.mjs'
 
 if (process.platform !== 'win32') {
   throw new Error('The live native workflow check requires Windows / WebView2.')
 }
-if (process.env.FRAME_STUDIO_LIVE_WORKFLOW !== '1') {
-  throw new Error('Set FRAME_STUDIO_LIVE_WORKFLOW=1 to opt in.')
+if (
+  process.env.FRAME_STUDIO_LIVE_WORKFLOW !== '1' &&
+  process.env.FRAME_STUDIO_LIVE_VIDEO !== '1'
+) {
+  throw new Error(
+    'Set FRAME_STUDIO_LIVE_WORKFLOW=1 or FRAME_STUDIO_LIVE_VIDEO=1 to opt in.',
+  )
 }
 const root = fileURLToPath(new URL('../', import.meta.url))
 const executable = path.join(root, 'src-tauri/target/debug/frame-studio.exe')
 await access(executable)
 const artifacts = path.join(root, 'artifacts')
 await mkdir(artifacts, { recursive: true })
-const profile = await mkdtemp(path.join(artifacts, 'live-workflow-'))
+const profile =
+  process.env.FRAME_STUDIO_LIVE_VIDEO_PROFILE ||
+  (await mkdtemp(path.join(artifacts, 'live-workflow-')))
 const port = await new Promise((resolve, reject) => {
   const server = net.createServer()
   server.on('error', reject)
@@ -76,6 +84,7 @@ try {
     timeout: 15000,
   })
   await testLiveWorkflow(page)
+  await testLiveVideoRelay(page, root)
 } catch (error) {
   console.error(
     `Native app exit=${app.exitCode}; stderr=${stderr || '(empty)'}`,
