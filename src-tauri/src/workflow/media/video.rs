@@ -207,7 +207,12 @@ pub(super) fn validate_request(
     if request.prompt.trim().is_empty()
         || request.prompt.chars().count() > 5000
         || request.negative_prompt.chars().count() > 500
-        || !(2..=15).contains(&request.duration)
+        || !(request
+            .wulusai
+            .as_ref()
+            .map(|s| s.minimum_duration())
+            .unwrap_or(2)..=15)
+            .contains(&request.duration)
         || (request.wulusai.is_none() && !["720P", "1080P"].contains(&request.resolution.as_str()))
     {
         return Err("请检查视频提示词、时长和分辨率".into());
@@ -811,11 +816,21 @@ fn client() -> AppResult<Client> {
 fn request_body(state: &WorkflowState, request: &VideoRequest) -> AppResult<Value> {
     let entry = validate_request(state, request)?;
     if let Some(settings) = &request.wulusai {
-        return Ok(wulusai::body(settings, request));
+        if settings.mode == wulusai::Mode::Text {
+            return wulusai::body(settings, request, None);
+        }
     }
     let bytes = std::fs::read(state.directory.join("assets").join(entry.file_name))
         .map_err(|_| "首帧原图已丢失")?;
-    let (decoded, _) = super::decode(&bytes)?;
+    let (mut decoded, _) = super::decode(&bytes)?;
+    if request.wulusai.as_ref().is_some_and(|s| s.is_grok()) {
+        let (width, height) = match request.resolution.as_str() {
+            "480P" => (854, 480),
+            "720P" => (1280, 720),
+            _ => (1920, 1080),
+        };
+        decoded = decoded.resize_to_fill(width, height, image::imageops::FilterType::Lanczos3);
+    }
     let (width, height) = decoded.dimensions();
     if width < 240 || height < 240 {
         return Err("万相首帧最短边不能小于 240 像素".into());
@@ -827,6 +842,13 @@ fn request_body(state: &WorkflowState, request: &VideoRequest) -> AppResult<Valu
     let jpeg = jpeg.into_inner();
     if jpeg.len() > MAX_IMAGE_BYTES {
         return Err("首帧转码后超过 20 MB 限制".into());
+    }
+    if let Some(settings) = &request.wulusai {
+        return wulusai::body(
+            settings,
+            request,
+            Some(&format!("data:image/jpeg;base64,{}", STANDARD.encode(jpeg))),
+        );
     }
     Ok(json!({
         "model": MODEL,
@@ -896,7 +918,11 @@ async fn execute(
             ));
         }
         let task_id = (if job.request.wulusai.is_some() {
-            data.get("task_id")
+            if job.request.wulusai.as_ref().is_some_and(|s| s.is_grok()) {
+                data.get("id")
+            } else {
+                data.get("task_id")
+            }
         } else {
             data.pointer("/output/task_id")
         })
@@ -931,7 +957,11 @@ async fn execute(
         }
         let normalized;
         let output = if job.request.wulusai.is_some() {
-            normalized = wulusai::output(&data, id)?;
+            normalized = wulusai::parse_output(
+                job.request.wulusai.as_ref().ok_or("视频中转站配置丢失")?,
+                &data,
+                id,
+            )?;
             &normalized
         } else {
             data.get("output").ok_or("查询响应缺少任务结果")?
@@ -1125,8 +1155,12 @@ async fn download(
         created_at: now(),
         file_name,
         metadata: Some(metadata),
-        source: if job.request.wulusai.is_some() {
-            "wulusai-text"
+        source: if let Some(settings) = &job.request.wulusai {
+            if settings.mode == wulusai::Mode::Frame {
+                "wulusai-frame"
+            } else {
+                "wulusai-text"
+            }
         } else {
             "wan"
         }

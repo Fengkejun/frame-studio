@@ -1,4 +1,4 @@
-//! Wulusai v2 video protocol. Settings travel with a job; credentials stay in
+//! Relay v2 MiniMax and v1 Grok protocols. Settings travel with a job; credentials stay in
 //! the system vault. This module only accepts documented generation modes.
 use super::*;
 
@@ -7,6 +7,7 @@ use super::*;
 pub enum Mode {
     #[default]
     Text,
+    Frame,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -18,6 +19,18 @@ pub struct Settings {
     pub mode: Mode,
     pub ratio: Option<String>,
     pub budget_reservation_micro_usd: u64,
+}
+impl Settings {
+    pub(super) fn is_grok(&self) -> bool {
+        self.model == "grok-imagine-video-1.5-lite"
+    }
+    pub(super) fn minimum_duration(&self) -> u8 {
+        if self.is_grok() {
+            1
+        } else {
+            4
+        }
+    }
 }
 
 fn base(value: &str) -> AppResult<Url> {
@@ -34,9 +47,9 @@ fn base(value: &str) -> AppResult<Url> {
         || url.password().is_some()
         || url.query().is_some()
         || url.fragment().is_some()
-        || !["", "/v2"].contains(&url.path().trim_end_matches('/'))
+        || !["", "/v1", "/v2"].contains(&url.path().trim_end_matches('/'))
     {
-        return Err("视频 API 根地址须为 HTTPS 服务根地址或 /v2 地址".into());
+        return Err("视频 API 根地址须为 HTTPS 服务根地址、/v1 或 /v2 地址".into());
     }
     url.set_path("/");
     Ok(url)
@@ -46,18 +59,34 @@ pub(super) fn endpoint(settings: &Settings, task_id: Option<&str>) -> AppResult<
     let mut url = base(&settings.base_url)?;
     if let Some(id) = task_id {
         super::valid_task_id(id)?;
-        url.set_path(&format!("/v2/query/video_generation/{id}"));
+        url.set_path(&if settings.is_grok() {
+            format!("/v1/videos/{id}")
+        } else {
+            format!("/v2/query/video_generation/{id}")
+        });
     } else {
-        url.set_path("/v2/video_generation");
+        url.set_path(if settings.is_grok() {
+            "/v1/videos"
+        } else {
+            "/v2/video_generation"
+        });
     }
     Ok(url)
 }
 
 pub(super) fn validate(settings: &Settings, request: &VideoRequest) -> AppResult<()> {
     base(&settings.base_url)?;
-    if !["minimax-h3", "MiniMax-H3"].contains(&settings.model.as_str())
-        || !(4..=15).contains(&request.duration)
-        || !["480P", "768P", "1080P", "2K"].contains(&request.resolution.as_str())
+    let resolutions = if settings.is_grok() {
+        &["480P", "720P", "1080P"][..]
+    } else {
+        &["480P", "768P", "1080P", "2K"][..]
+    };
+    if !["minimax-h3", "MiniMax-H3", "grok-imagine-video-1.5-lite"]
+        .contains(&settings.model.as_str())
+        || !(settings.minimum_duration()..=15).contains(&request.duration)
+        || !resolutions.contains(&request.resolution.as_str())
+        || (!settings.is_grok() && settings.mode != Mode::Text)
+        || (settings.is_grok() && settings.ratio.is_some())
         || settings
             .ratio
             .as_deref()
@@ -69,7 +98,11 @@ pub(super) fn validate(settings: &Settings, request: &VideoRequest) -> AppResult
     Ok(())
 }
 
-pub(super) fn body(settings: &Settings, request: &VideoRequest) -> Value {
+pub(super) fn body(
+    settings: &Settings,
+    request: &VideoRequest,
+    reference: Option<&str>,
+) -> AppResult<Value> {
     let prompt = if request.negative_prompt.trim().is_empty() {
         request.prompt.clone()
     } else {
@@ -78,12 +111,20 @@ pub(super) fn body(settings: &Settings, request: &VideoRequest) -> Value {
             request.prompt, request.negative_prompt
         )
     };
+    if settings.is_grok() {
+        let mut body = json!({"model":settings.model,"prompt":prompt,"seconds":request.duration.to_string(),"size":request.resolution.to_ascii_lowercase()});
+        if settings.mode == Mode::Frame {
+            body["input_reference"] =
+                json!({"image_url": reference.ok_or("图生视频缺少首帧图片")?});
+        }
+        return Ok(body);
+    }
     let mut body = json!({"model":settings.model,"content":[{"type":"text","text":prompt}],
         "resolution":request.resolution,"duration":request.duration});
     if let Some(ratio) = &settings.ratio {
         body["ratio"] = json!(ratio);
     }
-    body
+    Ok(body)
 }
 
 pub(super) fn output(data: &Value, expected_id: &str) -> AppResult<Value> {
@@ -103,7 +144,7 @@ pub(super) fn output(data: &Value, expected_id: &str) -> AppResult<Value> {
         .as_str()
     {
         "pending" | "queued" | "submitted" => "PENDING",
-        "running" | "processing" => "RUNNING",
+        "running" | "processing" | "in_progress" => "RUNNING",
         "success" | "succeeded" | "completed" => "SUCCEEDED",
         "failed" | "canceled" | "cancelled" => "FAILED",
         "unknown" | "expired" => "UNKNOWN",
@@ -117,6 +158,19 @@ pub(super) fn output(data: &Value, expected_id: &str) -> AppResult<Value> {
     }
     Ok(json!({"task_status":status,"video_url":url,
         "message":task.pointer("/error/message").or_else(|| task.get("error")).and_then(Value::as_str).unwrap_or("请查看服务商任务详情")}))
+}
+pub(super) fn parse_output(settings: &Settings, data: &Value, id: &str) -> AppResult<Value> {
+    if settings.is_grok()
+        && data["status"] == "completed"
+        && data.get("file_url").is_none()
+        && data.pointer("/content/url").is_none()
+    {
+        let mut data = data.clone();
+        data["file_url"] = json!(format!("https://ai.wulusai.com/workflow/files/{id}.mp4"));
+        output(&data, id)
+    } else {
+        output(data, id)
+    }
 }
 
 pub(super) fn trusted_download(value: &Url, settings: &Settings) -> AppResult<bool> {
@@ -258,13 +312,13 @@ mod tests {
         let mut settings = settings();
         request.wulusai = Some(settings.clone());
         assert!(validate(&settings, &request).is_ok());
-        let payload = body(&settings, &request);
+        let payload = body(&settings, &request, None).unwrap();
         assert_eq!(
             payload,
             json!({"model":"minimax-h3","content":[{"type":"text","text":"A red paper boat on a quiet lake."}],"resolution":"1080P","duration":5})
         );
         settings.ratio = Some("16:9".into());
-        assert_eq!(body(&settings, &request)["ratio"], "16:9");
+        assert_eq!(body(&settings, &request, None).unwrap()["ratio"], "16:9");
         request.duration = 3;
         assert!(validate(&settings, &request).is_err());
         request.duration = 16;
@@ -276,9 +330,72 @@ mod tests {
         }
         settings.budget_reservation_micro_usd = 0;
         assert!(validate(&settings, &request).is_err());
+        settings.budget_reservation_micro_usd = 675_000;
         request.wulusai = Some(settings);
         let mut unknown = serde_json::to_value(&request).unwrap();
         unknown["wulusai"]["mode"] = json!("frame");
-        assert!(serde_json::from_value::<VideoRequest>(unknown).is_err());
+        let unsupported = serde_json::from_value::<VideoRequest>(unknown).unwrap();
+        assert!(validate(unsupported.wulusai.as_ref().unwrap(), &unsupported).is_err());
+    }
+    #[test]
+    fn grok_frame_uses_json_reference_and_its_own_limits_and_endpoints() {
+        let mut settings = settings();
+        settings.model = "grok-imagine-video-1.5-lite".into();
+        settings.mode = Mode::Frame;
+        let mut request: VideoRequest = serde_json::from_value(json!({
+            "context":{"workflowId":"w","nodeId":"n","artifactId":"a","shotId":"s"},
+            "firstFrameVersionId":"frame","region":"singapore","prompt":"Animate the boat.",
+            "negativePrompt":"", "duration":1,"resolution":"480P"
+        }))
+        .unwrap();
+        assert!(validate(&settings, &request).is_ok());
+        assert!(body(&settings, &request, None).is_err());
+        let reference = "data:image/jpeg;base64,example";
+        assert_eq!(
+            body(&settings, &request, Some(reference)).unwrap(),
+            json!({
+                "model":"grok-imagine-video-1.5-lite","prompt":"Animate the boat.",
+                "seconds":"1","size":"480p","input_reference":{"image_url":reference}
+            })
+        );
+        assert_eq!(endpoint(&settings, None).unwrap().path(), "/v1/videos");
+        assert_eq!(
+            endpoint(&settings, Some("video-test")).unwrap().path(),
+            "/v1/videos/video-test"
+        );
+        for resolution in ["480P", "720P", "1080P"] {
+            request.resolution = resolution.into();
+            assert!(validate(&settings, &request).is_ok());
+        }
+        request.resolution = "768P".into();
+        assert!(validate(&settings, &request).is_err());
+        request.resolution = "480P".into();
+        request.duration = 0;
+        assert!(validate(&settings, &request).is_err());
+        request.duration = 15;
+        settings.ratio = Some("16:9".into());
+        assert!(validate(&settings, &request).is_err());
+        settings.ratio = None;
+        settings.mode = Mode::Text;
+        assert!(body(&settings, &request, None)
+            .unwrap()
+            .get("input_reference")
+            .is_none());
+        let result = parse_output(
+            &settings,
+            &json!({"id":"video-test","status":"completed"}),
+            "video-test",
+        )
+        .unwrap();
+        assert_eq!(
+            result["video_url"],
+            "https://ai.wulusai.com/workflow/files/video-test.mp4"
+        );
+        assert!(parse_output(
+            &settings,
+            &json!({"id":"other","status":"completed"}),
+            "video-test"
+        )
+        .is_err());
     }
 }
