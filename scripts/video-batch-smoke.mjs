@@ -1,5 +1,5 @@
 import path from 'node:path'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { expect } from '@playwright/test'
 
 const invoke = (page, command, args = {}) =>
@@ -29,6 +29,9 @@ export async function testVideoBatches(page, root, fixture) {
   const getJob = async (id) =>
     (await invoke(page, 'list_video_jobs', args)).find((j) => j.id === id)
   const timeout = { timeout: 30000 }
+  const pageErrors = []
+  const captureError = (error) => pageErrors.push(error.message)
+  page.on('pageerror', captureError)
   try {
     await invoke(page, 'save_workflow', { workflow })
     await invoke(page, 'save_video_key', {
@@ -187,7 +190,27 @@ export async function testVideoBatches(page, root, fixture) {
         .getByRole('region', { name: '图片批量队列', exact: true })
         .locator('.image-batch'),
     ).toHaveCount(imageBatches)
+  } catch (error) {
+    await writeFile(
+      path.join(root, 'artifacts/video-batch-failure.json'),
+      JSON.stringify(
+        {
+          error: String(error),
+          pageErrors,
+          body: await page.locator('body').innerText(),
+          batches: await invoke(page, 'list_image_batches', args),
+        },
+        null,
+        2,
+      ),
+    )
+    await page.screenshot({
+      path: path.join(root, 'artifacts/video-batch-failure.png'),
+      fullPage: true,
+    })
+    throw error
   } finally {
+    page.off('pageerror', captureError)
     fixture.setMode('success')
     fixture.setModes([])
     await invoke(page, 'clear_video_key', { region: 'singapore' })

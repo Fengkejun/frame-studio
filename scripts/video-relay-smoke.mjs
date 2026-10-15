@@ -201,6 +201,14 @@ export async function testVideoRelay(page, fixture) {
   expect(invalid).toContain('请检查')
   expect(fixture.requests).toHaveLength(1)
   fixture.setMode('hold')
+  const unadapted = await invoke(page, 'start_video_job', {
+    request: {
+      ...latest.request,
+      wulusai: { ...latest.request.wulusai, model: 'unadapted-video-model' },
+    },
+  }).then(() => '', String)
+  expect(unadapted).toContain('尚未适配')
+  expect(fixture.requests).toHaveLength(1)
   const paused = await invoke(page, 'start_video_job', {
     request: latest.request,
   })
