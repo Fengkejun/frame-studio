@@ -35,7 +35,13 @@ export function BatchSubmit({
           ...request.request,
           context: t.context,
           firstFrameVersionId: t.video.firstFrameVersionId,
-          duration: t.video.duration,
+          duration: Math.min(
+            15,
+            Math.max(
+              api.videoMinimumDuration(request.request),
+              t.video.duration,
+            ),
+          ),
           prompt: t.prompt,
         },
       }
@@ -56,7 +62,7 @@ export function BatchSubmit({
       <summary>{video ? '批量生成视频候选' : '批量生成镜头候选'}</summary>
       <p className="field-hint">
         {video
-          ? '勾选 1–24 个已确认有效首帧的镜头，逐个生成。首帧、视频提示词和时长使用各自分镜（时长取整并限制在 2–15 秒），地区、分辨率和负面提示词沿用上方设置。候选保存后仍需手动选择片段。已有视频任务时队列等待。'
+          ? '勾选 1–24 个已确认有效首帧的镜头，逐个生成。首帧、视频提示词和时长使用各自分镜（时长取整并限制在当前模型支持的范围），视频服务、生成方式、分辨率、预算预留和负面提示词沿用上方设置。候选保存后仍需手动选择片段。已有视频任务时队列等待。'
           : '勾选 1–24 个镜头，逐个生成。每个镜头使用自己的分镜提示词，其余参数沿用上方设置；候选保存后仍需手动选择首帧。'}
       </p>
       <button
@@ -91,7 +97,7 @@ export function BatchSubmit({
         {request.kind === 'cloud'
           ? ` · 合计预算预留 ${api.formatUsd(chosen.length * request.request.budgetReservationMicroUsd)}；请求可能计费，实际费用以服务商账单为准。`
           : request.kind === 'video'
-            ? ` · 合计标价预估 ${api.formatUsd(requests.reduce((sum, r) => sum + (r.kind === 'video' ? api.videoEstimateMicroUsd(r.request.region, r.request.resolution, r.request.duration) : 0), 0))}；实际费用以服务商账单为准。`
+            ? ` · 合计${request.request.wulusai ? '预算预留' : '标价预估'} ${api.formatUsd(requests.reduce((sum, r) => sum + (r.kind === 'video' ? api.videoEstimateMicroUsd(r.request.region, r.request.resolution, r.request.duration, r.request.wulusai) : 0), 0))}；实际费用以服务商账单为准。`
             : ' · 使用本机算力。'}
       </p>
       <button

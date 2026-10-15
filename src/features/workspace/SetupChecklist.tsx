@@ -14,6 +14,7 @@ interface Snapshot {
   cloudKey: boolean
   videoSingaporeKey: boolean
   videoBeijingKey: boolean
+  videoRelayKey: boolean
   tools: media.ExportToolsStatus | null
   failed: string[]
 }
@@ -40,6 +41,7 @@ async function readSnapshot(): Promise<Snapshot> {
     media.videoKeyStatus('singapore'),
     media.videoKeyStatus('beijing'),
     media.checkExportTools(),
+    media.wulusaiVideoKeyStatus('https://api.wulusai.com'),
   ] as const)
   const labels = [
     '文本连接',
@@ -48,6 +50,7 @@ async function readSnapshot(): Promise<Snapshot> {
     '新加坡视频密钥',
     '北京视频密钥',
     '导出工具',
+    '视频中转站密钥',
   ]
   const failed = results.flatMap((result, index) =>
     result.status === 'rejected' ? [labels[index] ?? '未知状态'] : [],
@@ -61,6 +64,7 @@ async function readSnapshot(): Promise<Snapshot> {
     cloudKey: results[2].status === 'fulfilled' && results[2].value,
     videoSingaporeKey: results[3].status === 'fulfilled' && results[3].value,
     videoBeijingKey: results[4].status === 'fulfilled' && results[4].value,
+    videoRelayKey: results[6].status === 'fulfilled' && results[6].value,
     tools: results[5].status === 'fulfilled' ? results[5].value : null,
     failed,
   }
@@ -142,6 +146,7 @@ export function SetupChecklist({
   const videoKeys = [
     snapshot?.videoSingaporeKey && '新加坡',
     snapshot?.videoBeijingKey && '北京',
+    snapshot?.videoRelayKey && '视频中转站',
   ].filter(Boolean)
   function toggleExpanded() {
     const next = !expanded
@@ -307,8 +312,8 @@ export function SetupChecklist({
                 {loading
                   ? '正在读取视频密钥状态…'
                   : videoKeys.length
-                    ? `${videoKeys.join('、')}地区密钥已保存，尚未验证服务权限。`
-                    : '配置视频服务地区和密钥，再逐镜头生成片段。'}
+                    ? `${videoKeys.join('、')}密钥已保存，尚未验证服务权限。`
+                    : '配置万相或视频中转站密钥，再逐镜头生成片段。'}
               </p>
               <div className="setup-actions">
                 <button className="small-button" onClick={onVideos}>

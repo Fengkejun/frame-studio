@@ -232,7 +232,7 @@ export function ConnectionsPage({
             <span className="eyebrow">MEDIA CONNECTIONS</span>
             <p>图片与视频服务</p>
             <small>
-              ComfyUI 和 OpenAI 图片生成在「首帧与素材」中配置；Wan
+              ComfyUI 和 OpenAI 图片生成在「首帧与素材」中配置；Wan 与中转站
               镜头视频在「镜头视频」中配置。
             </small>
           </div>

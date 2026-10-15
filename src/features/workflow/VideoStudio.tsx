@@ -9,6 +9,7 @@ import type { useMedia } from './useMedia'
 import { AssetImage } from './AssetImage'
 import type { ShotTarget } from './ImageStudio'
 import './media.css'
+import { VideoRelayFields } from './VideoRelayFields'
 
 interface Props {
   workflow: Workflow
@@ -98,7 +99,7 @@ export function VideoStudio({
           label: `${node.label} · ${shot.id} ${shot.title}`,
           video: {
             firstFrameVersionId: frame.versionId,
-            duration: Math.min(15, Math.max(2, Math.round(shot.duration))),
+            duration: Math.min(15, Math.max(1, Math.round(shot.duration))),
           },
         },
       ]
@@ -383,7 +384,10 @@ export function VideoStudio({
                 <p>{job.message}</p>
                 {job.estimatedCostMicroUsd > 0 && (
                   <small>
-                    提交时标价预估：{api.formatUsd(job.estimatedCostMicroUsd)}
+                    {job.request.wulusai
+                      ? '提交时预算预留：'
+                      : '提交时标价预估：'}
+                    {api.formatUsd(job.estimatedCostMicroUsd)}
                   </small>
                 )}
                 <small>
@@ -393,22 +397,26 @@ export function VideoStudio({
                 <details>
                   <summary>生成参数</summary>
                   <p>
-                    {job.request.region} · {job.request.resolution} ·{' '}
-                    {job.request.duration} 秒
+                    {job.request.wulusai
+                      ? `视频中转站 · ${job.request.wulusai.model}`
+                      : job.request.region}{' '}
+                    · {job.request.resolution} · {job.request.duration} 秒
                   </p>
                   <p>提示词：{job.request.prompt}</p>
                 </details>
-                {job.status === 'paused' && job.taskId && (
-                  <button
-                    className="small-button"
-                    disabled={working}
-                    onClick={() =>
-                      void action(() => api.resumeVideoJob(job.id))
-                    }
-                  >
-                    继续查询原任务
-                  </button>
-                )}
+                {(job.status === 'paused' ||
+                  (job.status === 'unknown' && job.request.wulusai)) &&
+                  job.taskId && (
+                    <button
+                      className="small-button"
+                      disabled={working}
+                      onClick={() =>
+                        void action(() => api.resumeVideoJob(job.id))
+                      }
+                    >
+                      继续查询原任务
+                    </button>
+                  )}
                 {api.isVideoRunning(job) && (
                   <button
                     className="small-button"
@@ -472,10 +480,21 @@ function VideoForm({
   const [testing, setTesting] = useState(false)
   const [connection, setConnection] = useState<api.ConnectionCheck | null>(null)
   const [budgetRevision, setBudgetRevision] = useState(0)
+  const relay = request.wulusai
+  const baseUrl = relay?.baseUrl
+  function resetConnection() {
+    setChecking(true)
+    setHasKey(false)
+    setConnection(null)
+    setKey('')
+  }
   useEffect(() => {
     let alive = true
-    api
-      .videoKeyStatus(request.region)
+    const check =
+      baseUrl !== undefined
+        ? api.wulusaiVideoKeyStatus(baseUrl)
+        : api.videoKeyStatus(request.region)
+    check
       .then((result) => {
         if (alive) setHasKey(result)
       })
@@ -488,7 +507,7 @@ function VideoForm({
     return () => {
       alive = false
     }
-  }, [request.region, onError])
+  }, [request.region, baseUrl, onError])
   return (
     <form
       className="image-form"
@@ -504,37 +523,97 @@ function VideoForm({
         disabled={!isDesktop || checking || disabled || saving || testing}
       >
         <p className="field-hint">
-          万相 Wan 2.7 图生视频。任务按秒计费，提交前请核对地区、时长与分辨率。
+          {relay
+            ? '视频中转站。提交前请核对模型、生成方式、时长、画幅与预算预留。'
+            : '万相 Wan 2.7 图生视频。任务按秒计费，提交前请核对地区、时长与分辨率。'}
         </p>
         <label className="field-label">
-          服务地区
+          视频服务
           <select
-            aria-label="视频服务地区"
-            value={request.region}
-            onChange={(event) => {
-              setChecking(true)
-              setHasKey(false)
-              setConnection(null)
-              setKey('')
-              setRequest((value) => ({
-                ...value,
-                region: event.target.value as api.VideoRequest['region'],
+            aria-label="视频服务"
+            value={relay ? 'relay' : 'wan'}
+            onChange={(e) => {
+              resetConnection()
+              const next =
+                e.target.value === 'relay' ? api.defaultVideoRelay() : null
+              setRequest((r) => ({
+                ...r,
+                wulusai: next,
+                resolution: next ? '1080P' : '720P',
+                duration: Math.max(next ? 4 : 2, r.duration),
               }))
             }}
           >
-            <option value="singapore">新加坡</option>
-            <option value="beijing">北京</option>
+            <option value="wan">阿里云万相 · 图生视频</option>
+            <option value="relay">视频中转站 · MiniMax / Grok</option>
           </select>
         </label>
+        {relay && (
+          <VideoRelayFields
+            settings={relay}
+            onChange={(next) => {
+              if (next.baseUrl !== relay.baseUrl) resetConnection()
+              if (next.model !== relay.model) {
+                setConnection(null)
+                next = {
+                  ...next,
+                  mode:
+                    next.model === 'grok-imagine-video-1.5-lite'
+                      ? 'frame'
+                      : 'text',
+                  ratio: null,
+                }
+              }
+              setRequest((r) => {
+                const resolutions = api.videoResolutions(next)
+                const updated = { ...r, wulusai: next }
+                return {
+                  ...updated,
+                  duration: Math.max(
+                    api.videoMinimumDuration(updated),
+                    r.duration,
+                  ),
+                  resolution: resolutions.includes(r.resolution)
+                    ? r.resolution
+                    : resolutions[0],
+                }
+              })
+            }}
+          />
+        )}
+        {!relay && (
+          <>
+            <label className="field-label">
+              服务地区
+              <select
+                aria-label="视频服务地区"
+                value={request.region}
+                onChange={(event) => {
+                  setChecking(true)
+                  setHasKey(false)
+                  setConnection(null)
+                  setKey('')
+                  setRequest((value) => ({
+                    ...value,
+                    region: event.target.value as api.VideoRequest['region'],
+                  }))
+                }}
+              >
+                <option value="singapore">新加坡</option>
+                <option value="beijing">北京</option>
+              </select>
+            </label>
+          </>
+        )}
         <label className="field-label">
-          万相 API Key
+          {relay ? '中转站 API Key' : '万相 API Key'}
           <input
-            aria-label="万相 API Key"
+            aria-label={relay ? '中转站 API Key' : '万相 API Key'}
             type="password"
             autoComplete="off"
             value={key}
             placeholder={
-              hasKey ? '已保存在系统凭据库' : '输入当前地区的 API Key'
+              hasKey ? '已保存在系统凭据库' : '输入当前视频服务的 API Key'
             }
             onChange={(event) => {
               setConnection(null)
@@ -549,8 +628,11 @@ function VideoForm({
             disabled={!key.trim()}
             onClick={() => {
               setSaving(true)
-              void api
-                .saveVideoKey(request.region, key)
+              void (
+                relay
+                  ? api.saveWulusaiVideoKey(relay.baseUrl, key)
+                  : api.saveVideoKey(request.region, key)
+              )
                 .then(() => {
                   setKey('')
                   setHasKey(true)
@@ -568,8 +650,11 @@ function VideoForm({
               className="text-button"
               onClick={() => {
                 setSaving(true)
-                void api
-                  .clearVideoKey(request.region)
+                void (
+                  relay
+                    ? api.clearWulusaiVideoKey(relay.baseUrl)
+                    : api.clearVideoKey(request.region)
+                )
                   .then(() => {
                     setHasKey(false)
                     setConnection(null)
@@ -588,8 +673,11 @@ function VideoForm({
             onClick={() => {
               setTesting(true)
               setConnection(null)
-              void api
-                .checkVideoConnection(request.region)
+              void (
+                relay
+                  ? api.checkWulusaiVideoConnection(relay.baseUrl, relay.model)
+                  : api.checkVideoConnection(request.region)
+              )
                 .then(setConnection)
                 .catch((error) => onError(errorMessage(error)))
                 .finally(() => setTesting(false))
@@ -600,8 +688,12 @@ function VideoForm({
         </div>
         <p className="field-hint" role="status">
           {hasKey
-            ? '当前地区密钥已保存在系统凭据库。'
-            : '请先保存当前地区的 API Key。'}
+            ? relay
+              ? '当前中转站密钥已保存在系统凭据库。'
+              : '当前地区密钥已保存在系统凭据库。'
+            : relay
+              ? '请先保存当前中转站的 API Key。'
+              : '请先保存当前地区的 API Key。'}
         </p>
         {connection && (
           <p
@@ -660,7 +752,7 @@ function VideoForm({
               aria-label="视频时长"
               type="number"
               required
-              min={2}
+              min={api.videoMinimumDuration(request)}
               max={15}
               step={1}
               value={request.duration}
@@ -685,22 +777,31 @@ function VideoForm({
                 }))
               }
             >
-              <option value="720P">720P</option>
-              <option value="1080P">1080P</option>
+              {api.videoResolutions(relay).map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
             </select>
           </label>
         </div>
         <p className="field-hint" role="status">
-          本次视频标价预估：
+          {relay ? '本次视频预算预留：' : '本次视频标价预估：'}
           {api.formatUsd(
             api.videoEstimateMicroUsd(
               request.region,
               request.resolution,
               request.duration,
+              relay,
             ),
           )}
-          （{request.region === 'beijing' ? '北京' : '新加坡'} ·{' '}
-          {request.resolution} · {request.duration}{' '}
+          （
+          {relay
+            ? '视频中转站'
+            : request.region === 'beijing'
+              ? '北京'
+              : '新加坡'}{' '}
+          · {request.resolution} · {request.duration}{' '}
           秒）。优惠和实际扣费以服务商账单为准。
         </p>
         <MediaBudgetPanel
@@ -712,7 +813,9 @@ function VideoForm({
           className="button primary generate-image-button"
           disabled={!hasKey}
         >
-          提交图生视频任务
+          {relay && relay.mode === 'text'
+            ? '提交文生视频任务'
+            : '提交图生视频任务'}
         </button>
         <p className="field-hint">
           停止只结束本地查询，不会取消远程生成。拿到任务 ID

@@ -153,13 +153,42 @@ export interface ConnectionCheck {
   modelListed: boolean | null
 }
 export interface VideoRequest {
+  wulusai?: WulusaiVideoSettings | null
   context: ShotContext
   firstFrameVersionId: string
   region: 'singapore' | 'beijing'
   prompt: string
   negativePrompt: string
   duration: number
-  resolution: '720P' | '1080P'
+  resolution: '480P' | '720P' | '768P' | '1080P' | '2K'
+}
+export interface WulusaiVideoSettings {
+  baseUrl: string
+  model: string
+  mode: 'text' | 'frame'
+  ratio: string | null
+  budgetReservationMicroUsd: number
+}
+export const defaultVideoRelay = (): WulusaiVideoSettings => ({
+  baseUrl: 'https://api.wulusai.com',
+  model: 'minimax-h3',
+  mode: 'text',
+  ratio: null,
+  budgetReservationMicroUsd: 1_000_000,
+})
+export const videoMinimumDuration = (request: VideoRequest) =>
+  request.wulusai
+    ? request.wulusai.model === 'grok-imagine-video-1.5-lite'
+      ? 1
+      : 4
+    : 2
+export function videoResolutions(
+  settings?: WulusaiVideoSettings | null,
+): [VideoRequest['resolution'], ...VideoRequest['resolution'][]] {
+  if (!settings) return ['720P', '1080P']
+  return settings.model === 'grok-imagine-video-1.5-lite'
+    ? ['480P', '720P', '1080P']
+    : ['480P', '768P', '1080P', '2K']
 }
 export interface VideoJob {
   id: string
@@ -399,14 +428,33 @@ export function videoEstimateMicroUsd(
   region: VideoRequest['region'],
   resolution: VideoRequest['resolution'],
   duration: number,
+  wulusai?: WulusaiVideoSettings | null,
 ): number {
+  if (wulusai) return wulusai.budgetReservationMicroUsd
   // Preview of the Rust budget tariff, checked against Model Studio on 2026-09-28.
   const rates = {
     beijing: { '720P': 86_012, '1080P': 143_353 },
     singapore: { '720P': 100_000, '1080P': 150_000 },
   }
-  return rates[region][resolution] * duration
+  return resolution === '720P' || resolution === '1080P'
+    ? rates[region][resolution] * duration
+    : 0
 }
+export const wulusaiVideoKeyStatus = (baseUrl: string): Promise<boolean> =>
+  isDesktop
+    ? invoke('wulusai_video_key_status', { baseUrl })
+    : Promise.resolve(false)
+export const saveWulusaiVideoKey = (
+  baseUrl: string,
+  apiKey: string,
+): Promise<void> => invoke('save_wulusai_video_key', { baseUrl, apiKey })
+export const clearWulusaiVideoKey = (baseUrl: string): Promise<void> =>
+  invoke('clear_wulusai_video_key', { baseUrl })
+export const checkWulusaiVideoConnection = (
+  baseUrl: string,
+  model: string,
+): Promise<ConnectionCheck> =>
+  invoke('check_wulusai_video_connection', { baseUrl, model })
 export const listCloudImageJobs = (
   workflowId: string,
 ): Promise<CloudImageJob[]> =>
