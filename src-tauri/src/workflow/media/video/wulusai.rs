@@ -114,8 +114,8 @@ pub(super) fn body(
     if settings.is_grok() {
         let mut body = json!({"model":settings.model,"prompt":prompt,"seconds":request.duration.to_string(),"size":request.resolution.to_ascii_lowercase()});
         if settings.mode == Mode::Frame {
-            body["input_reference"] =
-                json!({"image_url": reference.ok_or("图生视频缺少首帧图片")?});
+            // The relay's observed JSON schema uses a string, unlike OpenAI's object.
+            body["input_reference"] = json!(reference.ok_or("图生视频缺少首帧图片")?);
         }
         return Ok(body);
     }
@@ -147,12 +147,15 @@ pub(super) fn output(data: &Value, expected_id: &str) -> AppResult<Value> {
         "running" | "processing" | "in_progress" => "RUNNING",
         "success" | "succeeded" | "completed" => "SUCCEEDED",
         "failed" | "canceled" | "cancelled" => "FAILED",
-        "unknown" | "expired" => "UNKNOWN",
+        "unknown" => return Err("视频服务尚未确认原任务状态；可继续查询原任务".into()),
+        "expired" => "UNKNOWN",
         _ => return Err("Wulusai 视频状态暂未识别，可继续查询原任务".into()),
     };
     let url = task
         .pointer("/content/url")
-        .or_else(|| task.get("file_url"));
+        .or_else(|| task.get("file_url"))
+        .or_else(|| task.pointer("/metadata/url"))
+        .filter(|value| value.as_str().is_some_and(|s| !s.is_empty()));
     if status == "SUCCEEDED" && url.and_then(Value::as_str).is_none() {
         return Err("视频任务已完成但未返回下载地址，可继续查询原任务".into());
     }
@@ -162,8 +165,13 @@ pub(super) fn output(data: &Value, expected_id: &str) -> AppResult<Value> {
 pub(super) fn parse_output(settings: &Settings, data: &Value, id: &str) -> AppResult<Value> {
     if settings.is_grok()
         && data["status"] == "completed"
-        && data.get("file_url").is_none()
-        && data.pointer("/content/url").is_none()
+        && [
+            data.get("file_url"),
+            data.pointer("/content/url"),
+            data.pointer("/metadata/url"),
+        ]
+        .iter()
+        .all(|value| !value.is_some_and(|v| v.as_str().is_some_and(|s| !s.is_empty())))
     {
         let mut data = data.clone();
         data["file_url"] = json!(format!("https://ai.wulusai.com/workflow/files/{id}.mp4"));
@@ -355,7 +363,7 @@ mod tests {
             body(&settings, &request, Some(reference)).unwrap(),
             json!({
                 "model":"grok-imagine-video-1.5-lite","prompt":"Animate the boat.",
-                "seconds":"1","size":"480p","input_reference":{"image_url":reference}
+                "seconds":"1","size":"480p","input_reference":reference
             })
         );
         assert_eq!(endpoint(&settings, None).unwrap().path(), "/v1/videos");
@@ -377,6 +385,13 @@ mod tests {
         assert!(validate(&settings, &request).is_err());
         settings.ratio = None;
         settings.mode = Mode::Text;
+        assert!(parse_output(
+            &settings,
+            &json!({"id":"video-test","status":"unknown"}),
+            "video-test"
+        )
+        .is_err());
+        assert_eq!(parse_output(&settings, &json!({"id":"video-test","status":"completed", "metadata":{"url":"https://ai.wulusai.com/workflow/files/actual.mp4"}}), "video-test").unwrap()["video_url"], "https://ai.wulusai.com/workflow/files/actual.mp4");
         assert!(body(&settings, &request, None)
             .unwrap()
             .get("input_reference")

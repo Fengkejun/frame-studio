@@ -710,7 +710,9 @@ pub fn resume_video_job(
     id: String,
 ) -> AppResult<()> {
     let mut job = load_job(&state, &id)?;
-    if job.status != "paused" || job.task_id.is_none() {
+    let queryable =
+        job.status == "paused" || (job.status == "unknown" && job.request.wulusai.is_some());
+    if !queryable || job.task_id.is_none() {
         return Err("只有已取得远程任务 ID 的暂停任务可以继续查询".into());
     }
     let key = request_key(&job.request)?;
