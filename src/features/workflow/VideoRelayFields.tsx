@@ -1,5 +1,6 @@
 import type { WulusaiVideoSettings } from './mediaApi'
 import { useState } from 'react'
+import { getVideoModel, relayVideoModels, videoModeLabels } from './videoModels'
 
 export function VideoRelayFields({
   settings,
@@ -9,6 +10,7 @@ export function VideoRelayFields({
   onChange: (settings: WulusaiVideoSettings) => void
 }) {
   const [address, setAddress] = useState(settings.baseUrl)
+  const model = getVideoModel(settings.model)
   return (
     <>
       <label className="field-label">
@@ -39,13 +41,19 @@ export function VideoRelayFields({
           value={settings.model}
           onChange={(e) => onChange({ ...settings, model: e.target.value })}
         >
-          <option value="minimax-h3">MiniMax-H3</option>
-          <option value="grok-imagine-video-1.5-lite">
-            Grok Imagine Video 1.5 Lite
-          </option>
+          {relayVideoModels.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
         </select>
       </label>
-      {settings.model === 'grok-imagine-video-1.5-lite' && (
+      <p className="field-hint" data-testid="video-model-capabilities">
+        支持{model.modes.map((mode) => videoModeLabels[mode]).join('、')} ·{' '}
+        {model.duration.min}–{model.duration.max} 秒 ·{' '}
+        {model.resolutions.join(' / ')}
+      </p>
+      {model.modes.length > 1 && (
         <label className="field-label">
           生成方式
           <select
@@ -58,18 +66,21 @@ export function VideoRelayFields({
               })
             }
           >
-            <option value="text">文生视频</option>
-            <option value="frame">首帧图生视频</option>
+            {model.modes.map((mode) => (
+              <option key={mode} value={mode}>
+                {videoModeLabels[mode]}
+              </option>
+            ))}
           </select>
         </label>
       )}
       <p className="field-hint">
         {settings.mode === 'frame'
-          ? '将当前已确认首帧居中裁剪为所选的 16:9 尺寸并发送给视频模型，原图版本保留。'
+          ? '将当前已确认首帧按模型要求的尺寸居中裁剪并发送，原图版本保留。'
           : '文生视频按提示词生成，候选关联当前镜头。'}
         模型返回的实际尺寸和时长会在下载后读取。
       </p>
-      {settings.model !== 'grok-imagine-video-1.5-lite' && (
+      {model.ratios.length > 0 && (
         <>
           <label className="field-label">
             画面比例
@@ -81,7 +92,7 @@ export function VideoRelayFields({
               }
             >
               <option value="">由模型决定</option>
-              {['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'].map((ratio) => (
+              {model.ratios.map((ratio) => (
                 <option key={ratio}>{ratio}</option>
               ))}
             </select>
@@ -110,6 +121,9 @@ export function VideoRelayFields({
       </label>
       <p className="field-hint">
         预算预留由你填写；服务按成片秒数计费，余额与实际扣费以中转站账单为准。
+      </p>
+      <p className="field-hint">
+        这里只列出已适配的模型。模型目录中出现的其他模型，需要核对接口和参数后接入。
       </p>
     </>
   )

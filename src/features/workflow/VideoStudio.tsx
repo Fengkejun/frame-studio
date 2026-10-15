@@ -10,6 +10,7 @@ import { AssetImage } from './AssetImage'
 import type { ShotTarget } from './ImageStudio'
 import './media.css'
 import { VideoRelayFields } from './VideoRelayFields'
+import { getVideoModel, wanVideoModel } from './videoModels'
 
 interface Props {
   workflow: Workflow
@@ -99,7 +100,7 @@ export function VideoStudio({
           label: `${node.label} · ${shot.id} ${shot.title}`,
           video: {
             firstFrameVersionId: frame.versionId,
-            duration: Math.min(15, Math.max(1, Math.round(shot.duration))),
+            duration: Math.round(shot.duration),
           },
         },
       ]
@@ -470,8 +471,11 @@ function VideoForm({
     region: 'singapore',
     prompt: shot.videoPrompt,
     negativePrompt: '',
-    duration: Math.min(15, Math.max(2, Math.round(shot.duration))),
-    resolution: '720P',
+    duration: Math.min(
+      wanVideoModel.duration.max,
+      Math.max(wanVideoModel.duration.min, Math.round(shot.duration)),
+    ),
+    resolution: wanVideoModel.defaultResolution,
   })
   const [key, setKey] = useState('')
   const [hasKey, setHasKey] = useState(false)
@@ -536,12 +540,14 @@ function VideoForm({
               resetConnection()
               const next =
                 e.target.value === 'relay' ? api.defaultVideoRelay() : null
-              setRequest((r) => ({
-                ...r,
-                wulusai: next,
-                resolution: next ? '1080P' : '720P',
-                duration: Math.max(next ? 4 : 2, r.duration),
-              }))
+              setRequest((r) =>
+                api.normalizeVideoRequest({
+                  ...r,
+                  wulusai: next,
+                  resolution: api.videoModelFor({ wulusai: next })
+                    .defaultResolution,
+                }),
+              )
             }}
           >
             <option value="wan">阿里云万相 · 图生视频</option>
@@ -557,27 +563,13 @@ function VideoForm({
                 setConnection(null)
                 next = {
                   ...next,
-                  mode:
-                    next.model === 'grok-imagine-video-1.5-lite'
-                      ? 'frame'
-                      : 'text',
+                  mode: getVideoModel(next.model).defaultMode,
                   ratio: null,
                 }
               }
-              setRequest((r) => {
-                const resolutions = api.videoResolutions(next)
-                const updated = { ...r, wulusai: next }
-                return {
-                  ...updated,
-                  duration: Math.max(
-                    api.videoMinimumDuration(updated),
-                    r.duration,
-                  ),
-                  resolution: resolutions.includes(r.resolution)
-                    ? r.resolution
-                    : resolutions[0],
-                }
-              })
+              setRequest((r) =>
+                api.normalizeVideoRequest({ ...r, wulusai: next }),
+              )
             }}
           />
         )}
@@ -753,7 +745,7 @@ function VideoForm({
               type="number"
               required
               min={api.videoMinimumDuration(request)}
-              max={15}
+              max={api.videoMaximumDuration(request)}
               step={1}
               value={request.duration}
               onChange={(event) =>

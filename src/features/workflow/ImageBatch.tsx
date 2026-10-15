@@ -31,19 +31,13 @@ export function BatchSubmit({
     if (request.kind === 'video' && t.video)
       return {
         kind: 'video',
-        request: {
+        request: api.normalizeVideoRequest({
           ...request.request,
           context: t.context,
           firstFrameVersionId: t.video.firstFrameVersionId,
-          duration: Math.min(
-            15,
-            Math.max(
-              api.videoMinimumDuration(request.request),
-              t.video.duration,
-            ),
-          ),
+          duration: t.video.duration,
           prompt: t.prompt,
-        },
+        }),
       }
     if (request.kind === 'cloud')
       return {

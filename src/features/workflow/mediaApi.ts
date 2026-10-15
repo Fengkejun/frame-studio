@@ -1,5 +1,12 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core'
 import { isDesktop } from '@/shared/lib/desktop'
+import {
+  defaultRelayModel,
+  getVideoModel,
+  wanVideoModel,
+  type VideoMode,
+  type VideoResolution,
+} from './videoModels'
 
 export interface ShotContext {
   workflowId: string
@@ -160,35 +167,60 @@ export interface VideoRequest {
   prompt: string
   negativePrompt: string
   duration: number
-  resolution: '480P' | '720P' | '768P' | '1080P' | '2K'
+  resolution: VideoResolution
 }
 export interface WulusaiVideoSettings {
   baseUrl: string
   model: string
-  mode: 'text' | 'frame'
+  mode: VideoMode
   ratio: string | null
   budgetReservationMicroUsd: number
 }
 export const defaultVideoRelay = (): WulusaiVideoSettings => ({
   baseUrl: 'https://api.wulusai.com',
-  model: 'minimax-h3',
-  mode: 'text',
+  model: defaultRelayModel.id,
+  mode: defaultRelayModel.defaultMode,
   ratio: null,
   budgetReservationMicroUsd: 1_000_000,
 })
-export const videoMinimumDuration = (request: VideoRequest) =>
-  request.wulusai
-    ? request.wulusai.model === 'grok-imagine-video-1.5-lite'
-      ? 1
-      : 4
-    : 2
+export const videoModelFor = (request: Pick<VideoRequest, 'wulusai'>) =>
+  request.wulusai ? getVideoModel(request.wulusai.model) : wanVideoModel
+export const videoMinimumDuration = (request: Pick<VideoRequest, 'wulusai'>) =>
+  videoModelFor(request).duration.min
+export const videoMaximumDuration = (request: Pick<VideoRequest, 'wulusai'>) =>
+  videoModelFor(request).duration.max
 export function videoResolutions(
   settings?: WulusaiVideoSettings | null,
-): [VideoRequest['resolution'], ...VideoRequest['resolution'][]] {
-  if (!settings) return ['720P', '1080P']
-  return settings.model === 'grok-imagine-video-1.5-lite'
-    ? ['480P', '720P', '1080P']
-    : ['480P', '768P', '1080P', '2K']
+): VideoResolution[] {
+  return videoModelFor({ wulusai: settings }).resolutions
+}
+// Only normalize when the user changes service/model or builds a batch snapshot.
+// Persisted jobs retain their original request parameters during recovery.
+export function normalizeVideoRequest(request: VideoRequest): VideoRequest {
+  const model = videoModelFor(request)
+  const settings = request.wulusai
+  return {
+    ...request,
+    duration: Math.min(
+      model.duration.max,
+      Math.max(model.duration.min, request.duration),
+    ),
+    resolution: model.resolutions.includes(request.resolution)
+      ? request.resolution
+      : model.defaultResolution,
+    wulusai: settings
+      ? {
+          ...settings,
+          mode: model.modes.includes(settings.mode)
+            ? settings.mode
+            : model.defaultMode,
+          ratio:
+            settings.ratio && model.ratios.includes(settings.ratio)
+              ? settings.ratio
+              : null,
+        }
+      : settings,
+  }
 }
 export interface VideoJob {
   id: string

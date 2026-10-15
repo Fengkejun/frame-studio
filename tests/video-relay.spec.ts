@@ -145,8 +145,19 @@ test('video relay keeps credentials bound to its address and sends explicit plan
     baseUrl: 'https://api.wulusai.com',
   })
   expect(JSON.stringify(submitted)).not.toContain('fixture-only')
+  await page.getByLabel('视频分辨率').selectOption('2K')
+  await page.getByLabel('视频画面比例').selectOption('9:16')
   await page.getByLabel('视频模型').selectOption('grok-imagine-video-1.5-lite')
   await expect(page.getByLabel('视频时长')).toHaveAttribute('min', '1')
+  await expect(page.getByLabel('视频时长')).toHaveAttribute('max', '15')
+  await expect(page.getByLabel('视频分辨率')).toHaveValue('480P')
+  await expect(page.getByLabel('视频画面比例')).toHaveCount(0)
+  await expect(page.getByTestId('video-model-capabilities')).toContainText(
+    '1–15 秒',
+  )
+  expect(
+    await page.getByLabel('视频分辨率').locator('option').allTextContents(),
+  ).toEqual(['480P', '720P', '1080P'])
   await page.getByLabel('视频时长').fill('1')
   await page.getByLabel('视频分辨率').selectOption('480P')
   await expect(page.getByLabel('视频生成方式')).toHaveValue('frame')
@@ -174,6 +185,17 @@ test('video relay keeps credentials bound to its address and sends explicit plan
       ratio: null,
     },
   })
+  // Switching back removes an unsupported mode/size and clamps the duration.
+  await page.getByLabel('视频分辨率').selectOption('720P')
+  await page.getByLabel('视频模型').selectOption('minimax-h3')
+  await expect(page.getByLabel('视频时长')).toHaveValue('4')
+  await expect(page.getByLabel('视频分辨率')).toHaveValue('1080P')
+  await expect(page.getByLabel('视频画面比例')).toHaveValue('')
+  await expect(page.getByLabel('视频生成方式')).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: '提交文生视频任务', exact: true }),
+  ).toBeEnabled()
+  await page.getByLabel('视频模型').selectOption('grok-imagine-video-1.5-lite')
   await page.getByLabel('视频 API 根地址').fill('https://other.example.com')
   await page.getByLabel('视频 API 根地址').press('Tab')
   await expect(
