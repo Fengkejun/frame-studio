@@ -2,13 +2,18 @@ import { z } from 'zod'
 import source from '@/shared/video-models.json'
 
 const mode = z.enum(['text', 'frame'])
-const resolution = z.enum(['480P', '720P', '768P', '1080P', '2K'])
+const resolution = z.enum(['480P', '720P', '768P', '1080P', '2K', '4K'])
 const modelSchema = z
   .object({
     id: z.string().min(1),
     name: z.string().min(1),
     aliases: z.array(z.string()),
-    protocol: z.enum(['wan', 'relay-content-v2', 'relay-videos-v1']),
+    protocol: z.enum([
+      'wan',
+      'relay-content-v2',
+      'relay-videos-v1',
+      'relay-ark-v3',
+    ]),
     modes: z.array(mode).min(1),
     defaultMode: mode,
     duration: z.object({
@@ -18,6 +23,8 @@ const modelSchema = z
     resolutions: z.array(resolution).min(1),
     defaultResolution: resolution,
     ratios: z.array(z.string()),
+    frameRatios: z.array(z.string()).optional(),
+    framePromptOptional: z.boolean().default(false),
     frameSizes: z.record(
       z.string(),
       z.tuple([z.number().int().positive(), z.number().int().positive()]),
@@ -27,6 +34,8 @@ const modelSchema = z
 export type VideoModel = z.infer<typeof modelSchema>
 export type VideoMode = z.infer<typeof mode>
 export type VideoResolution = z.infer<typeof resolution>
+export const videoRatiosFor = (model: VideoModel, mode: VideoMode) =>
+  mode === 'frame' ? (model.frameRatios ?? model.ratios) : model.ratios
 
 const catalog = z
   .object({

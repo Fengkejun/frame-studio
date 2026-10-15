@@ -551,7 +551,7 @@ function VideoForm({
             }}
           >
             <option value="wan">阿里云万相 · 图生视频</option>
-            <option value="relay">视频中转站 · MiniMax / Grok</option>
+            <option value="relay">视频中转站</option>
           </select>
         </label>
         {relay && (
@@ -704,7 +704,7 @@ function VideoForm({
           视频提示词
           <textarea
             aria-label="视频提示词"
-            required
+            required={api.videoPromptRequired(request)}
             maxLength={5000}
             rows={5}
             value={request.prompt}

@@ -4,6 +4,7 @@ import {
   defaultRelayModel,
   getVideoModel,
   wanVideoModel,
+  videoRatiosFor,
   type VideoMode,
   type VideoResolution,
 } from './videoModels'
@@ -189,6 +190,9 @@ export const videoMinimumDuration = (request: Pick<VideoRequest, 'wulusai'>) =>
   videoModelFor(request).duration.min
 export const videoMaximumDuration = (request: Pick<VideoRequest, 'wulusai'>) =>
   videoModelFor(request).duration.max
+export const videoPromptRequired = (request: Pick<VideoRequest, 'wulusai'>) =>
+  request.wulusai?.mode !== 'frame' ||
+  !videoModelFor(request).framePromptOptional
 export function videoResolutions(
   settings?: WulusaiVideoSettings | null,
 ): VideoResolution[] {
@@ -199,6 +203,10 @@ export function videoResolutions(
 export function normalizeVideoRequest(request: VideoRequest): VideoRequest {
   const model = videoModelFor(request)
   const settings = request.wulusai
+  const mode =
+    settings && model.modes.includes(settings.mode)
+      ? settings.mode
+      : model.defaultMode
   return {
     ...request,
     duration: Math.min(
@@ -211,11 +219,10 @@ export function normalizeVideoRequest(request: VideoRequest): VideoRequest {
     wulusai: settings
       ? {
           ...settings,
-          mode: model.modes.includes(settings.mode)
-            ? settings.mode
-            : model.defaultMode,
+          mode,
           ratio:
-            settings.ratio && model.ratios.includes(settings.ratio)
+            settings.ratio &&
+            videoRatiosFor(model, mode).includes(settings.ratio)
               ? settings.ratio
               : null,
         }

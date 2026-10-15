@@ -195,6 +195,40 @@ test('video relay keeps credentials bound to its address and sends explicit plan
   await expect(
     page.getByRole('button', { name: '提交文生视频任务', exact: true }),
   ).toBeEnabled()
+  for (const model of ['sd2.0', 'sd2.0-fast', 'sd2.0-mini', 'sd2.5']) {
+    await page.getByLabel('视频模型').selectOption(model)
+    await expect(page.getByLabel('视频时长')).toHaveAttribute('min', '4')
+    await expect(page.getByLabel('视频时长')).toHaveAttribute('max', '15')
+    expect(
+      await page.getByLabel('视频分辨率').locator('option').allTextContents(),
+    ).toEqual(['480P', '720P', '1080P', '4K'])
+    await expect(page.getByLabel('视频生成方式')).toHaveValue('text')
+  }
+  await page.getByLabel('视频画面比例').selectOption('16:9')
+  await page.getByLabel('视频生成方式').selectOption('frame')
+  await expect(page.getByLabel('视频画面比例')).toHaveValue('')
+  expect(
+    await page.getByLabel('视频画面比例').locator('option').allTextContents(),
+  ).toEqual(['由模型决定', 'adaptive'])
+  await page.getByLabel('视频提示词').fill('')
+  await expect(page.getByLabel('视频提示词')).not.toHaveAttribute('required')
+  await page.getByLabel('视频分辨率').selectOption('4K')
+  await page
+    .getByRole('button', { name: '提交图生视频任务', exact: true })
+    .click()
+  expect(
+    await page.evaluate(
+      () =>
+        (globalThis as unknown as { submittedVideoFixture: unknown })
+          .submittedVideoFixture,
+    ),
+  ).toMatchObject({
+    prompt: '',
+    resolution: '4K',
+    wulusai: { model: 'sd2.5', mode: 'frame', ratio: null },
+  })
+  await page.getByLabel('视频生成方式').selectOption('text')
+  await expect(page.getByLabel('视频提示词')).toHaveAttribute('required')
   await page.getByLabel('视频模型').selectOption('grok-imagine-video-1.5-lite')
   await page.getByLabel('视频 API 根地址').fill('https://other.example.com')
   await page.getByLabel('视频 API 根地址').press('Tab')

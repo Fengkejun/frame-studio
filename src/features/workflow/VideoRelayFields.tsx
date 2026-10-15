@@ -1,6 +1,11 @@
 import type { WulusaiVideoSettings } from './mediaApi'
 import { useState } from 'react'
-import { getVideoModel, relayVideoModels, videoModeLabels } from './videoModels'
+import {
+  getVideoModel,
+  relayVideoModels,
+  videoModeLabels,
+  videoRatiosFor,
+} from './videoModels'
 
 export function VideoRelayFields({
   settings,
@@ -11,6 +16,7 @@ export function VideoRelayFields({
 }) {
   const [address, setAddress] = useState(settings.baseUrl)
   const model = getVideoModel(settings.model)
+  const ratios = videoRatiosFor(model, settings.mode)
   return (
     <>
       <label className="field-label">
@@ -76,11 +82,18 @@ export function VideoRelayFields({
       )}
       <p className="field-hint">
         {settings.mode === 'frame'
-          ? '将当前已确认首帧按模型要求的尺寸居中裁剪并发送，原图版本保留。'
+          ? Object.keys(model.frameSizes).length
+            ? '将当前已确认首帧按模型要求的尺寸居中裁剪并发送，原图版本保留。'
+            : '将当前已确认首帧转为 JPEG 并发送，原图尺寸和版本保留。'
           : '文生视频按提示词生成，候选关联当前镜头。'}
         模型返回的实际尺寸和时长会在下载后读取。
       </p>
-      {model.ratios.length > 0 && (
+      {model.frameRatios && settings.mode === 'frame' && (
+        <p className="field-hint">
+          当前首帧模式按原图比例适配；比例不选时使用 adaptive。
+        </p>
+      )}
+      {ratios.length > 0 && (
         <>
           <label className="field-label">
             画面比例
@@ -92,7 +105,7 @@ export function VideoRelayFields({
               }
             >
               <option value="">由模型决定</option>
-              {model.ratios.map((ratio) => (
+              {ratios.map((ratio) => (
                 <option key={ratio}>{ratio}</option>
               ))}
             </select>
