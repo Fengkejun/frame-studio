@@ -1,5 +1,6 @@
 //! Wan first-frame video jobs. Persist the remote task ID before polling; never
 //! repeat a possibly billable submit after an uncertain response.
+pub mod wulusai;
 use super::budget::{reserve_job, video_estimate_micro_usd, BillableJob};
 use super::connection::{check_catalog, ConnectionCheck};
 use super::*;
@@ -30,6 +31,8 @@ pub struct ActiveVideo {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VideoRequest {
+    #[serde(default)]
+    pub wulusai: Option<wulusai::Settings>,
     pub context: ShotContext,
     pub first_frame_version_id: String,
     pub region: String,
@@ -195,13 +198,17 @@ pub(super) fn validate_request(
     state: &WorkflowState,
     request: &VideoRequest,
 ) -> AppResult<ImageAsset> {
-    valid_region(&request.region)?;
+    if let Some(settings) = &request.wulusai {
+        wulusai::validate(settings, request)?;
+    } else {
+        valid_region(&request.region)?;
+    }
     validate_context(state, &request.context)?;
     if request.prompt.trim().is_empty()
         || request.prompt.chars().count() > 5000
         || request.negative_prompt.chars().count() > 500
         || !(2..=15).contains(&request.duration)
-        || !["720P", "1080P"].contains(&request.resolution.as_str())
+        || (request.wulusai.is_none() && !["720P", "1080P"].contains(&request.resolution.as_str()))
     {
         return Err("请检查视频提示词、时长和分辨率".into());
     }
@@ -623,7 +630,7 @@ fn launch(app: tauri::AppHandle, mut job: VideoJob, key: String, cancel: Arc<Ato
                 }
                 .into();
             }
-            job.message = error;
+            job.message = error.replace(&key, "[REDACTED_SECRET]");
         }
         job.updated_at = now();
         if let Err(error) = save_job(&state, &job) {
@@ -649,9 +656,8 @@ pub(super) fn start_with_id(
     id: String,
 ) -> AppResult<VideoJob> {
     validate_request(&state, &request)?;
-    let key = get_key(&request.region)?.ok_or("请先保存对应地区的万相 API Key")?;
-    let estimate =
-        video_estimate_micro_usd(&request.region, request.duration, &request.resolution)?;
+    let key = request_key(&request)?;
+    let estimate = estimate(&request)?;
     let mut job = VideoJob {
         id,
         request,
@@ -702,7 +708,7 @@ pub fn resume_video_job(
     if job.status != "paused" || job.task_id.is_none() {
         return Err("只有已取得远程任务 ID 的暂停任务可以继续查询".into());
     }
-    let key = get_key(&job.request.region)?.ok_or("请先保存对应地区的万相 API Key")?;
+    let key = request_key(&job.request)?;
     let cancel = reserve(&state, &job)?;
     job.status = "running".into();
     job.message = "正在查询原视频任务".into();
@@ -716,6 +722,39 @@ pub fn resume_video_job(
         return Err(error);
     }
     launch(app, job, key, cancel);
+    Ok(())
+}
+pub(super) fn estimate(request: &VideoRequest) -> AppResult<u64> {
+    if let Some(settings) = &request.wulusai {
+        wulusai::validate(settings, request)?;
+        Ok(settings.budget_reservation_micro_usd)
+    } else {
+        video_estimate_micro_usd(&request.region, request.duration, &request.resolution)
+    }
+}
+fn request_key(request: &VideoRequest) -> AppResult<String> {
+    if let Some(settings) = &request.wulusai {
+        wulusai::key(&settings.base_url)?.ok_or("请先保存当前 Wulusai 服务的 API Key".into())
+    } else {
+        get_key(&request.region)?.ok_or("请先保存对应地区的万相 API Key".into())
+    }
+}
+fn service_url(request: &VideoRequest, task_id: Option<&str>) -> AppResult<Url> {
+    if let Some(settings) = &request.wulusai {
+        wulusai::endpoint(settings, task_id)
+    } else {
+        api_url(&request.region, task_id)
+    }
+}
+fn valid_task_id(id: &str) -> AppResult<()> {
+    if id.is_empty()
+        || id.len() > 128
+        || !id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err("远程视频任务 ID 无效".into());
+    }
     Ok(())
 }
 fn api_url(region: &str, task_id: Option<&str>) -> AppResult<Url> {
@@ -738,14 +777,7 @@ fn api_url(region: &str, task_id: Option<&str>) -> AppResult<Url> {
         }
     }
     if let Some(id) = task_id {
-        if id.is_empty()
-            || id.len() > 128
-            || !id
-                .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-        {
-            return Err("远程视频任务 ID 无效".into());
-        }
+        valid_task_id(id)?;
         url.set_path(&format!("/api/v1/tasks/{id}"));
     } else {
         url.set_path("/api/v1/services/aigc/video-generation/video-synthesis");
@@ -778,6 +810,9 @@ fn client() -> AppResult<Client> {
 }
 fn request_body(state: &WorkflowState, request: &VideoRequest) -> AppResult<Value> {
     let entry = validate_request(state, request)?;
+    if let Some(settings) = &request.wulusai {
+        return Ok(wulusai::body(settings, request));
+    }
     let bytes = std::fs::read(state.directory.join("assets").join(entry.file_name))
         .map_err(|_| "首帧原图已丢失")?;
     let (decoded, _) = super::decode(&bytes)?;
@@ -825,12 +860,13 @@ async fn execute(
         if cancel.load(Ordering::SeqCst) {
             return Err("提交前已停止；没有创建远程视频任务".into());
         }
-        let url = api_url(&job.request.region, None)?;
+        let url = service_url(&job.request, None)?;
         job.status = "submitting".into();
-        let response = client
-            .post(url)
-            .bearer_auth(key)
-            .header("X-DashScope-Async", "enable")
+        let mut submission = client.post(url).bearer_auth(key);
+        if job.request.wulusai.is_none() {
+            submission = submission.header("X-DashScope-Async", "enable");
+        }
+        let response = submission
             .json(&body)
             .send()
             .await
@@ -838,6 +874,7 @@ async fn execute(
         let status = response.status();
         let data = response_json(response).await?;
         if !status.is_success()
+            || data.get("error").is_some_and(|e| !e.is_null())
             || data
                 .get("code")
                 .and_then(Value::as_str)
@@ -847,21 +884,25 @@ async fn execute(
                 job.status = "failed".into();
             }
             return Err(format!(
-                "万相拒绝视频任务（HTTP {}）：{}",
+                "视频服务拒绝任务（HTTP {}）：{}",
                 status.as_u16(),
-                data["message"]
-                    .as_str()
+                data.pointer("/error/message")
+                    .or_else(|| data.get("message"))
+                    .and_then(Value::as_str)
                     .unwrap_or("请检查密钥、地区与模型权限")
                     .chars()
                     .take(200)
                     .collect::<String>()
             ));
         }
-        let task_id = data
-            .pointer("/output/task_id")
-            .and_then(Value::as_str)
-            .ok_or("提交响应缺少任务 ID；结果未知，请核对服务商用量")?;
-        api_url(&job.request.region, Some(task_id))?;
+        let task_id = (if job.request.wulusai.is_some() {
+            data.get("task_id")
+        } else {
+            data.pointer("/output/task_id")
+        })
+        .and_then(Value::as_str)
+        .ok_or("提交响应缺少任务 ID；结果未知，请核对服务商用量")?;
+        service_url(&job.request, Some(task_id))?;
         job.task_id = Some(task_id.to_owned());
         job.status = "queued".into();
         job.message = "远程任务已创建，正在等待结果".into();
@@ -875,7 +916,7 @@ async fn execute(
         }
         let id = job.task_id.as_deref().ok_or("远程任务 ID 丢失")?;
         let response = client
-            .get(api_url(&job.request.region, Some(id))?)
+            .get(service_url(&job.request, Some(id))?)
             .bearer_auth(key)
             .send()
             .await
@@ -888,7 +929,13 @@ async fn execute(
                 status.as_u16()
             ));
         }
-        let output = data.get("output").ok_or("查询响应缺少任务结果")?;
+        let normalized;
+        let output = if job.request.wulusai.is_some() {
+            normalized = wulusai::output(&data, id)?;
+            &normalized
+        } else {
+            data.get("output").ok_or("查询响应缺少任务结果")?
+        };
         match output["task_status"].as_str().unwrap_or("") {
             "PENDING" | "RUNNING" => {
                 job.status = if output["task_status"] == "PENDING" {
@@ -907,7 +954,12 @@ async fn execute(
                 save_job(state, job)?;
                 tokio::time::sleep(Duration::from_secs(
                     if cfg!(debug_assertions)
-                        && std::env::var_os("FRAME_STUDIO_TEST_WAN_URL").is_some()
+                        && (std::env::var_os("FRAME_STUDIO_TEST_WAN_URL").is_some()
+                            || job
+                                .request
+                                .wulusai
+                                .as_ref()
+                                .is_some_and(|s| s.base_url.starts_with("http://127.0.0.1:")))
                     {
                         1
                     } else {
@@ -950,12 +1002,16 @@ async fn execute(
         }
     }
 }
-fn valid_download_url(value: &str) -> AppResult<Url> {
+fn valid_download_url(value: &str, request: &VideoRequest) -> AppResult<Url> {
     let url = Url::parse(value).map_err(|_| "视频下载地址无效")?;
-    let trusted = url.scheme() == "https"
-        && url
-            .host_str()
-            .is_some_and(|host| host.ends_with(".aliyuncs.com"));
+    let trusted = if let Some(settings) = &request.wulusai {
+        wulusai::trusted_download(&url, settings)?
+    } else {
+        url.scheme() == "https"
+            && url
+                .host_str()
+                .is_some_and(|host| host.ends_with(".aliyuncs.com"))
+    };
     let fixture = cfg!(debug_assertions)
         && std::env::var_os("FRAME_STUDIO_TEST_DATA_DIR").is_some()
         && url.scheme() == "http"
@@ -987,7 +1043,7 @@ async fn download(
         }
     }
     let response = client
-        .get(valid_download_url(value)?)
+        .get(valid_download_url(value, &job.request)?)
         .send()
         .await
         .map_err(|_| "视频下载中断；可继续查询原任务")?;
@@ -1069,7 +1125,12 @@ async fn download(
         created_at: now(),
         file_name,
         metadata: Some(metadata),
-        source: "wan".into(),
+        source: if job.request.wulusai.is_some() {
+            "wulusai-text"
+        } else {
+            "wan"
+        }
+        .into(),
         name: None,
     };
     save_asset(state, &entry)?;
@@ -1097,6 +1158,7 @@ mod tests {
             directory: directory.clone(),
         };
         let request = VideoRequest {
+            wulusai: None,
             context: ShotContext {
                 workflow_id: "w".into(),
                 node_id: "n".into(),

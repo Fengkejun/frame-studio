@@ -260,7 +260,7 @@ fn start_batch(app: tauri::AppHandle, requests: Vec<BatchRequest>) -> AppResult<
             }
             BatchRequest::Video(r) => {
                 video::validate_request(&state, r)?;
-                budget::video_estimate_micro_usd(&r.region, r.duration, &r.resolution)?
+                video::estimate(r)?
             }
         };
         estimate = estimate.checked_add(amount).ok_or("批量预算金额溢出")?;
@@ -604,6 +604,7 @@ mod tests {
         let mut video_item = saved.clone();
         video_item.job_id = "video-saved".into();
         video_item.request = BatchRequest::Video(video::VideoRequest {
+            wulusai: None,
             context: video_item.request.context().clone(),
             first_frame_version_id: "frame-v1".into(),
             region: "singapore".into(),

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-check-wulusai-video-connection"
+description = "Enables the check_wulusai_video_connection command without any pre-configured scope."
+commands.allow = ["check_wulusai_video_connection"]
+
+[[permission]]
+identifier = "deny-check-wulusai-video-connection"
+description = "Denies the check_wulusai_video_connection command without any pre-configured scope."
+commands.deny = ["check_wulusai_video_connection"]

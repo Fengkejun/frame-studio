@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-wulusai-video-key-status"
+description = "Enables the wulusai_video_key_status command without any pre-configured scope."
+commands.allow = ["wulusai_video_key_status"]
+
+[[permission]]
+identifier = "deny-wulusai-video-key-status"
+description = "Denies the wulusai_video_key_status command without any pre-configured scope."
+commands.deny = ["wulusai_video_key_status"]
