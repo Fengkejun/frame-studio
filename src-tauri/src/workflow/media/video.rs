@@ -1,5 +1,6 @@
 //! Wan first-frame video jobs. Persist the remote task ID before polling; never
 //! repeat a possibly billable submit after an uncertain response.
+mod models;
 pub mod wulusai;
 use super::budget::{reserve_job, video_estimate_micro_usd, BillableJob};
 use super::connection::{check_catalog, ConnectionCheck};
@@ -19,7 +20,6 @@ use std::{
 use tauri::Manager;
 use tokio::io::AsyncWriteExt;
 
-const MODEL: &str = "wan2.7-i2v-2026-04-25";
 const MAX_VIDEO_BYTES: u64 = 256 * 1024 * 1024;
 const API_LIMIT: usize = 128 * 1024;
 
@@ -189,10 +189,10 @@ pub async fn check_video_connection(region: String) -> AppResult<ConnectionCheck
     let mut url = api_url(&region, None)?;
     url.set_path("/api/v1/models");
     url.query_pairs_mut()
-        .append_pair("model", MODEL)
+        .append_pair("model", &models::wan()?.id)
         .append_pair("page_no", "1")
         .append_pair("page_size", "1");
-    check_catalog(url, &key, MODEL, "wan").await
+    check_catalog(url, &key, &models::wan()?.id, "wan").await
 }
 pub(super) fn validate_request(
     state: &WorkflowState,
@@ -202,18 +202,17 @@ pub(super) fn validate_request(
         wulusai::validate(settings, request)?;
     } else {
         valid_region(&request.region)?;
+        models::wan()?.validate(
+            request.duration,
+            &request.resolution,
+            models::Mode::Frame,
+            None,
+        )?;
     }
     validate_context(state, &request.context)?;
     if request.prompt.trim().is_empty()
         || request.prompt.chars().count() > 5000
         || request.negative_prompt.chars().count() > 500
-        || !(request
-            .wulusai
-            .as_ref()
-            .map(|s| s.minimum_duration())
-            .unwrap_or(2)..=15)
-            .contains(&request.duration)
-        || (request.wulusai.is_none() && !["720P", "1080P"].contains(&request.resolution.as_str()))
     {
         return Err("请检查视频提示词、时长和分辨率".into());
     }
@@ -825,13 +824,11 @@ fn request_body(state: &WorkflowState, request: &VideoRequest) -> AppResult<Valu
     let bytes = std::fs::read(state.directory.join("assets").join(entry.file_name))
         .map_err(|_| "首帧原图已丢失")?;
     let (mut decoded, _) = super::decode(&bytes)?;
-    if request.wulusai.as_ref().is_some_and(|s| s.is_grok()) {
-        let (width, height) = match request.resolution.as_str() {
-            "480P" => (854, 480),
-            "720P" => (1280, 720),
-            _ => (1920, 1080),
-        };
-        decoded = decoded.resize_to_fill(width, height, image::imageops::FilterType::Lanczos3);
+    if let Some(settings) = &request.wulusai {
+        if let Some([width, height]) = settings.profile()?.frame_sizes.get(&request.resolution) {
+            decoded =
+                decoded.resize_to_fill(*width, *height, image::imageops::FilterType::Lanczos3);
+        }
     }
     let (width, height) = decoded.dimensions();
     if width < 240 || height < 240 {
@@ -853,7 +850,7 @@ fn request_body(state: &WorkflowState, request: &VideoRequest) -> AppResult<Valu
         );
     }
     Ok(json!({
-        "model": MODEL,
+        "model": models::wan()?.id,
         "input": {
             "prompt": request.prompt,
             "negative_prompt": request.negative_prompt,
@@ -920,7 +917,15 @@ async fn execute(
             ));
         }
         let task_id = (if job.request.wulusai.is_some() {
-            if job.request.wulusai.as_ref().is_some_and(|s| s.is_grok()) {
+            if job
+                .request
+                .wulusai
+                .as_ref()
+                .ok_or("视频服务配置丢失")?
+                .profile()?
+                .protocol
+                == models::Protocol::RelayVideosV1
+            {
                 data.get("id")
             } else {
                 data.get("task_id")

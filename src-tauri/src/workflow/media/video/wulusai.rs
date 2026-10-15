@@ -1,14 +1,8 @@
 //! Relay v2 MiniMax and v1 Grok protocols. Settings travel with a job; credentials stay in
 //! the system vault. This module only accepts documented generation modes.
+pub use super::models::Mode;
+use super::models::{Model, Protocol};
 use super::*;
-
-#[derive(Clone, Default, Serialize, Deserialize, PartialEq, Debug)]
-#[serde(rename_all = "lowercase")]
-pub enum Mode {
-    #[default]
-    Text,
-    Frame,
-}
 
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -21,15 +15,12 @@ pub struct Settings {
     pub budget_reservation_micro_usd: u64,
 }
 impl Settings {
-    pub(super) fn is_grok(&self) -> bool {
-        self.model == "grok-imagine-video-1.5-lite"
-    }
-    pub(super) fn minimum_duration(&self) -> u8 {
-        if self.is_grok() {
-            1
-        } else {
-            4
+    pub(super) fn profile(&self) -> AppResult<&'static Model> {
+        let profile = models::find(&self.model)?;
+        if profile.protocol == Protocol::Wan {
+            return Err("请在万相视频服务中选择该模型".into());
         }
+        Ok(profile)
     }
 }
 
@@ -57,15 +48,16 @@ fn base(value: &str) -> AppResult<Url> {
 
 pub(super) fn endpoint(settings: &Settings, task_id: Option<&str>) -> AppResult<Url> {
     let mut url = base(&settings.base_url)?;
+    let protocol = settings.profile()?.protocol;
     if let Some(id) = task_id {
         super::valid_task_id(id)?;
-        url.set_path(&if settings.is_grok() {
+        url.set_path(&if protocol == Protocol::RelayVideosV1 {
             format!("/v1/videos/{id}")
         } else {
             format!("/v2/query/video_generation/{id}")
         });
     } else {
-        url.set_path(if settings.is_grok() {
+        url.set_path(if protocol == Protocol::RelayVideosV1 {
             "/v1/videos"
         } else {
             "/v2/video_generation"
@@ -76,24 +68,14 @@ pub(super) fn endpoint(settings: &Settings, task_id: Option<&str>) -> AppResult<
 
 pub(super) fn validate(settings: &Settings, request: &VideoRequest) -> AppResult<()> {
     base(&settings.base_url)?;
-    let resolutions = if settings.is_grok() {
-        &["480P", "720P", "1080P"][..]
-    } else {
-        &["480P", "768P", "1080P", "2K"][..]
-    };
-    if !["minimax-h3", "MiniMax-H3", "grok-imagine-video-1.5-lite"]
-        .contains(&settings.model.as_str())
-        || !(settings.minimum_duration()..=15).contains(&request.duration)
-        || !resolutions.contains(&request.resolution.as_str())
-        || (!settings.is_grok() && settings.mode != Mode::Text)
-        || (settings.is_grok() && settings.ratio.is_some())
-        || settings
-            .ratio
-            .as_deref()
-            .is_some_and(|r| !["16:9", "9:16", "1:1", "4:3", "3:4", "21:9"].contains(&r))
-        || !(10_000..=1_000_000_000).contains(&settings.budget_reservation_micro_usd)
-    {
-        return Err("请检查 Wulusai 模型、分辨率、比例和本次预算预留（0.01–1000 美元）".into());
+    settings.profile()?.validate(
+        request.duration,
+        &request.resolution,
+        settings.mode,
+        settings.ratio.as_deref(),
+    )?;
+    if !(10_000..=1_000_000_000).contains(&settings.budget_reservation_micro_usd) {
+        return Err("请检查本次视频预算预留（0.01–1000 美元）".into());
     }
     Ok(())
 }
@@ -111,7 +93,7 @@ pub(super) fn body(
             request.prompt, request.negative_prompt
         )
     };
-    if settings.is_grok() {
+    if settings.profile()?.protocol == Protocol::RelayVideosV1 {
         let mut body = json!({"model":settings.model,"prompt":prompt,"seconds":request.duration.to_string(),"size":request.resolution.to_ascii_lowercase()});
         if settings.mode == Mode::Frame {
             // The relay's observed JSON schema uses a string, unlike OpenAI's object.
@@ -163,7 +145,7 @@ pub(super) fn output(data: &Value, expected_id: &str) -> AppResult<Value> {
         "message":task.pointer("/error/message").or_else(|| task.get("error")).and_then(Value::as_str).unwrap_or("请查看服务商任务详情")}))
 }
 pub(super) fn parse_output(settings: &Settings, data: &Value, id: &str) -> AppResult<Value> {
-    if settings.is_grok()
+    if settings.profile()?.protocol == Protocol::RelayVideosV1
         && data["status"] == "completed"
         && [
             data.get("file_url"),

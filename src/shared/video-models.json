@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "defaultWanModel": "wan2.7-i2v-2026-04-25",
+  "defaultRelayModel": "minimax-h3",
+  "models": [
+    {
+      "id": "wan2.7-i2v-2026-04-25",
+      "name": "万相 Wan 2.7",
+      "aliases": [],
+      "protocol": "wan",
+      "modes": ["frame"],
+      "defaultMode": "frame",
+      "duration": { "min": 2, "max": 15 },
+      "resolutions": ["720P", "1080P"],
+      "defaultResolution": "720P",
+      "ratios": [],
+      "frameSizes": {}
+    },
+    {
+      "id": "minimax-h3",
+      "name": "MiniMax-H3",
+      "aliases": ["MiniMax-H3"],
+      "protocol": "relay-content-v2",
+      "modes": ["text"],
+      "defaultMode": "text",
+      "duration": { "min": 4, "max": 15 },
+      "resolutions": ["480P", "768P", "1080P", "2K"],
+      "defaultResolution": "1080P",
+      "ratios": ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"],
+      "frameSizes": {}
+    },
+    {
+      "id": "grok-imagine-video-1.5-lite",
+      "name": "Grok Imagine Video 1.5 Lite",
+      "aliases": [],
+      "protocol": "relay-videos-v1",
+      "modes": ["text", "frame"],
+      "defaultMode": "frame",
+      "duration": { "min": 1, "max": 15 },
+      "resolutions": ["480P", "720P", "1080P"],
+      "defaultResolution": "480P",
+      "ratios": [],
+      "frameSizes": {
+        "480P": [854, 480],
+        "720P": [1280, 720],
+        "1080P": [1920, 1080]
+      }
+    }
+  ]
+}
