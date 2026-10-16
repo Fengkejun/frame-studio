@@ -272,7 +272,14 @@ export interface TimelineClip {
   trimEndMs: number
   caption: string
 }
+export interface VoiceCue {
+  clipVersionId: string
+  sourceStartMs: number
+  sourceEndMs: number
+}
 export interface Composition {
+  fit?: 'contain' | 'cover' | 'blur'
+  voiceCues?: VoiceCue[]
   workflowId: string
   clips: TimelineClip[]
   aspect: '9:16' | '16:9' | '1:1'

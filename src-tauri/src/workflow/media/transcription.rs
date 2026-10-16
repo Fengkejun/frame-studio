@@ -457,6 +457,8 @@ mod tests {
             aspect: "1:1".into(),
             resolution: 720,
             quality: Default::default(),
+            fit: Default::default(),
+            voice_cues: vec![],
             music_version_id: None,
             voice_version_id: Some(audio.version_id.clone()),
             voice_start_ms: 0,

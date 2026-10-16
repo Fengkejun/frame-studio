@@ -12,6 +12,7 @@ use std::{
 };
 use tauri::Manager;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+pub mod presentation;
 
 pub(super) const MAX_AUDIO_BYTES: usize = 20 * 1024 * 1024;
 
@@ -52,6 +53,10 @@ pub struct Composition {
     pub resolution: u16,
     #[serde(default)]
     pub quality: ExportQuality,
+    #[serde(default)]
+    pub fit: presentation::FrameFit,
+    #[serde(default)]
+    pub voice_cues: Vec<presentation::VoiceCue>,
     pub music_version_id: Option<String>,
     pub voice_version_id: Option<String>,
     #[serde(default)]
@@ -210,6 +215,7 @@ fn workflow_exists(state: &WorkflowState, id: &str) -> AppResult<()> {
 
 fn validate_draft(draft: &Composition) -> AppResult<()> {
     editing::validate_effects(&draft.effects)?;
+    presentation::validate_voice_cues(draft, None)?;
     if draft.workflow_id.is_empty()
         || draft.workflow_id.len() > 128
         || draft.clips.len() > 24
@@ -248,6 +254,12 @@ fn validate_draft(draft: &Composition) -> AppResult<()> {
 }
 
 fn save_draft(state: &WorkflowState, draft: &Composition) -> AppResult<()> {
+    let duration = draft
+        .voice_version_id
+        .as_ref()
+        .map(|id| audio(state, id).map(|a| a.duration_ms))
+        .transpose()?;
+    presentation::validate_voice_cues(draft, duration)?;
     let db = state.store.db()?;
     for clip in &draft.clips {
         super::cleanup::require_version(&db, "video_assets", &clip.version_id)?;
@@ -778,13 +790,19 @@ fn subtitles(draft: &Composition, clips: &[ResolvedClip]) -> Option<(String, Str
     let layout = editing::layout(draft).ok()?;
     let mut count = 0;
     for (index, clip) in clips.iter().enumerate() {
+        let cue = draft
+            .voice_cues
+            .iter()
+            .find(|cue| cue.clip_version_id == draft.clips[index].version_id);
         let position = u64::from(layout.starts_ms[index])
             + if index > 0 {
                 u64::from(layout.overlap_ms / 2)
             } else {
                 0
             };
-        let end = if index + 1 < clips.len() {
+        let end = if let Some(cue) = cue {
+            position + u64::from(cue.source_end_ms - cue.source_start_ms)
+        } else if index + 1 < clips.len() {
             u64::from(layout.starts_ms[index + 1] + layout.overlap_ms / 2)
         } else {
             u64::from(layout.total_ms)
@@ -833,6 +851,7 @@ async fn render(
         .as_ref()
         .map(|id| audio_asset_duration(state, id))
         .transpose()?;
+    presentation::validate_voice_cues(&job.draft, voice_duration)?;
     let music_fades = if job.draft.music_version_id.is_some() {
         editing::fades(
             0,
@@ -868,7 +887,8 @@ async fn render(
         }
         let mut filters = Vec::new();
         for (index,clip) in clips.iter().enumerate() {
-            filters.push(format!("[{index}:v]trim=start={:.3}:end={:.3},setpts=PTS-STARTPTS,fps=30,tpad=stop_mode=clone:stop_duration=0.1,trim=end_frame={},scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,settb=AVTB[v{index}]", f64::from(clip.start_ms)/1000.0, f64::from(clip.end_ms)/1000.0, layout.duration_frames[index]));
+            filters.push(format!("[{index}:v]trim=start={:.3}:end={:.3},setpts=PTS-STARTPTS,fps=30,tpad=stop_mode=clone:stop_duration=0.1,trim=end_frame={},setsar=1,settb=AVTB[s{index}]", f64::from(clip.start_ms)/1000.0, f64::from(clip.end_ms)/1000.0, layout.duration_frames[index]));
+            filters.push(presentation::video_filter(index, width, height, job.draft.fit));
         }
         filters.extend(editing::video_join(&job.draft, &layout));
         let captions = if let Some(id) = &job.draft.subtitle_version_id {
@@ -884,11 +904,11 @@ async fn render(
         match (job.draft.music_version_id.is_some(),job.draft.voice_version_id.is_some()) {
             (true,true) => {
                 filters.push(format!("[{base}:a]atrim=duration={:.3},asetpts=PTS-STARTPTS,volume={:.2}{music_fades}[music]", total_ms as f64/1000.0, f64::from(job.draft.music_volume)/100.0));
-                filters.push(voice_filter(base+1, total_ms, job.draft.voice_start_ms, &voice_fades, "voice"));
+                filters.extend(presentation::voice_filters(&job.draft, &layout, base+1, &voice_fades, "voice"));
                 filters.push("[music][voice]amix=inputs=2:duration=first:normalize=0[audio]".into());
             }
             (true,false) => filters.push(format!("[{base}:a]atrim=duration={:.3},asetpts=PTS-STARTPTS,volume={:.2}{music_fades}[audio]", total_ms as f64/1000.0, f64::from(job.draft.music_volume)/100.0)),
-            (false,true) => filters.push(voice_filter(base, total_ms, job.draft.voice_start_ms, &voice_fades, "audio")),
+            (false,true) => filters.extend(presentation::voice_filters(&job.draft, &layout, base, &voice_fades, "audio")),
             (false,false) => {},
         }
         command.arg("-filter_complex").arg(filters.join(";"))
@@ -1114,6 +1134,8 @@ mod tests {
                 aspect: "9:16".into(),
                 resolution: 720,
                 quality: ExportQuality::Balanced,
+                fit: Default::default(),
+                voice_cues: vec![],
                 music_version_id: None,
                 voice_version_id: None,
                 voice_start_ms: 0,

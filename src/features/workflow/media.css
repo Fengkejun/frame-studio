@@ -585,6 +585,27 @@
 .voice-audition h4 {
   margin: 0;
 }
+.timeline-review-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 12px;
+}
+.timeline-review-strip article {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+.timeline-review-strip img {
+  width: 100%;
+  height: 160px;
+  object-fit: contain;
+  background: #10120f;
+}
+.shot-voice-alignment {
+  display: grid;
+  gap: 12px;
+}
 .speech-connection summary {
   cursor: pointer;
   margin-bottom: 12px;

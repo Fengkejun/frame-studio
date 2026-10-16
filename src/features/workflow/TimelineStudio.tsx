@@ -14,6 +14,12 @@ import {
 } from './timelineTiming'
 import { SubtitleStudio } from './SubtitleStudio'
 import { VoiceoverStudio } from './VoiceoverStudio'
+import { ShotVoiceAlignment } from './ShotVoiceAlignment'
+import {
+  storyboardRanks,
+  storyboardOrder,
+  voiceCueError,
+} from './timelineReview'
 import type { Workflow } from './model'
 import type { useMedia } from './useMedia'
 import './media.css'
@@ -59,32 +65,48 @@ export function TimelineStudio({
   const [busy, setBusy] = useState(false)
   const [preview, setPreview] = useState<string | null>(null)
   const [exportPreview, setExportPreview] = useState<api.ExportJob | null>(null)
+  const ranks = useMemo(
+    () => storyboardRanks(workflow, media.videoAssets),
+    [workflow, media.videoAssets],
+  )
   const candidates = useMemo(
     () =>
-      media.selectedVideos.flatMap((selection) => {
-        const asset = media.videoAssets.find(
-          (item) => item.versionId === selection.versionId,
-        )
-        const frame = media.frames.find((item) =>
-          api.sameShot(item.context, selection.context),
-        )
-        const storyboard = workflow.nodes.find(
-          (node) => node.id === selection.context.nodeId,
-        )
-        const shot =
-          storyboard?.output?.value && 'shots' in storyboard.output.value
-            ? storyboard.output.value.shots.find(
-                (item) => item.id === selection.context.shotId,
-              )
-            : undefined
-        return asset &&
-          frame?.versionId === asset.firstFrameVersionId &&
-          storyboard?.output?.id === selection.context.artifactId &&
-          !storyboard.stale
-          ? [{ asset, shot }]
-          : []
-      }),
-    [media.selectedVideos, media.videoAssets, media.frames, workflow.nodes],
+      media.selectedVideos
+        .flatMap((selection) => {
+          const asset = media.videoAssets.find(
+            (item) => item.versionId === selection.versionId,
+          )
+          const frame = media.frames.find((item) =>
+            api.sameShot(item.context, selection.context),
+          )
+          const storyboard = workflow.nodes.find(
+            (node) => node.id === selection.context.nodeId,
+          )
+          const shot =
+            storyboard?.output?.value && 'shots' in storyboard.output.value
+              ? storyboard.output.value.shots.find(
+                  (item) => item.id === selection.context.shotId,
+                )
+              : undefined
+          return asset &&
+            frame?.versionId === asset.firstFrameVersionId &&
+            storyboard?.output?.id === selection.context.artifactId &&
+            !storyboard.stale
+            ? [{ asset, shot }]
+            : []
+        })
+        .sort(
+          (a, b) =>
+            (ranks.get(a.asset.versionId) ?? Infinity) -
+            (ranks.get(b.asset.versionId) ?? Infinity),
+        ),
+    [
+      media.selectedVideos,
+      media.videoAssets,
+      media.frames,
+      workflow.nodes,
+      ranks,
+    ],
   )
   useEffect(() => {
     let alive = true
@@ -143,6 +165,46 @@ export function TimelineStudio({
   )
   const invalidVoiceStart =
     !!draft.voiceVersionId && draft.voiceStartMs >= totalMs
+  const cueError = voiceCueError(
+    draft,
+    audio.find((a) => a.versionId === draft.voiceVersionId)?.durationMs,
+  )
+  const sortedClips = storyboardOrder(draft.clips, ranks)
+  const orderChanged = sortedClips.some(
+    (c, i) => c.versionId !== draft.clips[i]?.versionId,
+  )
+  const targetRatio =
+    draft.aspect === '9:16' ? 9 / 16 : draft.aspect === '1:1' ? 1 : 16 / 9
+  const firstMetadata = media.videoAssets.find(
+    (a) => a.versionId === draft.clips[0]?.versionId,
+  )?.metadata
+  const suggestedAspect = firstMetadata
+    ? firstMetadata.width === firstMetadata.height
+      ? '1:1'
+      : firstMetadata.width > firstMetadata.height
+        ? '16:9'
+        : '9:16'
+    : draft.aspect
+  const letterboxed = draft.clips.flatMap((c) => {
+    const asset = media.videoAssets.find((a) => a.versionId === c.versionId)
+    const m = asset?.metadata
+    if (!m) return []
+    const ratio = m.width / m.height
+    const visible = Math.min(ratio / targetRatio, targetRatio / ratio)
+    return visible < 0.75
+      ? [{ shot: asset.context.shotId, visible: Math.round(visible * 100) }]
+      : []
+  })
+  const voiceDuration = audio.find(
+    (a) => a.versionId === draft.voiceVersionId,
+  )?.durationMs
+  const quietTail =
+    draft.voiceVersionId &&
+    !draft.musicVersionId &&
+    !draft.voiceCues?.length &&
+    voiceDuration !== undefined
+      ? Math.max(0, totalMs - draft.voiceStartMs - voiceDuration)
+      : 0
   const missing = draft.clips.some(
     (clip) =>
       !candidates.some(({ asset }) => asset.versionId === clip.versionId),
@@ -300,9 +362,55 @@ export function TimelineStudio({
             </article>
           ))}
         </div>
+        {!!candidates.length && (
+          <button
+            className="small-button"
+            onClick={() =>
+              setDraft((value) => ({
+                ...value,
+                clips: candidates.map(
+                  ({ asset, shot }) =>
+                    value.clips.find(
+                      (c) => c.versionId === asset.versionId,
+                    ) ?? {
+                      versionId: asset.versionId,
+                      trimStartMs: 0,
+                      trimEndMs: Math.min(
+                        60000,
+                        asset.metadata?.durationMs ?? asset.duration * 1000,
+                        (shot?.duration ?? 60) * 1000,
+                      ),
+                      caption: shot?.dialogue ?? '',
+                    },
+                ),
+                voiceCues: (value.voiceCues ?? []).filter((c) =>
+                  candidates.some((v) => v.asset.versionId === c.clipVersionId),
+                ),
+              }))
+            }
+          >
+            按分镜装配全部已选镜头
+          </button>
+        )}
       </section>
       <section className="timeline-section">
         <h3>镜头顺序与裁剪</h3>
+        {orderChanged && (
+          <p className="workflow-error">
+            当前镜头顺序与分镜不同，请确认是有意调整。
+            <button
+              className="small-button"
+              onClick={() =>
+                setDraft((value) => ({
+                  ...value,
+                  clips: storyboardOrder(value.clips, ranks),
+                }))
+              }
+            >
+              恢复分镜顺序
+            </button>
+          </p>
+        )}
         {!draft.clips.length && (
           <p className="media-empty">从上方添加片段，再调整顺序和长度。</p>
         )}
@@ -406,6 +514,9 @@ export function TimelineStudio({
                       setDraft((value) => ({
                         ...value,
                         clips: value.clips.filter((_, i) => i !== index),
+                        voiceCues: (value.voiceCues ?? []).filter(
+                          (c) => c.clipVersionId !== clip.versionId,
+                        ),
                       }))
                     }
                   >
@@ -436,6 +547,26 @@ export function TimelineStudio({
               <option value="16:9">16:9 横屏</option>
               <option value="1:1">1:1 方形</option>
             </select>
+          </label>
+          <label className="field-label">
+            画面适配
+            <select
+              aria-label="画面适配"
+              value={draft.fit ?? 'contain'}
+              onChange={(e) =>
+                setDraft((value) => ({
+                  ...value,
+                  fit: e.target.value as api.Composition['fit'],
+                }))
+              }
+            >
+              <option value="contain">保留完整画面（留黑边）</option>
+              <option value="cover">铺满画面（居中裁切）</option>
+              <option value="blur">保留完整画面 + 模糊背景</option>
+            </select>
+            <small>
+              横屏素材建议优先横屏导出。裁切可能切掉人物或道具；模糊背景只填补空白，不补画面内容。
+            </small>
           </label>
           <label className="field-label">
             分辨率
@@ -521,6 +652,7 @@ export function TimelineStudio({
                 setDraft((value) => ({
                   ...value,
                   voiceVersionId: event.target.value || null,
+                  voiceCues: [],
                 }))
               }
             >
@@ -550,27 +682,128 @@ export function TimelineStudio({
           </label>
         </div>
       </section>
-      <AudioAlignment
-        key={`audio-alignment-${workflow.id}`}
-        voice={audio.find((item) => item.versionId === draft.voiceVersionId)}
-        music={audio.find((item) => item.versionId === draft.musicVersionId)}
-        clips={draft.clips}
-        layout={layout}
-        effects={draft.effects}
-        voiceStartMs={draft.voiceStartMs}
-        musicVolume={draft.musicVolume}
+      <section
+        className="timeline-section timeline-preflight"
+        aria-label="成片审片检查"
+      >
+        <h3>成片审片检查</h3>
+        <p className="field-hint">
+          导出前按顺序播放相邻镜头，核对人物外观、天气、道具和动作。程序检查尺寸与时间关系，视觉一致性仍需人工确认；镜头原声当前不参与导出混音。
+        </p>
+        <div className="timeline-review-strip">
+          {draft.clips.map((clip, i) => {
+            const asset = media.videoAssets.find(
+              (a) => a.versionId === clip.versionId,
+            )
+            return (
+              <article key={clip.versionId}>
+                <strong>
+                  {i + 1} · {asset?.context.shotId ?? '失效镜头'}
+                </strong>
+                <small>
+                  {(layout.startsMs[i]! / 1000).toFixed(2)} 秒起 ·{' '}
+                  {asset?.metadata
+                    ? `${asset.metadata.width}×${asset.metadata.height}`
+                    : '尺寸待核实'}
+                </small>
+                <AssetImage
+                  versionId={asset?.firstFrameVersionId ?? ''}
+                  alt={`审片 ${i + 1} 首帧`}
+                />
+                <p>{clip.caption || '无台词'}</p>
+                <button
+                  className="small-button"
+                  onClick={() =>
+                    void api
+                      .videoPreview(clip.versionId)
+                      .then(setPreview)
+                      .catch((e) => setError(errorMessage(e)))
+                  }
+                >
+                  审看镜头 {i + 1}
+                </button>
+              </article>
+            )
+          })}
+        </div>
+        {!!letterboxed.length && (
+          <p role="status">
+            {letterboxed
+              .map((v) => `${v.shot} 主画面约占画布 ${v.visible}%`)
+              .join('；')}
+            。
+            {(draft.fit ?? 'contain') === 'contain'
+              ? '当前会出现明显黑边。'
+              : draft.fit === 'cover'
+                ? '当前会裁掉部分内容，请检查主体。'
+                : '当前使用模糊背景补齐。'}
+            <button
+              className="small-button"
+              onClick={() =>
+                setDraft((value) => ({
+                  ...value,
+                  aspect: suggestedAspect,
+                }))
+              }
+            >
+              按首镜头方向调整画幅
+            </button>
+          </p>
+        )}
+        {quietTail > 1000 && (
+          <p role="status">
+            末尾约 {(quietTail / 1000).toFixed(1)}{' '}
+            秒没有外加配音或音乐。请核对分句对齐，或导入合适的背景音乐。
+          </p>
+        )}
+        {draft.voiceVersionId &&
+          !draft.voiceCues?.length &&
+          draft.subtitleFormat === 'none' &&
+          draft.clips.some((c) => c.caption) && (
+            <p role="status">
+              当前片段字幕按整镜头显示，尚未与配音逐句对齐。可在下方按镜头对齐配音与字幕。
+            </p>
+          )}
+      </section>
+      <ShotVoiceAlignment
+        draft={draft}
+        voice={audio.find((a) => a.versionId === draft.voiceVersionId)}
         busy={busy || !!active || !loaded}
-        onOffset={(voiceStartMs) =>
-          setDraft((value) => ({ ...value, voiceStartMs }))
-        }
+        onChange={setDraft}
       />
+      {!draft.voiceCues?.length ? (
+        <>
+          <AudioAlignment
+            key={`audio-alignment-${workflow.id}`}
+            voice={audio.find(
+              (item) => item.versionId === draft.voiceVersionId,
+            )}
+            music={audio.find(
+              (item) => item.versionId === draft.musicVersionId,
+            )}
+            clips={draft.clips}
+            layout={layout}
+            effects={draft.effects}
+            voiceStartMs={draft.voiceStartMs}
+            musicVolume={draft.musicVolume}
+            busy={busy || !!active || !loaded}
+            onOffset={(voiceStartMs) =>
+              setDraft((value) => ({ ...value, voiceStartMs }))
+            }
+          />
+        </>
+      ) : (
+        <p className="field-hint">
+          已启用分镜配音；各句跟随对应镜头，整体配音偏移与波形操作暂停。修改转场或裁剪后会重新检查每句时长。
+        </p>
+      )}
       <TimelineEffectsPanel
         effects={draft.effects}
         totalMs={totalMs}
         clipCount={draft.clips.length}
         invalidTransition={layout.invalid}
         fadeError={fadeError}
-        hasVoice={!!draft.voiceVersionId}
+        hasVoice={!!draft.voiceVersionId && !draft.voiceCues?.length}
         hasMusic={!!draft.musicVersionId}
         busy={busy || !!active || !loaded}
         onChange={(patch) =>
@@ -602,33 +835,39 @@ export function TimelineStudio({
         setAssets={setAudio}
         selectedId={draft.voiceVersionId}
         onUse={(versionId) =>
-          setDraft((value) => ({ ...value, voiceVersionId: versionId }))
+          setDraft((value) => ({
+            ...value,
+            voiceVersionId: versionId,
+            voiceCues: [],
+          }))
         }
         captions={draft.clips
           .map((clip) => clip.caption)
           .filter(Boolean)
           .join('\n')}
       />
-      <SubtitleStudio
-        key={`subtitles-${workflow.id}`}
-        workflow={workflow}
-        save={save}
-        voice={audio.find((item) => item.versionId === draft.voiceVersionId)}
-        voiceStartMs={draft.voiceStartMs}
-        timelineDurationMs={totalMs}
-        audio={audio}
-        assets={subtitles}
-        setAssets={setSubtitles}
-        appliedId={draft.subtitleVersionId}
-        onApply={(asset, srt) =>
-          setDraft((value) => ({
-            ...value,
-            subtitleVersionId: asset.versionId,
-            subtitleFormat: 'srt',
-            subtitleText: srt,
-          }))
-        }
-      />
+      {!draft.voiceCues?.length && (
+        <SubtitleStudio
+          key={`subtitles-${workflow.id}`}
+          workflow={workflow}
+          save={save}
+          voice={audio.find((item) => item.versionId === draft.voiceVersionId)}
+          voiceStartMs={draft.voiceStartMs}
+          timelineDurationMs={totalMs}
+          audio={audio}
+          assets={subtitles}
+          setAssets={setSubtitles}
+          appliedId={draft.subtitleVersionId}
+          onApply={(asset, srt) =>
+            setDraft((value) => ({
+              ...value,
+              subtitleVersionId: asset.versionId,
+              subtitleFormat: 'srt',
+              subtitleText: srt,
+            }))
+          }
+        />
+      )}
       {staleSubtitles && (
         <p className="workflow-error" role="alert">
           已应用字幕与当前配音不匹配；请应用匹配的字幕，或改用片段字幕后再导出。
@@ -645,6 +884,7 @@ export function TimelineStudio({
             type="file"
             aria-label="导入字幕文件"
             accept=".srt,.vtt"
+            disabled={!!draft.voiceCues?.length}
             onChange={(event) => {
               const file = event.target.files?.[0]
               if (file) {
@@ -668,6 +908,11 @@ export function TimelineStudio({
             }}
           />
         </label>
+        {!!draft.voiceCues?.length && (
+          <p className="field-hint">
+            分镜配音使用逐句台词字幕。要导入字幕或使用转写字幕，请先点击“恢复整段配音”，以免改变已确认的音画对齐。
+          </p>
+        )}
         {draft.subtitleFormat !== 'none' && (
           <div>
             <p className="field-hint">
@@ -706,7 +951,8 @@ export function TimelineStudio({
             invalidVoiceStart ||
             layout.invalid ||
             !!fadeError ||
-            invalidClip
+            invalidClip ||
+            !!cueError
           }
           onClick={() => void exportVideo()}
         >
@@ -714,6 +960,11 @@ export function TimelineStudio({
         </button>
         {missing && (
           <p className="workflow-error">时间线中有失效的视频版本，请替换。</p>
+        )}
+        {cueError && (
+          <p className="workflow-error" role="alert">
+            {cueError}
+          </p>
         )}
         {invalidClip && (
           <p className="workflow-error" role="alert">

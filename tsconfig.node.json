@@ -6,6 +6,8 @@
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "paths": { "@/*": ["./src/*"] },
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "strict": true,

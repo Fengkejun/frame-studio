@@ -13,6 +13,7 @@ import { testLiveComfy } from './live-comfy-smoke.mjs'
 import { testLiveWorkflow } from './live-workflow-smoke.mjs'
 import { createVideoFixture, testVideoMedia } from './video-media-smoke.mjs'
 import { testTimelineMedia } from './timeline-media-smoke.mjs'
+import { testFilmReview } from './film-review-smoke.mjs'
 import { createSpeechFixture } from './speech-media-smoke.mjs'
 import { createTranscriptionFixture } from './subtitle-media-smoke.mjs'
 import { testTransitions } from './transitions-media-smoke.mjs'
@@ -190,6 +191,7 @@ try {
     speechFixture,
     transcriptionFixture,
   )
+  await testFilmReview(page, profile)
   await testTransitions(page, root, profile, videoFixture)
   await testLocalVideo(page, root, profile)
   await testImageBatches(page, root)
