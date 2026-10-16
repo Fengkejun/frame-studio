@@ -312,6 +312,7 @@ export interface SpeechRequest {
   voice: string
   speed: number
   responseFormat?: 'wav' | 'mp3'
+  voiceCatalogId?: string | null
   budgetReservationMicroUsd: number
 }
 export interface SpeechJob {
@@ -337,6 +338,27 @@ export const checkSpeechConnection = (
   model: string,
 ): Promise<ConnectionCheck> =>
   invoke('check_speech_connection', { baseUrl, model })
+export interface SpeechVoice {
+  id: string
+  name: string
+  locale: string
+  gender: string
+}
+export interface SpeechVoiceCatalog {
+  id: string
+  baseUrl: string
+  model: string
+  source: 'official_live' | 'official_documentation_snapshot'
+  sourceUrl: string
+  checkedAt: string
+  expiresAt: number
+  voices: SpeechVoice[]
+}
+export const listSpeechVoices = (
+  baseUrl: string,
+  model: string,
+): Promise<SpeechVoiceCatalog> =>
+  invoke('list_speech_voices', { baseUrl, model })
 export const listSpeechJobs = (workflowId: string): Promise<SpeechJob[]> =>
   isDesktop ? invoke('list_speech_jobs', { workflowId }) : Promise.resolve([])
 export const startSpeechJob = (request: SpeechRequest): Promise<SpeechJob> =>

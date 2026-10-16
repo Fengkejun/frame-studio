@@ -38,6 +38,10 @@ await access(executable).catch(() => {
 const artifacts = path.join(root, 'artifacts')
 await mkdir(artifacts, { recursive: true })
 const profile = await mkdtemp(path.join(artifacts, 'webview-test-'))
+await writeFile(
+  path.join(profile, 'mai-voices.md'),
+  '| Voice ID | Locale | Language | Gender | Supported models | Supported styles |\n| `en-US-Harper` | `en-US` | English | Female | `MAI-Voice-2.1`, `MAI-Voice-2.1-Flash` | `neutral` |\n| `zh-CN-Harper` | `zh-CN` | Chinese | Female | `MAI-Voice-2.1`, `MAI-Voice-2.1-Flash` | `neutral` |',
+)
 const backupDirectory = await mkdtemp(path.join(artifacts, 'backup-test-'))
 const comfyModelsDir = path.join(profile, 'comfy-models')
 await mkdir(comfyModelsDir)

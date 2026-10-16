@@ -93,6 +93,7 @@ pub fn run() {
             workflow::media::speech::save_speech_key,
             workflow::media::speech::clear_speech_key,
             workflow::media::speech::check_speech_connection,
+            workflow::media::speech::voices::list_speech_voices,
             workflow::media::speech::list_speech_jobs,
             workflow::media::speech::start_speech_job,
             workflow::media::transcription::transcription_key_status,

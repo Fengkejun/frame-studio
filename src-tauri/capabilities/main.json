@@ -93,6 +93,7 @@
     "allow-save-speech-key",
     "allow-clear-speech-key",
     "allow-check-speech-connection",
+    "allow-list-speech-voices",
     "allow-list-speech-jobs",
     "allow-start-speech-job",
     "allow-transcription-key-status",

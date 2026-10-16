@@ -89,6 +89,7 @@ export async function testSpeechMedia(page, fixture, root) {
     'Hello from Frame Studio',
   )
   await page.getByLabel('旁白文本').fill('你好，这是自动验证的配音旁白。')
+  await page.getByLabel('配音音色').selectOption('coral')
   await page.getByLabel('配音语速').fill('1.1')
   const originalVoice = await page
     .getByLabel('配音', { exact: true })
@@ -163,7 +164,10 @@ export async function testSpeechMedia(page, fixture, root) {
   expect(stored).not.toContain('fixture-speech-key')
   fixture.setMode('success')
   await page.getByLabel('配音模型 ID').fill('mai-voice-2.1')
-  await page.getByLabel('配音音色').fill('en-US-Harper')
+  await page.getByLabel('配音音色').selectOption('en-US-Harper')
+  await expect(
+    page.getByLabel('配音音色').locator('option[value="alloy"]'),
+  ).toHaveCount(0)
   await page.getByLabel('配音文件格式').selectOption('mp3')
   await page.getByLabel('配音语速').fill('1')
   await page.getByRole('button', { name: '生成配音', exact: true }).click()

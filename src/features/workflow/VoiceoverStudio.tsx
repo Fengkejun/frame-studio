@@ -6,12 +6,13 @@ import * as api from './mediaApi'
 import { AudioPreview } from './AudioPreview'
 import { MediaBudgetPanel } from './MediaBudgetPanel'
 import type { Workflow } from './model'
+import { useSpeechVoices } from './useSpeechVoices'
 
 const storageKey = 'frame-studio.speech-settings'
 const defaults = {
   baseUrl: 'https://api.openai.com/v1',
   model: 'gpt-4o-mini-tts',
-  voice: 'coral',
+  voice: '',
   speed: 1,
   responseFormat: 'wav' as 'wav' | 'mp3',
 }
@@ -77,6 +78,10 @@ export function VoiceoverStudio({
   const [connection, setConnection] = useState('')
   const active = jobs.some(api.isSpeechRunning)
   const length = Array.from(input).length
+  const voices = useSpeechVoices(settings.baseUrl, settings.model)
+  const voiceReady =
+    !!voices.catalog &&
+    voices.catalog.voices.some((v) => v.id === settings.voice)
 
   useEffect(() => {
     try {
@@ -152,6 +157,8 @@ export function VoiceoverStudio({
     }
   }
   async function generate() {
+    if (!voiceReady || !voices.catalog)
+      throw new Error('请先获取当前模型的音色列表，再选择音色生成配音')
     const amount = Number(reservation)
     if (!Number.isFinite(amount) || amount < 0.001 || amount > 1000)
       throw new Error('配音预算预留金额须在 0.001–1000 美元之间')
@@ -159,6 +166,7 @@ export function VoiceoverStudio({
     const job = await api.startSpeechJob({
       workflowId: workflow.id,
       ...settings,
+      voiceCatalogId: voices.catalog.id,
       input,
       budgetReservationMicroUsd: Math.round(amount * 1_000_000),
     })
@@ -187,7 +195,11 @@ export function VoiceoverStudio({
                 setHasKey(false)
                 setKey('')
                 setConnection('')
-                setSettings({ ...settings, baseUrl: event.target.value })
+                setSettings({
+                  ...settings,
+                  baseUrl: event.target.value,
+                  voice: '',
+                })
               }}
             />
           </label>
@@ -200,10 +212,20 @@ export function VoiceoverStudio({
               list="speech-models"
               onChange={(event) => {
                 setConnection('')
-                setSettings({ ...settings, model: event.target.value })
+                setError('')
+                setSettings({
+                  ...settings,
+                  model: event.target.value,
+                  voice: '',
+                  responseFormat: event.target.value.startsWith('mai-voice-')
+                    ? 'mp3'
+                    : settings.responseFormat,
+                })
               }}
             />
             <datalist id="speech-models">
+              <option value="mai-voice-2.1" />
+              <option value="mai-voice-2.1-flash" />
               <option value="gpt-4o-mini-tts" />
               <option value="tts-1" />
               <option value="tts-1-hd" />
@@ -233,6 +255,7 @@ export function VoiceoverStudio({
                 await api.saveSpeechKey(settings.baseUrl, key)
                 setKey('')
                 setHasKey(true)
+                voices.refresh()
                 setConnection('密钥已保存到系统凭据库')
               })
             }
@@ -246,6 +269,7 @@ export function VoiceoverStudio({
               void run(async () => {
                 await api.clearSpeechKey(settings.baseUrl)
                 setHasKey(false)
+                voices.refresh()
                 setConnection('密钥已删除')
               })
             }
@@ -295,35 +319,48 @@ export function VoiceoverStudio({
       <div className="timeline-settings-grid">
         <label className="field-label">
           配音音色
-          <input
+          <select
             aria-label="配音音色"
-            list="speech-voices"
-            maxLength={128}
-            value={settings.voice}
-            disabled={busy || active}
-            onChange={(event) =>
+            value={voiceReady ? settings.voice : ''}
+            disabled={busy || active || !voices.catalog || voices.loading}
+            onChange={(event) => {
+              setError('')
               setSettings({ ...settings, voice: event.target.value })
-            }
-          />
-          <datalist id="speech-voices">
-            {[
-              'alloy',
-              'ash',
-              'ballad',
-              'coral',
-              'echo',
-              'sage',
-              'shimmer',
-              'verse',
-              'marin',
-              'cedar',
-            ].map((voice) => (
-              <option key={voice}>{voice}</option>
+            }}
+          >
+            <option value="">
+              {voices.loading ? '正在获取模型音色…' : '请选择当前模型的音色'}
+            </option>
+            {voices.catalog?.voices.map((voice) => (
+              <option key={voice.id} value={voice.id}>
+                {voice.name} ·{' '}
+                {voice.locale === 'multilingual' ? '多语言' : voice.locale}
+                {voice.gender === 'Female'
+                  ? ' · 女声'
+                  : voice.gender === 'Male'
+                    ? ' · 男声'
+                    : ''}
+              </option>
             ))}
-          </datalist>
+          </select>
           <small>
-            可输入服务商音色，例如 en-US-Harper；中文音色请使用服务商提供的 ID。
+            {voices.catalog
+              ? `${voices.catalog.source === 'official_live' ? '微软官方在线目录' : 'OpenAI 官方文档目录（2026-10-16 核对）'} · ${voices.catalog.voices.length} 个音色。中转站实际开放范围需单独验证。`
+              : '先获取当前模型的官方音色目录，再选择音色。'}
           </small>
+          <button
+            className="text-button"
+            type="button"
+            disabled={!isDesktop || busy || active || voices.loading}
+            onClick={voices.refresh}
+          >
+            刷新音色列表
+          </button>
+          {voices.error && (
+            <small className="workflow-error" role="alert">
+              {voices.error}
+            </small>
+          )}
         </label>
         <label className="field-label">
           配音文件格式
@@ -383,6 +420,7 @@ export function VoiceoverStudio({
           !hasKey ||
           !input.trim() ||
           length > 4096 ||
+          !voiceReady ||
           !settings.model.trim()
         }
         onClick={() => void run(generate)}

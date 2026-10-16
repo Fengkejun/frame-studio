@@ -88,6 +88,7 @@ fn main() {
             "save_speech_key",
             "clear_speech_key",
             "check_speech_connection",
+            "list_speech_voices",
             "list_speech_jobs",
             "start_speech_job",
             "transcription_key_status",

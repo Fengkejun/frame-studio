@@ -1,4 +1,5 @@
 //! Non-streamed OpenAI-compatible speech. An uncertain submission is never retried.
+pub mod voices;
 use super::budget::{reserve_job, BillableJob};
 use super::composition::{audio, store_audio, MAX_AUDIO_BYTES};
 use super::connection::{check_catalog, ConnectionCheck};
@@ -19,6 +20,8 @@ pub struct SpeechRequest {
     pub speed: f64,
     #[serde(default = "default_response_format")]
     pub response_format: String,
+    #[serde(default)]
+    pub voice_catalog_id: Option<String>,
     pub budget_reservation_micro_usd: u64,
 }
 fn default_response_format() -> String {
@@ -202,7 +205,7 @@ pub fn recover(state: &WorkflowState) -> AppResult<()> {
 mod tests {
     use super::*;
 
-    fn request() -> SpeechRequest {
+    pub(super) fn request() -> SpeechRequest {
         SpeechRequest {
             workflow_id: "project".into(),
             base_url: "http://127.0.0.1:8188/v1".into(),
@@ -211,6 +214,7 @@ mod tests {
             voice: "coral".into(),
             speed: 1.0,
             response_format: default_response_format(),
+            voice_catalog_id: None,
             budget_reservation_micro_usd: 50_000,
         }
     }
@@ -345,6 +349,7 @@ pub fn start_speech_job(
     request: SpeechRequest,
 ) -> AppResult<SpeechJob> {
     validate(&request)?;
+    voices::validate_selection(&request)?;
     let key = get_key(&request.base_url)?.ok_or("请先保存当前配音服务的 API Key")?;
     let mut active = state.speech_active.lock().map_err(|_| "配音任务锁不可用")?;
     if active.is_some() {
@@ -417,6 +422,9 @@ async fn execute(
         .map_err(|_| "配音请求中断，结果待核实；请核对服务商用量后再手动生成")?;
     if !response.status().is_success() {
         job.status = "failed".into();
+        if response.status() == reqwest::StatusCode::BAD_REQUEST {
+            return Err("配音参数被服务商拒绝（HTTP 400）；请刷新当前模型的官方音色目录，核对中转站是否开放此音色、所选格式及语速".into());
+        }
         return Err(format!(
             "配音服务返回 HTTP {}；请检查密钥、模型权限和服务状态",
             response.status().as_u16()

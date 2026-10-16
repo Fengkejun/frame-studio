@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-list-speech-voices"
+description = "Enables the list_speech_voices command without any pre-configured scope."
+commands.allow = ["list_speech_voices"]
+
+[[permission]]
+identifier = "deny-list-speech-voices"
+description = "Denies the list_speech_voices command without any pre-configured scope."
+commands.deny = ["list_speech_voices"]
