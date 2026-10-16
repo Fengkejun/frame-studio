@@ -6,7 +6,7 @@ import { expect } from '@playwright/test'
 
 // Fixed PNG and a fake API key: no external requests or image-model charges.
 export async function createCloudFixture(root) {
-  const png = await readFile(path.join(root, 'src-tauri/icons/128x128.png'))
+  let png = await readFile(path.join(root, 'src-tauri/icons/128x128.png'))
   const requests = []
   const downloads = []
   let downloadMode = 'success'
@@ -83,6 +83,9 @@ export async function createCloudFixture(root) {
     baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
     screenshotPath: path.join(root, 'artifacts/desktop-cloud-image-studio.png'),
     requests,
+    setImage: (bytes) => {
+      png = bytes
+    },
     downloads,
     setDownloadMode: (next) => {
       downloadMode = next

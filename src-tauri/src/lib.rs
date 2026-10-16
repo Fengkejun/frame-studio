@@ -5,6 +5,17 @@ pub fn run() {
     tauri::Builder::default()
         .setup(workflow::init)
         .invoke_handler(tauri::generate_handler![
+            workflow::agent::start_agent,
+            workflow::agent::stop_agent,
+            workflow::agent::resume_agent,
+            workflow::agent::get_agent_session,
+            workflow::agent::list_agent_sessions,
+            workflow::agent::get_agent_config,
+            workflow::agent::save_agent_config,
+            workflow::agent::skills::list_agent_skills,
+            workflow::agent::skills::set_agent_skill_enabled,
+            workflow::agent::skills::search_agent_skills,
+            workflow::agent::skills::install_agent_skill,
             commands::get_app_info,
             workflow::media::cleanup::get_storage_report,
             workflow::media::cleanup::trash_assets,

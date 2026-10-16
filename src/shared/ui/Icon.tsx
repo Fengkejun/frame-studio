@@ -1,4 +1,5 @@
 const paths = {
+  director: 'm12 2 2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5Z',
   sidebarCollapse: 'M3 3h18v18H3ZM8 3v18m8-13-4 4 4 4',
   sidebarExpand: 'M3 3h18v18H3ZM8 3v18m4-13 4 4-4 4',
   home: 'M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z',

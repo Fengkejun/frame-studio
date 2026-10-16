@@ -367,17 +367,55 @@ fn ollama_output_schema(node: &WorkflowNode) -> Value {
 }
 
 pub async fn generate(p: &Provider, node: &WorkflowNode, input: &Value) -> AppResult<Value> {
+    let value = generate_json(
+        p,
+        &system_prompt(node),
+        input,
+        ollama_output_schema(node),
+        node.config.temperature,
+    )
+    .await?;
+    validate_output(&node.kind, &value)?;
+    if node.kind == NodeKind::Storyboard {
+        let shots = value["shots"].as_array().ok_or("分镜结构无效")?;
+        let total: f64 = shots.iter().filter_map(|s| s["duration"].as_f64()).sum();
+        if shots.len() != node.config.shot_count as usize
+            || (total - f64::from(node.config.duration)).abs() > 0.5
+        {
+            return Err("分镜数量或总时长不符合配置，请调整任务要求后重跑；未自动重试".into());
+        }
+    }
+    Ok(value)
+}
+
+pub(super) async fn generate_json(
+    p: &Provider,
+    system: &str,
+    input: &Value,
+    schema: Value,
+    temperature: f64,
+) -> AppResult<Value> {
+    generate_json_image(p, system, input, schema, temperature, None).await
+}
+pub(super) async fn generate_json_image(
+    p: &Provider,
+    system: &str,
+    input: &Value,
+    schema: Value,
+    temperature: f64,
+    image: Option<&str>,
+) -> AppResult<Value> {
     validate_provider(p)?;
-    let messages = json!([{"role":"system","content":system_prompt(node)},{"role":"user","content":serde_json::to_string(input).map_err(|_|"输入无法序列化")?}]);
+    let messages = image_messages(&p.kind, system, input, image)?;
     let (suffix, body) = if p.kind == "ollama" {
         (
             "chat",
-            json!({"model":p.model,"messages":messages,"stream":false,"format":ollama_output_schema(node),"options":{"temperature":node.config.temperature}}),
+            json!({"model":p.model,"messages":messages,"stream":false,"format":schema,"options":{"temperature":temperature}}),
         )
     } else {
         (
             "chat/completions",
-            json!({"model":p.model,"messages":messages,"stream":false,"temperature":node.config.temperature}),
+            json!({"model":p.model,"messages":messages,"stream":false,"temperature":temperature}),
         )
     };
     let mut request = client(180)?.post(endpoint(p, suffix)).json(&body);
@@ -406,23 +444,57 @@ pub async fn generate(p: &Provider, node: &WorkflowNode, input: &Value) -> AppRe
         .trim();
     let value: Value = serde_json::from_str(clean)
         .map_err(|_| "模型未返回有效 JSON。请调整模型或任务要求后重跑；未自动重试")?;
-    validate_output(&node.kind, &value)?;
-    if node.kind == NodeKind::Storyboard {
-        let shots = value["shots"].as_array().ok_or("分镜结构无效")?;
-        let total: f64 = shots.iter().filter_map(|s| s["duration"].as_f64()).sum();
-        if shots.len() != node.config.shot_count as usize
-            || (total - f64::from(node.config.duration)).abs() > 0.5
-        {
-            return Err("分镜数量或总时长不符合配置，请调整任务要求后重跑；未自动重试".into());
+    Ok(value)
+}
+fn image_messages(
+    kind: &str,
+    system: &str,
+    input: &Value,
+    image: Option<&str>,
+) -> AppResult<Value> {
+    let text = serde_json::to_string(input).map_err(|_| "输入序列化失败")?;
+    let mut user = json!({"role":"user","content":text});
+    if let Some(image) = image {
+        if kind == "ollama" {
+            user["images"] = json!([image.split_once(',').ok_or("参考图格式无效")?.1]);
+        } else {
+            user["content"] =
+                json!([{"type":"text","text":text},{"type":"image_url","image_url":{"url":image}}]);
         }
     }
-    Ok(value)
+    Ok(json!([{"role":"system","content":system},user]))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::{Read, Write};
+    #[test]
+    fn vision_reference_is_sent_in_the_selected_protocol_without_leaking_into_text() {
+        let openai = image_messages(
+            "openai",
+            "director",
+            &json!({"goal":"test"}),
+            Some("data:image/png;base64,aGVsbG8="),
+        )
+        .unwrap();
+        assert_eq!(
+            openai[1]["content"][1]["image_url"]["url"],
+            "data:image/png;base64,aGVsbG8="
+        );
+        assert!(!openai[1]["content"][0]["text"]
+            .as_str()
+            .unwrap()
+            .contains("aGVsbG8="));
+        let ollama = image_messages(
+            "ollama",
+            "director",
+            &json!({"goal":"test"}),
+            Some("data:image/png;base64,aGVsbG8="),
+        )
+        .unwrap();
+        assert_eq!(ollama[1]["images"][0], "aGVsbG8=");
+    }
 
     fn reply_fixture(status: &str, body: &str) -> (Provider, std::thread::JoinHandle<()>) {
         let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();

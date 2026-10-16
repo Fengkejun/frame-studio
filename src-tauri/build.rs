@@ -1,6 +1,17 @@
 fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
+            "start_agent",
+            "stop_agent",
+            "resume_agent",
+            "get_agent_session",
+            "list_agent_sessions",
+            "get_agent_config",
+            "save_agent_config",
+            "list_agent_skills",
+            "set_agent_skill_enabled",
+            "search_agent_skills",
+            "install_agent_skill",
             "get_app_info",
             "get_storage_report",
             "trash_assets",

@@ -2,6 +2,8 @@
 
 AI 短视频创作桌面应用。支持故事、分镜和提示词可视化工作流、本地 Ollama 或 OpenAI 兼容文本服务，以及首帧生图、镜头视频、AI 配音、自动字幕、素材版本和本地成片导出。
 
+桌面端现默认进入「灵感创作 Agent」：配置一次模型，输入创作目标，自动规划并调用剧本、分镜、图片和视频工具；支持参考图、对话式修改、本地技能及公开仓库技能下载。操作与当前能力范围见 [Agent 创作工作流](docs/agent-workflow.md)，原画布保留为高级编辑入口。
+
 中文桌面录屏的章节、演示数据范围与录制维护见 [完整使用教程](docs/user-tutorial.md)；配置后直接检测模型目录或实际文本回复见 [模型连接检测](docs/text-connection-checks.md)。
 
 配音使用可配置的 OpenAI 兼容语音服务，生成后试听并手动选入时间线。操作说明见 [AI 配音生成](docs/voiceover-workflow.md)；字幕识别、校对和 SRT 下载见 [配音自动字幕](docs/subtitle-workflow.md)；波形与配音起点调整见 [音频时间对齐](docs/audio-alignment-workflow.md)；镜头转场与声音淡化见 [转场与淡入淡出](docs/transitions-audio-fades.md)；跨设备迁移见 [项目素材包](docs/project-bundles.md)。
@@ -52,6 +54,7 @@ npm run desktop:lint          # Rust Clippy，警告视为错误
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
 npm run tauri -- build --debug --no-bundle  # 本地调试可执行文件
 npm run test:desktop           # Windows 原生冒烟测试，需要先构建上面的程序
+npm run test:agent             # Agent 自动制作、图像输入与真正重启恢复（本地模拟服务）
 npm run test:macos             # macOS .app 启动和内嵌 FFmpeg 冒烟测试
 npm run desktop:build         # 发布构建和当前平台安装包
 ```

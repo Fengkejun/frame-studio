@@ -7,32 +7,7 @@ import { BatchSubmit, type BatchTarget } from './ImageBatch'
 import type { Shot } from './model'
 import { VideoRelayFields } from './VideoRelayFields'
 import { getVideoModel, wanVideoModel } from './videoModels'
-import { z } from 'zod'
-
-const videoSettingsKey = 'frame-studio.video-settings'
-const videoSettingsSchema = z.object({
-  region: z.enum(['singapore', 'beijing']),
-  resolution: z.enum(['480P', '720P', '768P', '1080P', '2K', '4K']),
-  wulusai: z
-    .object({
-      baseUrl: z.string().url(),
-      model: z.string(),
-      mode: z.enum(['text', 'frame']),
-      ratio: z.string().nullable(),
-      budgetReservationMicroUsd: z.number().int().nonnegative(),
-    })
-    .nullable(),
-})
-function withSavedVideoSettings(request: api.VideoRequest): api.VideoRequest {
-  try {
-    const saved = videoSettingsSchema.parse(
-      JSON.parse(localStorage.getItem(videoSettingsKey) ?? 'null'),
-    )
-    return api.normalizeVideoRequest({ ...request, ...saved })
-  } catch {
-    return api.normalizeVideoRequest(request)
-  }
-}
+import { videoSettingsKey, withSavedVideoSettings } from './videoPreferences'
 
 export function VideoForm({
   context,

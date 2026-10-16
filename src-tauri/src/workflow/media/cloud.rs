@@ -240,7 +240,7 @@ pub fn start_cloud_image_job(
     start_with_id(app, state, request, uid())
 }
 
-pub(super) fn start_with_id(
+pub(crate) fn start_with_id(
     app: tauri::AppHandle,
     state: tauri::State<WorkflowState>,
     request: CloudImageRequest,

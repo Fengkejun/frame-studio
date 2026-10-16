@@ -238,6 +238,7 @@ test('video relay keeps credentials bound to its address and sends explicit plan
   ).toBeDisabled()
   await expect(page.getByLabel('中转站 API Key')).toHaveValue('')
   await page.reload()
+  await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '镜头视频', exact: true }).click()
   await expect(page.getByLabel('视频模型')).toHaveValue(
     'grok-imagine-video-1.5-lite',

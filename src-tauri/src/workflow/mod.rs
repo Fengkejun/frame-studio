@@ -1,3 +1,4 @@
+pub mod agent;
 pub mod media;
 pub mod package;
 mod providers;
@@ -65,6 +66,7 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     media::transcription::recover(&app.state::<WorkflowState>())?;
     media::batches::recover(&app.state::<WorkflowState>())?;
     media::cleanup::recover(&app.state::<WorkflowState>())?;
+    agent::recover(&app.state::<WorkflowState>())?;
     Ok(())
 }
 fn idle(state: &WorkflowState) -> AppResult<()> {
@@ -80,6 +82,7 @@ pub fn list_workflows(state: tauri::State<WorkflowState>) -> AppResult<Vec<Workf
 }
 #[tauri::command]
 pub fn save_workflow(state: tauri::State<WorkflowState>, workflow: Workflow) -> AppResult<()> {
+    agent::ensure_project_editable(&state, &workflow.id)?;
     state.store.save_workflow(&workflow)
 }
 #[tauri::command]
@@ -266,6 +269,7 @@ pub fn start_run(
     workflow: Workflow,
     target: Option<String>,
 ) -> AppResult<RunRecord> {
+    agent::ensure_project_editable(&state, &workflow.id)?;
     let order = validate_graph(&workflow, target.is_none())?;
     let selected = if let Some(id) = &target {
         if !order.contains(id) {

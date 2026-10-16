@@ -97,6 +97,7 @@ test('speech generation uses the selected model catalog and ignores stale replie
     })
   })
   await page.goto('/')
+  await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
   const generate = page.getByRole('button', { name: '生成配音', exact: true })
   await page.getByLabel('旁白文本').fill('别怕，我来了。')

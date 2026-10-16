@@ -1,6 +1,6 @@
 //! Wan first-frame video jobs. Persist the remote task ID before polling; never
 //! repeat a possibly billable submit after an uncertain response.
-mod models;
+pub(crate) mod models;
 pub mod sequence;
 pub mod wulusai;
 use super::budget::{reserve_job, video_estimate_micro_usd, BillableJob};
@@ -748,7 +748,7 @@ pub fn start_video_job(
 ) -> AppResult<VideoJob> {
     start_with_id(app, state, request, uid())
 }
-pub(super) fn start_with_id(
+pub(crate) fn start_with_id(
     app: tauri::AppHandle,
     state: tauri::State<WorkflowState>,
     request: VideoRequest,

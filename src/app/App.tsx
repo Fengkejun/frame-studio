@@ -10,12 +10,14 @@ import { Icon } from '@/shared/ui/Icon'
 import packageInfo from '../../package.json'
 import './styles.css'
 import { isDesktop } from '@/shared/lib/desktop'
+import { AgentPage } from '@/features/agent/AgentPage'
+import { listWorkflows } from '@/features/workflow/api'
 
-type Page = 'workspace' | 'workflow' | 'connections' | 'settings'
+type Page = 'agent' | 'workspace' | 'workflow' | 'connections' | 'settings'
 type WorkflowTab = 'shots' | 'images' | 'videos' | 'timeline'
 
 export function App() {
-  const [page, setPage] = useState<Page>(isDesktop ? 'workflow' : 'workspace')
+  const [page, setPage] = useState<Page>(isDesktop ? 'agent' : 'workspace')
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem('frame-studio.sidebar-collapsed') === 'true'
@@ -44,7 +46,7 @@ export function App() {
 
   return (
     <div
-      className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${page === 'workflow' ? 'workflow-shell' : ''}`}
+      className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${page === 'workflow' ? 'workflow-shell' : ''} ${page === 'agent' ? 'agent-shell' : ''}`}
     >
       <a className="skip-link" href="#main-content">
         跳转到主要内容
@@ -59,6 +61,16 @@ export function App() {
         </div>
         <p className="nav-label">工作空间</p>
         <nav aria-label="主导航">
+          <button
+            className={`nav-item ${page === 'agent' ? 'active' : ''}`}
+            aria-label="灵感创作"
+            title="灵感创作"
+            aria-current={page === 'agent' ? 'page' : undefined}
+            onClick={() => setPage('agent')}
+          >
+            <Icon name="director" />
+            <span>灵感创作</span>
+          </button>
           <button
             className={`nav-item ${page === 'workspace' ? 'active' : ''}`}
             aria-label="工作台"
@@ -128,13 +140,15 @@ export function App() {
               <span className="breadcrumb-muted">工作空间</span>
               <span className="breadcrumb-slash">/</span>
               <span>
-                {page === 'workspace'
-                  ? '工作台'
-                  : page === 'workflow'
-                    ? '工作流'
-                    : page === 'connections'
-                      ? '模型连接'
-                      : '设置'}
+                {page === 'agent'
+                  ? '灵感创作'
+                  : page === 'workspace'
+                    ? '工作台'
+                    : page === 'workflow'
+                      ? '工作流'
+                      : page === 'connections'
+                        ? '模型连接'
+                        : '设置'}
               </span>
             </div>
           </div>
@@ -156,7 +170,27 @@ export function App() {
               }
             </span>
           )}
-          {page === 'workspace' ? (
+          {page === 'agent' ? (
+            <AgentPage
+              modelsRevision={modelsRevision}
+              onModels={() => setPage('connections')}
+              onCanvas={(id) => {
+                if (!id) {
+                  openWorkflow('shots')
+                  return
+                }
+                void listWorkflows()
+                  .then(async (items) => {
+                    const w = items.find((w) => w.id === id)
+                    if (w) {
+                      await workflow.selectProject(w)
+                      openWorkflow('shots')
+                    }
+                  })
+                  .catch((e) => workflow.setError(String(e)))
+              }}
+            />
+          ) : page === 'workspace' ? (
             <WorkspacePage
               status={status}
               onRetry={retry}
