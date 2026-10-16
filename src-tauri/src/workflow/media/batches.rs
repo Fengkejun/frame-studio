@@ -604,6 +604,7 @@ mod tests {
         let mut video_item = saved.clone();
         video_item.job_id = "video-saved".into();
         video_item.request = BatchRequest::Video(video::VideoRequest {
+            sequence: None,
             wulusai: None,
             context: video_item.request.context().clone(),
             first_frame_version_id: "frame-v1".into(),

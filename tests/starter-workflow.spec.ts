@@ -9,8 +9,8 @@ test('starter has a complete valid pipeline with no unconnected input nodes', ()
   const workflow = makeStarterWorkflow('configured-text')
   expect(graphError(workflow)).toBeNull()
   expect(parseWorkflow(JSON.stringify(workflow))).toEqual(workflow)
-  expect(workflow.nodes).toHaveLength(7)
-  expect(workflow.edges).toHaveLength(6)
+  expect(workflow.nodes).toHaveLength(6)
+  expect(workflow.edges).toHaveLength(5)
   for (const node of workflow.nodes.filter((node) => node.kind !== 'brief'))
     expect(
       workflow.edges.filter((edge) => edge.target === node.id),

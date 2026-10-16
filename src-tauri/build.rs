@@ -79,6 +79,7 @@ fn main() {
             "import_video",
             "list_selected_videos",
             "select_video",
+            "save_video_copy",
             "get_composition",
             "save_composition",
             "import_audio",

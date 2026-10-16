@@ -440,19 +440,29 @@ async fn execute(
                 }
             } else if node.kind == NodeKind::Video {
                 let image_artifact = artifacts.get(&edge.source).ok_or("上游图片结果不可用")?;
-                let storyboard_node_id = run
-                    .snapshot
-                    .edges
-                    .iter()
-                    .find(|candidate| candidate.target == edge.source)
-                    .map(|candidate| candidate.source.as_str())
-                    .ok_or("图片节点缺少分镜输入")?;
-                match media::video::collect_video_clips(
-                    state,
-                    &run.workflow_id,
-                    storyboard_node_id,
-                    image_artifact,
-                )? {
+                let collection = if image_artifact.kind == NodeKind::Storyboard {
+                    media::video::sequence::collect(
+                        state,
+                        &run.workflow_id,
+                        &edge.source,
+                        image_artifact,
+                    )?
+                } else {
+                    let storyboard_node_id = run
+                        .snapshot
+                        .edges
+                        .iter()
+                        .find(|candidate| candidate.target == edge.source)
+                        .map(|candidate| candidate.source.as_str())
+                        .ok_or("图片节点缺少分镜输入")?;
+                    media::video::collect_video_clips(
+                        state,
+                        &run.workflow_id,
+                        storyboard_node_id,
+                        image_artifact,
+                    )?
+                };
+                match collection {
                     media::FrameCollection::Complete(value) => {
                         validate_output(&NodeKind::Video, &value)?;
                         (value, "selection")
@@ -498,8 +508,13 @@ async fn execute(
                     .iter()
                     .find(|p| p.id == node.config.provider_id)
                     .ok_or("模型配置不存在")?;
+                let input = if let Some(production) = &run.snapshot.production {
+                    serde_json::json!({"upstream":input,"production":production})
+                } else {
+                    input.clone()
+                };
                 let value = tokio::select! {
-                    result=providers::generate(provider,&node,input)=>result?,
+                    result=providers::generate(provider,&node,&input)=>result?,
                     ()=cancelled(cancel.clone())=> {
                         run.nodes[index].status="cancelled".into();
                         run.nodes[index].message="已停止等待与后续调度；服务端可能仍在生成或计费".into();

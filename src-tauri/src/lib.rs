@@ -83,6 +83,7 @@ pub fn run() {
             workflow::media::video::import_video,
             workflow::media::video::list_selected_videos,
             workflow::media::video::select_video,
+            workflow::media::video::save_video_copy,
             workflow::media::composition::get_composition,
             workflow::media::composition::save_composition,
             workflow::media::composition::import_audio,

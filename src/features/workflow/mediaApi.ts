@@ -162,6 +162,7 @@ export interface ConnectionCheck {
   modelListed: boolean | null
 }
 export interface VideoRequest {
+  sequence?: { shotIds: string[] } | null
   wulusai?: WulusaiVideoSettings | null
   context: ShotContext
   firstFrameVersionId: string
@@ -242,6 +243,7 @@ export interface VideoJob {
   estimatedCostMicroUsd: number
 }
 export interface VideoAsset {
+  sequence?: { shotIds: string[] } | null
   assetId: string
   versionId: string
   context: ShotContext
@@ -566,6 +568,10 @@ export const listVideoAssets = (workflowId: string): Promise<VideoAsset[]> =>
   isDesktop ? invoke('list_video_assets', { workflowId }) : Promise.resolve([])
 export const videoPreview = (versionId: string): Promise<string> =>
   invoke<string>('video_preview', { versionId }).then(convertFileSrc)
+export const saveVideoCopy = (
+  versionId: string,
+  outputPath: string,
+): Promise<void> => invoke('save_video_copy', { versionId, outputPath })
 export const importVideo = (
   context: ShotContext,
   firstFrameVersionId: string,

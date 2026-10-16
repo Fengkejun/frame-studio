@@ -22,6 +22,8 @@
   border-right: 1px solid var(--border);
 }
 .cloud-image-recovery .field-label,
+.sequence-studio .field-label,
+.production-settings .field-label,
 .image-settings .field-label,
 .timeline-studio .field-label {
   display: flex;
@@ -31,6 +33,10 @@
   font-size: 12px;
 }
 .cloud-image-recovery input,
+.sequence-studio input,
+.sequence-studio select,
+.sequence-studio textarea,
+.production-settings textarea,
 .image-settings input,
 .image-settings select,
 .image-settings textarea,
@@ -566,7 +572,8 @@
   display: grid;
   gap: 12px;
 }
-.speech-connection {
+.speech-connection,
+.production-settings {
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -606,7 +613,8 @@
   display: grid;
   gap: 12px;
 }
-.speech-connection summary {
+.speech-connection summary,
+.production-settings summary {
   cursor: pointer;
   margin-bottom: 12px;
 }
@@ -769,4 +777,23 @@
   background: var(--accent);
   opacity: 0.12;
   pointer-events: none;
+}
+.sequence-player {
+  display: block;
+  width: 100%;
+  max-height: 540px;
+  background: #080a08;
+  margin-block: 12px;
+}
+.production-settings textarea {
+  min-height: 100px;
+}
+.sequence-studio {
+  max-width: 1080px;
+  margin-inline: auto;
+}
+.sequence-studio textarea {
+  min-height: 160px;
+  resize: vertical;
+  line-height: 1.6;
 }

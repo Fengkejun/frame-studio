@@ -83,21 +83,29 @@ export const outputSchemas = {
     storyboardArtifactId: required,
     clips: z
       .array(
-        z.object({
-          shotId: required,
-          assetId: required,
-          versionId: required,
-          firstFrameVersionId: required,
-          duration: z.number().min(0.1).max(3600),
-          resolution: z
-            .string()
-            .refine(
-              (value) =>
-                ['720P', '1080P'].includes(value) ||
-                (/^[1-9]\d{0,3}x[1-9]\d{0,3}$/.test(value) &&
-                  value.split('x').every((part) => Number(part) <= 8192)),
-            ),
-        }),
+        z
+          .object({
+            shotId: required,
+            assetId: required,
+            versionId: required,
+            firstFrameVersionId: text,
+            sequenceShotIds: z.array(required).min(1).max(24).optional(),
+            duration: z.number().min(0.1).max(3600),
+            resolution: z
+              .string()
+              .refine(
+                (value) =>
+                  ['720P', '1080P'].includes(value) ||
+                  (/^[1-9]\d{0,3}x[1-9]\d{0,3}$/.test(value) &&
+                    value.split('x').every((part) => Number(part) <= 8192)),
+              ),
+          })
+          .refine(
+            (clip) =>
+              !!clip.firstFrameVersionId.trim() ||
+              !!clip.sequenceShotIds?.length,
+            '文生整段视频须包含覆盖的分镜信息',
+          ),
       )
       .min(1)
       .max(24)
@@ -159,6 +167,14 @@ const nodeSchema = z
       ctx.addIssue({ code: 'custom', message: '节点输出类型无效' })
   })
 export const workflowSchema = z.object({
+  production: z
+    .object({
+      style: z.string().max(1500),
+      characters: z.string().max(1500),
+      scene: z.string().max(1500),
+      rules: z.string().max(1500),
+    })
+    .optional(),
   schemaVersion: z.literal(1),
   id: z.string().min(1).max(128),
   name: z.string().trim().min(1).max(300),
@@ -259,18 +275,20 @@ export function makeWorkflow(): Workflow {
   }
 }
 export function makeStarterWorkflow(providerId = ''): Workflow {
-  const nodes = kinds.map((kind, index) => {
-    const node = makeNode(
-      kind,
-      40 + (index % 4) * 310,
-      100 + Math.floor(index / 4) * 300,
-    )
-    node.config.duration = 12
-    node.config.shotCount = 3
-    if (kind === 'story' || kind === 'storyboard' || kind === 'prompt')
-      node.config.providerId = providerId
-    return node
-  })
+  const nodes = kinds
+    .filter((kind) => kind !== 'image')
+    .map((kind, index) => {
+      const node = makeNode(
+        kind,
+        40 + (index % 4) * 310,
+        100 + Math.floor(index / 4) * 300,
+      )
+      node.config.duration = 12
+      node.config.shotCount = 3
+      if (kind === 'story' || kind === 'storyboard' || kind === 'prompt')
+        node.config.providerId = providerId
+      return node
+    })
   const byKind = Object.fromEntries(nodes.map((node) => [node.kind, node]))
   byKind.brief!.config.text =
     '制作一部12秒的治愈系AI动漫短片《星光来信》。雨夜的城市屋顶，白发蓝眼、穿蓝色雨衣的少女邮差小星，给橘白小猫送来一封发光的信。信纸化成星光小伞，为小猫遮雨。要求角色外观一致，温暖结尾，恰好3个镜头，每个4秒。'
@@ -284,14 +302,21 @@ export function makeStarterWorkflow(providerId = ''): Workflow {
     ['brief', 'story'],
     ['story', 'storyboard'],
     ['storyboard', 'prompt'],
-    ['storyboard', 'image'],
-    ['image', 'video'],
+    ['storyboard', 'video'],
     ['video', 'timeline'],
   ]
   return {
     schemaVersion: 1,
     id: crypto.randomUUID(),
     name: '默认 · AI 动漫短片',
+    production: {
+      style: '统一日系二维动画电影风格，柔和光影，不混用真人写实或三维画风。',
+      characters:
+        '小星：白发蓝眼的少女邮差，蓝色雨衣、固定邮差包；小猫：同一只橘白小猫，保持花纹与体型。',
+      scene: '同一雨夜城市屋顶，湿润瓦片、远处暖色灯光，持续细雨。',
+      rules:
+        '三个分镜是同一事件连续发生。保持人物、衣服、猫花纹和道具状态连续；不切换季节，不出现雪景，不添加其他人物。',
+    },
     nodes,
     edges: links.map(([source, target]) => ({
       id: crypto.randomUUID(),
@@ -312,7 +337,7 @@ export function compatible(source: NodeKind, target: NodeKind) {
         : target === 'image'
           ? source === 'storyboard'
           : target === 'video'
-            ? source === 'image'
+            ? source === 'image' || source === 'storyboard'
             : target === 'timeline'
               ? source === 'video'
               : false
@@ -395,7 +420,7 @@ export function outputSummary(node: WorkflowNode): string {
       : node.kind === 'image'
         ? '连接分镜并确认每个镜头首帧'
         : node.kind === 'video'
-          ? '连接图片节点并确认每个镜头片段'
+          ? '连接分镜生成整段，或连接图片汇集短镜头'
           : node.kind === 'timeline'
             ? '连接视频节点并完成本地 MP4 导出'
             : '连接模型后，等待你的第一次创作'

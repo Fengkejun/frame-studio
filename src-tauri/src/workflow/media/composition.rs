@@ -718,7 +718,12 @@ fn resolve_inputs(
             "SELECT version_id FROM first_frames WHERE workflow_id=?1 AND node_id=?2 AND artifact_id=?3 AND shot_id=?4",
             params![draft.workflow_id, entry.context.node_id, entry.context.artifact_id, entry.context.shot_id], |row|row.get(0)
         ).optional().map_err(|e|e.to_string())?;
-        if frame.as_deref() != Some(&entry.first_frame_version_id) {
+        if let Some(plan) = &entry.sequence {
+            video::sequence::validate(state, &entry.context, plan, entry.duration)?;
+        }
+        if !(entry.sequence.is_some() && entry.first_frame_version_id.is_empty())
+            && frame.as_deref() != Some(&entry.first_frame_version_id)
+        {
             return Err("源首帧已变化，请重新生成镜头视频".into());
         }
         let selected: Option<String> = state.store.db()?.query_row(

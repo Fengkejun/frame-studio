@@ -11,7 +11,7 @@ const invoke = (page, command, args = {}) =>
   )
 
 export async function createVideoRelayFixture(root) {
-  const clip = await readFile(path.join(root, 'tests/fixtures/clip.mp4'))
+  let clip = await readFile(path.join(root, 'tests/fixtures/clip.mp4'))
   const requests = []
   const polls = new Map()
   let mode = 'success'
@@ -157,6 +157,9 @@ export async function createVideoRelayFixture(root) {
     baseUrl: `http://127.0.0.1:${server.address().port}`,
     requests,
     polls,
+    setClip: (bytes) => {
+      clip = bytes
+    },
     setMode: (next) => {
       mode = next
     },

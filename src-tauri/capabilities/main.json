@@ -84,6 +84,7 @@
     "allow-import-video",
     "allow-list-selected-videos",
     "allow-select-video",
+    "allow-save-video-copy",
     "allow-get-composition",
     "allow-save-composition",
     "allow-import-audio",

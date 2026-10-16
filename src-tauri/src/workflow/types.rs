@@ -79,6 +79,8 @@ pub struct Viewport {
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Workflow {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub production: Option<Production>,
     pub schema_version: u32,
     pub id: String,
     pub name: String,
@@ -97,6 +99,14 @@ pub struct Provider {
     pub base_url: String,
     pub model: String,
     pub has_key: bool,
+}
+#[derive(Clone, Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Production {
+    pub style: String,
+    pub characters: String,
+    pub scene: String,
+    pub rules: String,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -130,13 +140,20 @@ pub fn compatible(source: &NodeKind, target: &NodeKind) -> bool {
             NodeKind::Brief | NodeKind::Story | NodeKind::Storyboard
         ),
         NodeKind::Image => *source == NodeKind::Storyboard,
-        NodeKind::Video => *source == NodeKind::Image,
+        NodeKind::Video => matches!(source, NodeKind::Image | NodeKind::Storyboard),
         NodeKind::Timeline => *source == NodeKind::Video,
     }
 }
 
 /// Saving allows an unfinished graph; execution additionally requires every input.
 pub fn validate_graph(w: &Workflow, executable: bool) -> AppResult<Vec<String>> {
+    if w.production.as_ref().is_some_and(|p| {
+        [&p.style, &p.characters, &p.scene, &p.rules]
+            .iter()
+            .any(|s| s.chars().count() > 1500)
+    }) {
+        return Err("统一创作设定每项最多 1500 字".into());
+    }
     if w.schema_version != 1
         || w.id.is_empty()
         || w.id.len() > 128
@@ -292,7 +309,16 @@ pub fn validate_output(kind: &NodeKind, value: &Value) -> AppResult<()> {
                             required_text(clip, "shotId")
                                 && required_text(clip, "assetId")
                                 && required_text(clip, "versionId")
-                                && required_text(clip, "firstFrameVersionId")
+                                && (required_text(clip, "firstFrameVersionId")
+                                    || (clip["firstFrameVersionId"].as_str() == Some("")
+                                        && clip["sequenceShotIds"].as_array().is_some_and(|ids| {
+                                            !ids.is_empty()
+                                                && ids.len() <= 24
+                                                && ids.iter().all(|id| {
+                                                    id.as_str()
+                                                        .is_some_and(|s| !s.trim().is_empty())
+                                                })
+                                        })))
                                 && clip["duration"]
                                     .as_f64()
                                     .is_some_and(|n| n.is_finite() && (0.1..=3600.0).contains(&n))

@@ -6,12 +6,12 @@ test('canvas keeps measured nodes visible through data and selection updates', a
   await page.goto('/')
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   const nodes = page.locator('.react-flow__node')
-  await expect(nodes).toHaveCount(7)
-  for (let i = 0; i < 7; i++) {
+  await expect(nodes).toHaveCount(6)
+  for (let i = 0; i < 6; i++) {
     await nodes.nth(i).locator('.node-mark').click()
     await page.getByRole('textbox', { name: '节点名称' }).fill(`节点校对 ${i}`)
     await page.getByRole('button', { name: '适应画布' }).click()
-    for (let n = 0; n < 7; n++)
+    for (let n = 0; n < 6; n++)
       await expect(nodes.nth(n)).toHaveCSS('visibility', 'visible')
   }
 })

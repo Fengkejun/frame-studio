@@ -14,6 +14,7 @@ import { testLiveWorkflow } from './live-workflow-smoke.mjs'
 import { createVideoFixture, testVideoMedia } from './video-media-smoke.mjs'
 import { testTimelineMedia } from './timeline-media-smoke.mjs'
 import { testFilmReview } from './film-review-smoke.mjs'
+import { testSequenceVideo } from './sequence-video-smoke.mjs'
 import { createSpeechFixture } from './speech-media-smoke.mjs'
 import { createTranscriptionFixture } from './subtitle-media-smoke.mjs'
 import { testTransitions } from './transitions-media-smoke.mjs'
@@ -192,6 +193,7 @@ try {
     transcriptionFixture,
   )
   await testFilmReview(page, profile)
+  await testSequenceVideo(page, root, profile, videoRelayFixture)
   await testTransitions(page, root, profile, videoFixture)
   await testLocalVideo(page, root, profile)
   await testImageBatches(page, root)

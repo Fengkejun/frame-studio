@@ -183,7 +183,9 @@ fn snapshot(store: &Store, workflow_id: &str) -> AppResult<Snapshot> {
     }
     for video in &all_videos {
         if video.context.workflow_id == workflow_id || video_ids.contains(&video.version_id) {
-            image_ids.insert(video.first_frame_version_id.clone());
+            if !video.first_frame_version_id.is_empty() {
+                image_ids.insert(video.first_frame_version_id.clone());
+            }
         }
     }
     let videos: Vec<_> = all_videos
@@ -330,7 +332,8 @@ fn validate_snapshot(snapshot: &Snapshot) -> AppResult<()> {
         if !safe_file(&video.file_name, &video.version_id, &["mp4"])
             || !logical_id(&video.asset_id)
             || video.context.workflow_id != *workflow_id
-            || !image_ids.contains(video.first_frame_version_id.as_str())
+            || (!(video.sequence.is_some() && video.first_frame_version_id.is_empty())
+                && !image_ids.contains(video.first_frame_version_id.as_str()))
         {
             return Err("项目包的视频素材信息无效".into());
         }
@@ -1057,6 +1060,7 @@ mod tests {
         fs::create_dir_all(directory.join("assets")).unwrap();
         let store = Store::open(&directory.join("studio.sqlite")).unwrap();
         let workflow = Workflow {
+            production: None,
             schema_version: 1,
             id: uid(),
             name: "可迁移项目".into(),
@@ -1115,6 +1119,7 @@ mod tests {
             file_name: format!("{image_id}.png"),
         };
         let video = VideoAsset {
+            sequence: None,
             asset_id: video_id.clone(),
             version_id: video_id.clone(),
             context: context.clone(),

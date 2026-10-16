@@ -43,6 +43,7 @@ import { VideoStudio } from './VideoStudio'
 import { TimelineStudio } from './TimelineStudio'
 import { AssetImage } from './AssetImage'
 import { BackupPanel } from './BackupPanel'
+import { ProductionSettings } from './ProductionSettings'
 import './workflow.css'
 
 const nodeTypes = { agent: FlowNode }
@@ -372,27 +373,47 @@ function WorkflowEditor({
           ),
         )
       : undefined
-  const videoStoryboard = videoSource
-    ? w.nodes.find((node) =>
-        w.edges.some(
-          (edge) => edge.target === videoSource.id && edge.source === node.id,
-        ),
-      )
-    : undefined
+  const videoStoryboard =
+    videoSource?.kind === 'storyboard'
+      ? videoSource
+      : videoSource
+        ? w.nodes.find((node) =>
+            w.edges.some(
+              (edge) =>
+                edge.target === videoSource.id && edge.source === node.id,
+            ),
+          )
+        : undefined
   const videoFrames =
     videoSource?.output?.value && 'frames' in videoSource.output.value
       ? videoSource.output.value.frames
       : []
-  const videoReady = videoFrames.filter((frame) =>
+  const videoShots =
+    videoStoryboard?.output && 'shots' in videoStoryboard.output.value
+      ? videoStoryboard.output.value.shots
+      : []
+  const videoReady = videoShots.filter((shot) =>
     media.selectedVideos.some(
       (selected) =>
         selected.context.nodeId === videoStoryboard?.id &&
         selected.context.artifactId === videoStoryboard?.output?.id &&
-        selected.context.shotId === frame.shotId &&
         media.videoAssets.some(
           (asset) =>
             asset.versionId === selected.versionId &&
-            asset.firstFrameVersionId === frame.versionId,
+            (asset.sequence
+              ? asset.sequence.shotIds.includes(shot.id) &&
+                (!asset.firstFrameVersionId ||
+                  media.frames.some(
+                    (f) =>
+                      api.sameShot(f.context, asset.context) &&
+                      f.versionId === asset.firstFrameVersionId,
+                  ))
+              : selected.context.shotId === shot.id &&
+                videoFrames.some(
+                  (f) =>
+                    f.shotId === shot.id &&
+                    f.versionId === asset.firstFrameVersionId,
+                )),
         ),
     ),
   ).length
@@ -565,6 +586,11 @@ function WorkflowEditor({
           }}
         />
       )}
+      <ProductionSettings
+        workflow={w}
+        disabled={busy || bundleBusy}
+        onChange={c.change}
+      />
       {!isDesktop && (
         <div className="preview-strip">
           浏览器画布预览 · 支持编辑和本机保存。真实模型调用请在桌面应用中运行。
@@ -751,7 +777,7 @@ function WorkflowEditor({
             }}
             onRun={() => setConfirmRun({ target: focused.id })}
             imageProgress={{ ready: imageReady, total: imageShots.length }}
-            videoProgress={{ ready: videoReady, total: videoFrames.length }}
+            videoProgress={{ ready: videoReady, total: videoShots.length }}
             onImages={() => {
               if (imageSource && imageShots.length) {
                 const missing = imageShots.find(

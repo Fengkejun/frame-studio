@@ -72,6 +72,21 @@ export function TimelineStudio({
   const candidates = useMemo(
     () =>
       media.selectedVideos
+        .filter(
+          (selection) =>
+            !media.selectedVideos.some((other) => {
+              const whole = media.videoAssets.find(
+                (a) => a.versionId === other.versionId,
+              )
+              return (
+                whole?.sequence &&
+                other.context.nodeId === selection.context.nodeId &&
+                other.context.artifactId === selection.context.artifactId &&
+                whole.sequence.shotIds.includes(selection.context.shotId) &&
+                other.versionId !== selection.versionId
+              )
+            }),
+        )
         .flatMap((selection) => {
           const asset = media.videoAssets.find(
             (item) => item.versionId === selection.versionId,
@@ -89,10 +104,26 @@ export function TimelineStudio({
                 )
               : undefined
           return asset &&
-            frame?.versionId === asset.firstFrameVersionId &&
+            ((asset.sequence && !asset.firstFrameVersionId) ||
+              frame?.versionId === asset.firstFrameVersionId) &&
             storyboard?.output?.id === selection.context.artifactId &&
             !storyboard.stale
-            ? [{ asset, shot }]
+            ? [
+                {
+                  asset,
+                  shot:
+                    asset.sequence && shot
+                      ? {
+                          ...shot,
+                          title: `整段 · ${asset.sequence.shotIds.length} 个分镜`,
+                          duration: asset.metadata
+                            ? asset.metadata.durationMs / 1000
+                            : asset.duration,
+                          dialogue: '',
+                        }
+                      : shot,
+                },
+              ]
             : []
         })
         .sort(
@@ -315,10 +346,14 @@ export function TimelineStudio({
         <div className="timeline-candidates">
           {candidates.map(({ asset, shot }) => (
             <article key={asset.versionId} className="timeline-choice">
-              <AssetImage
-                versionId={asset.firstFrameVersionId}
-                alt={`${asset.context.shotId} 首帧`}
-              />
+              {asset.firstFrameVersionId ? (
+                <AssetImage
+                  versionId={asset.firstFrameVersionId}
+                  alt={`${asset.context.shotId} 首帧`}
+                />
+              ) : (
+                <span className="field-hint">文生整段视频</span>
+              )}
               <div>
                 <strong>{shot?.title ?? asset.context.shotId}</strong>
                 <small>版本 {asset.versionId.slice(0, 8)}</small>
@@ -426,10 +461,14 @@ export function TimelineStudio({
               <article key={clip.versionId} className="timeline-clip">
                 <div className="timeline-clip-head">
                   <span>{index + 1}</span>
-                  <AssetImage
-                    versionId={asset?.firstFrameVersionId ?? ''}
-                    alt={`${asset?.context.shotId ?? '失效'} 首帧`}
-                  />
+                  {asset?.firstFrameVersionId ? (
+                    <AssetImage
+                      versionId={asset?.firstFrameVersionId ?? ''}
+                      alt={`${asset?.context.shotId ?? '失效'} 首帧`}
+                    />
+                  ) : (
+                    <span className="field-hint">整段</span>
+                  )}
                   <div>
                     <strong>{asset?.context.shotId ?? '原片段已丢失'}</strong>
                     <small>版本 {clip.versionId.slice(0, 8)}</small>
@@ -706,10 +745,14 @@ export function TimelineStudio({
                     ? `${asset.metadata.width}×${asset.metadata.height}`
                     : '尺寸待核实'}
                 </small>
-                <AssetImage
-                  versionId={asset?.firstFrameVersionId ?? ''}
-                  alt={`审片 ${i + 1} 首帧`}
-                />
+                {asset?.firstFrameVersionId ? (
+                  <AssetImage
+                    versionId={asset?.firstFrameVersionId ?? ''}
+                    alt={`审片 ${i + 1} 首帧`}
+                  />
+                ) : (
+                  <span className="field-hint">文生整段视频</span>
+                )}
                 <p>{clip.caption || '无台词'}</p>
                 <button
                   className="small-button"

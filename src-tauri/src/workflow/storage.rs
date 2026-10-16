@@ -204,6 +204,7 @@ mod tests {
         assert_eq!(store.default_workflow().unwrap(), None);
         assert!(store.set_default_workflow("missing").is_err());
         let make = |id: &str| Workflow {
+            production: None,
             schema_version: 1,
             id: id.into(),
             name: id.into(),

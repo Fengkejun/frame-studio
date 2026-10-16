@@ -108,7 +108,7 @@ export function NodeInspector({
             <p className="field-hint">
               {node.kind === 'image'
                 ? '连接分镜节点，在每个镜头中选择一张首帧。图片节点只汇集所选版本，不会发起生图请求。'
-                : '连接图片节点，在每个镜头中确认一段视频。视频节点只汇集所选版本，不会发起生成请求。'}
+                : '整段模式连接分镜节点，选择一条覆盖全组分镜的视频；逐镜头模式连接图片节点。视频节点汇集已选版本，不会再次提交生成。'}
             </p>
             <button
               className="small-button"

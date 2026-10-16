@@ -1,6 +1,7 @@
 //! Wan first-frame video jobs. Persist the remote task ID before polling; never
 //! repeat a possibly billable submit after an uncertain response.
 mod models;
+pub mod sequence;
 pub mod wulusai;
 use super::budget::{reserve_job, video_estimate_micro_usd, BillableJob};
 use super::connection::{check_catalog, ConnectionCheck};
@@ -32,6 +33,8 @@ pub struct ActiveVideo {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct VideoRequest {
     #[serde(default)]
+    pub sequence: Option<sequence::Sequence>,
+    #[serde(default)]
     pub wulusai: Option<wulusai::Settings>,
     pub context: ShotContext,
     pub first_frame_version_id: String,
@@ -58,6 +61,8 @@ pub struct VideoJob {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VideoAsset {
+    #[serde(default)]
+    pub sequence: Option<sequence::Sequence>,
     pub asset_id: String,
     pub version_id: String,
     pub context: ShotContext,
@@ -94,6 +99,25 @@ pub fn collect_video_clips(
     let artifact_id = image_artifact.value["storyboardArtifactId"]
         .as_str()
         .ok_or("分镜产物 ID 无效")?;
+    let workflow = state
+        .store
+        .workflows()?
+        .into_iter()
+        .find(|w| w.id == workflow_id)
+        .ok_or("项目不存在")?;
+    if let Some(storyboard) = workflow
+        .nodes
+        .iter()
+        .find(|n| n.id == storyboard_node_id)
+        .and_then(|n| n.output.as_ref())
+        .filter(|a| a.id == artifact_id)
+    {
+        if let FrameCollection::Complete(value) =
+            sequence::collect(state, workflow_id, storyboard_node_id, storyboard)?
+        {
+            return Ok(FrameCollection::Complete(value));
+        }
+    }
     let frames = image_artifact.value["frames"]
         .as_array()
         .ok_or("首帧列表无效")?;
@@ -197,7 +221,7 @@ pub async fn check_video_connection(region: String) -> AppResult<ConnectionCheck
 pub(super) fn validate_request(
     state: &WorkflowState,
     request: &VideoRequest,
-) -> AppResult<ImageAsset> {
+) -> AppResult<Option<ImageAsset>> {
     if let Some(settings) = &request.wulusai {
         wulusai::validate(settings, request)?;
     } else {
@@ -210,11 +234,24 @@ pub(super) fn validate_request(
         )?;
     }
     validate_context(state, &request.context)?;
-    if (request.wulusai.is_none() && request.prompt.trim().is_empty())
+    if let Some(plan) = &request.sequence {
+        sequence::validate(state, &request.context, plan, request.duration)?;
+    }
+    if ((request.wulusai.is_none() || request.sequence.is_some())
+        && request.prompt.trim().is_empty())
         || request.prompt.chars().count() > 5000
         || request.negative_prompt.chars().count() > 500
     {
         return Err("请检查视频提示词、时长和分辨率".into());
+    }
+    if request.sequence.is_some()
+        && request.first_frame_version_id.is_empty()
+        && request
+            .wulusai
+            .as_ref()
+            .is_some_and(|s| s.mode == wulusai::Mode::Text)
+    {
+        return Ok(None);
     }
     let selected: Option<String> = state.store.db()?.query_row(
         "SELECT version_id FROM first_frames WHERE workflow_id=?1 AND node_id=?2 AND artifact_id=?3 AND shot_id=?4",
@@ -242,7 +279,7 @@ pub(super) fn validate_request(
     {
         return Err("首帧原图已丢失".into());
     }
-    Ok(entry)
+    Ok(Some(entry))
 }
 fn save_job(state: &WorkflowState, job: &VideoJob) -> AppResult<()> {
     state.store.db()?.execute(
@@ -396,12 +433,17 @@ pub fn select_video(
 ) -> AppResult<()> {
     validate_context(&state, &context)?;
     let entry = load_asset(&state, &version_id)?;
+    if let Some(plan) = &entry.sequence {
+        sequence::validate(&state, &context, plan, entry.duration)?;
+    }
     let first_frame: Option<String> = state.store.db()?.query_row(
         "SELECT version_id FROM first_frames WHERE workflow_id=?1 AND node_id=?2 AND artifact_id=?3 AND shot_id=?4",
         params![context.workflow_id, context.node_id, context.artifact_id, context.shot_id],
         |row| row.get(0),
     ).optional().map_err(|e| e.to_string())?;
-    if first_frame.as_deref() != Some(&entry.first_frame_version_id) {
+    if !(entry.sequence.is_some() && entry.first_frame_version_id.is_empty())
+        && first_frame.as_deref() != Some(&entry.first_frame_version_id)
+    {
         return Err("视频的源首帧已变化，请使用当前首帧重新生成".into());
     }
     if entry.context != context
@@ -420,6 +462,58 @@ pub fn select_video(
         params![context.workflow_id,context.node_id,context.artifact_id,context.shot_id,version_id],
     ).map_err(|e| e.to_string())?;
     Ok(())
+}
+#[tauri::command]
+pub async fn save_video_copy(
+    app: tauri::AppHandle,
+    version_id: String,
+    output_path: String,
+) -> AppResult<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<WorkflowState>();
+        let entry = load_asset(&state, &version_id)?;
+        {
+            let db = state.store.db()?;
+            super::cleanup::require_version(&db, "video_assets", &version_id)?;
+        }
+        let destination = std::path::Path::new(&output_path);
+        if !destination.is_absolute()
+            || !destination
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("mp4"))
+        {
+            return Err("请选择 MP4 保存位置".into());
+        }
+        let root = state
+            .directory
+            .join("assets")
+            .canonicalize()
+            .map_err(|_| "视频原件已丢失")?;
+        let source_path = root
+            .join(entry.file_name)
+            .canonicalize()
+            .map_err(|_| "视频原件已丢失")?;
+        if !source_path.starts_with(&root) {
+            return Err("视频原件路径无效".into());
+        }
+        let mut source = std::fs::File::open(source_path).map_err(|_| "视频原件已丢失")?;
+        let mut target = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(destination)
+            .map_err(|_| "目标已存在或保存位置不可写，请使用新文件名")?;
+        if std::io::copy(&mut source, &mut target)
+            .and_then(|_| target.sync_all())
+            .is_err()
+        {
+            drop(target);
+            let _ = std::fs::remove_file(destination);
+            return Err("保存视频副本失败，请检查磁盘空间".into());
+        }
+        Ok(())
+    })
+    .await
+    .map_err(|_| "保存视频任务异常")?
 }
 #[tauri::command]
 pub async fn video_preview(app: tauri::AppHandle, version_id: String) -> AppResult<String> {
@@ -566,6 +660,7 @@ pub async fn import_video(
         let state = app.state::<WorkflowState>();
         validate_import_frame(&state, &context, &first_frame_version_id)?;
         let entry = VideoAsset {
+            sequence: None,
             asset_id: format!(
                 "{}:{}:{}",
                 context.workflow_id, context.node_id, context.shot_id
@@ -839,6 +934,7 @@ fn request_body(state: &WorkflowState, request: &VideoRequest) -> AppResult<Valu
             return wulusai::body(settings, request, None);
         }
     }
+    let entry = entry.ok_or("图生视频需要已确认首帧")?;
     let bytes = std::fs::read(state.directory.join("assets").join(entry.file_name))
         .map_err(|_| "首帧原图已丢失")?;
     let (mut decoded, _) = super::decode(&bytes)?;
@@ -1152,6 +1248,7 @@ async fn download(
         .await
         .map_err(|_| "无法保存视频原件")?;
     let entry = VideoAsset {
+        sequence: job.request.sequence.clone(),
         asset_id: format!(
             "{}:{}:{}",
             job.request.context.workflow_id,
@@ -1219,6 +1316,7 @@ mod tests {
             directory: directory.clone(),
         };
         let request = VideoRequest {
+            sequence: None,
             wulusai: None,
             context: ShotContext {
                 workflow_id: "w".into(),

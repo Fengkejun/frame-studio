@@ -10,6 +10,7 @@ import { CloudImageRecovery } from './CloudImageRecovery'
 import { ComfyModelManager } from './ComfyModelManager'
 import { BatchSubmit, ImageBatchHistory, type BatchTarget } from './ImageBatch'
 import './media.css'
+import { productionPrompt } from './production'
 
 export interface ShotTarget {
   nodeId: string
@@ -86,7 +87,7 @@ export function ImageStudio({
         artifactId: item.artifactId,
         shotId: item.shot.id,
       },
-      prompt: item.shot.imagePrompt,
+      prompt: productionPrompt(workflow, item.shot.imagePrompt),
       label: `${item.shot.id} · ${item.shot.title}`,
     }))
   const startBatch = (requests: api.BatchRequest[]) =>
@@ -221,9 +222,15 @@ export function ImageStudio({
                 <CloudImageForm
                   batchTargets={batchTargets}
                   onBatch={startBatch}
-                  key={`${workflow.id}/${context.artifactId}/${context.shotId}`}
+                  key={`${workflow.id}/${context.artifactId}/${context.shotId}/${JSON.stringify(workflow.production)}`}
                   context={context}
-                  shot={selected.shot}
+                  shot={{
+                    ...selected.shot,
+                    imagePrompt: productionPrompt(
+                      workflow,
+                      selected.shot.imagePrompt,
+                    ),
+                  }}
                   disabled={
                     busy || working || media.running || selected.node.stale
                   }
@@ -241,9 +248,15 @@ export function ImageStudio({
                 <ImageForm
                   batchTargets={batchTargets}
                   onBatch={startBatch}
-                  key={`${workflow.id}/${context.artifactId}/${context.shotId}`}
+                  key={`${workflow.id}/${context.artifactId}/${context.shotId}/${JSON.stringify(workflow.production)}`}
                   context={context}
-                  shot={selected.shot}
+                  shot={{
+                    ...selected.shot,
+                    imagePrompt: productionPrompt(
+                      workflow,
+                      selected.shot.imagePrompt,
+                    ),
+                  }}
                   disabled={
                     busy || working || media.running || selected.node.stale
                   }

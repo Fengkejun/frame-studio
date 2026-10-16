@@ -315,6 +315,7 @@ pub fn system_prompt(node: &WorkflowNode) -> String {
         NodeKind::Image | NodeKind::Video | NodeKind::Timeline => "{}",
         NodeKind::Brief => "{}",
     };
+    let schema = format!("{schema}\n上游含 production 时，将其中角色、场景、天气、画风视为全片固定设定。分镜是同一故事连续发生的机位和动作变化；每镜头完整重复必要外观特征，承接上一镜头状态，不自行改发色、服装、季节或画风。视频提示词描述镜头之间的连续动作，不把每镜头当成新故事。");
     format!("你是专业的短视频创作助手。只输出一个 JSON 对象，不要 Markdown 代码围栏。使用中文。严格遵循此结构：{schema}\n目标总时长 {} 秒。如生成分镜，必须恰好 {} 个镜头，镜头 ID 不重复，时长总和等于目标时长。\n用户定义的任务要求：{}",node.config.duration,node.config.shot_count,node.config.instructions)
 }
 
