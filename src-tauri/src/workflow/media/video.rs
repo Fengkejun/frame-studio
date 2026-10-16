@@ -814,6 +814,24 @@ fn client() -> AppResult<Client> {
         .build()
         .map_err(|_| "无法初始化视频服务连接".into())
 }
+fn fit_reference_frame(
+    source: &image::DynamicImage,
+    width: u32,
+    height: u32,
+) -> image::DynamicImage {
+    // Provider-required landscape dimensions must not silently cut off a portrait character.
+    let fitted = source
+        .resize(width, height, image::imageops::FilterType::Lanczos3)
+        .to_rgb8();
+    let mut canvas = image::RgbImage::from_pixel(width, height, image::Rgb([16, 18, 20]));
+    image::imageops::overlay(
+        &mut canvas,
+        &fitted,
+        i64::from((width - fitted.width()) / 2),
+        i64::from((height - fitted.height()) / 2),
+    );
+    image::DynamicImage::ImageRgb8(canvas)
+}
 fn request_body(state: &WorkflowState, request: &VideoRequest) -> AppResult<Value> {
     let entry = validate_request(state, request)?;
     if let Some(settings) = &request.wulusai {
@@ -826,8 +844,7 @@ fn request_body(state: &WorkflowState, request: &VideoRequest) -> AppResult<Valu
     let (mut decoded, _) = super::decode(&bytes)?;
     if let Some(settings) = &request.wulusai {
         if let Some([width, height]) = settings.profile()?.frame_sizes.get(&request.resolution) {
-            decoded =
-                decoded.resize_to_fill(*width, *height, image::imageops::FilterType::Lanczos3);
+            decoded = fit_reference_frame(&decoded, *width, *height);
         }
     }
     let (width, height) = decoded.dimensions();
@@ -1170,6 +1187,20 @@ async fn download(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn fixed_size_reference_keeps_the_full_portrait_instead_of_cropping() {
+        let mut image = image::RgbImage::from_pixel(300, 600, image::Rgb([0, 200, 0]));
+        for x in 0..300 {
+            image.put_pixel(x, 0, image::Rgb([255, 0, 0]));
+            image.put_pixel(x, 599, image::Rgb([0, 0, 255]));
+        }
+        let fitted =
+            fit_reference_frame(&image::DynamicImage::ImageRgb8(image), 854, 480).to_rgb8();
+        assert_eq!(fitted.dimensions(), (854, 480));
+        assert!(fitted.get_pixel(427, 0)[0] > 150);
+        assert!(fitted.get_pixel(427, 479)[2] > 150);
+        assert_eq!(*fitted.get_pixel(0, 240), image::Rgb([16, 18, 20]));
+    }
 
     #[test]
     fn restart_only_resumes_jobs_with_remote_ids() {

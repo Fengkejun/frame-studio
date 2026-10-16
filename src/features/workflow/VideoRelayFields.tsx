@@ -83,7 +83,7 @@ export function VideoRelayFields({
       <p className="field-hint">
         {settings.mode === 'frame'
           ? Object.keys(model.frameSizes).length
-            ? '将当前已确认首帧按模型要求的尺寸居中裁剪并发送，原图版本保留。'
+            ? '此模型使用固定横屏尺寸；首帧会等比缩放并补边，保留完整人物与道具。竖屏作品建议选择支持原图比例的模型，避免后续出现黑边。原图版本保留。'
             : '将当前已确认首帧转为 JPEG 并发送，原图尺寸和版本保留。'
           : '文生视频按提示词生成，候选关联当前镜头。'}
         模型返回的实际尺寸和时长会在下载后读取。
