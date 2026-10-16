@@ -61,6 +61,7 @@ fn main() {
             "set_media_budget",
             "list_cloud_image_jobs",
             "start_cloud_image_job",
+            "recover_cloud_image_job",
             "video_key_status",
             "save_video_key",
             "clear_video_key",

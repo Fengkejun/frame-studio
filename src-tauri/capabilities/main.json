@@ -66,6 +66,7 @@
     "allow-set-media-budget",
     "allow-list-cloud-image-jobs",
     "allow-start-cloud-image-job",
+    "allow-recover-cloud-image-job",
     "allow-video-key-status",
     "allow-save-video-key",
     "allow-clear-video-key",

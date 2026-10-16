@@ -65,6 +65,7 @@ pub fn run() {
             workflow::media::budget::set_media_budget,
             workflow::media::cloud::list_cloud_image_jobs,
             workflow::media::cloud::start_cloud_image_job,
+            workflow::media::cloud::recover_cloud_image_job,
             workflow::media::video::video_key_status,
             workflow::media::video::save_video_key,
             workflow::media::video::clear_video_key,

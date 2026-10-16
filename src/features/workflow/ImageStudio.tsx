@@ -6,6 +6,7 @@ import type { Shot, Workflow } from './model'
 import type { useMedia } from './useMedia'
 import { AssetImage } from './AssetImage'
 import { CloudImageForm } from './CloudImageForm'
+import { CloudImageRecovery } from './CloudImageRecovery'
 import { ComfyModelManager } from './ComfyModelManager'
 import { BatchSubmit, ImageBatchHistory, type BatchTarget } from './ImageBatch'
 import './media.css'
@@ -484,6 +485,15 @@ export function ImageStudio({
                   </p>
                   <p>避免元素：{job.request.negative || '无'}</p>
                 </details>
+                {job.status === 'unknown' && (
+                  <CloudImageRecovery
+                    job={job}
+                    disabled={!isDesktop || busy || working || media.running}
+                    onRecover={(url) =>
+                      action(() => api.recoverCloudImageJob(job.id, url))
+                    }
+                  />
+                )}
               </article>
             ))}
           </details>

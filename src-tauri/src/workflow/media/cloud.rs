@@ -1,5 +1,6 @@
 //! OpenAI Images API adapter. Cloud requests have no resumable task ID, so an
 //! uncertain response is recorded and never submitted again automatically.
+//! Returned image links are persisted so downloads can be recovered without a POST.
 use super::budget::{reserve_job, BillableJob};
 use super::connection::{check_catalog, ConnectionCheck};
 use super::*;
@@ -48,6 +49,8 @@ pub struct CloudImageJob {
     pub asset_ids: Vec<String>,
     #[serde(default)]
     pub estimated_cost_micro_usd: u64,
+    #[serde(default)]
+    pub result_url: Option<String>,
 }
 
 pub(super) fn validate(request: &CloudImageRequest) -> AppResult<()> {
@@ -197,6 +200,9 @@ pub fn recover(state: &WorkflowState) -> AppResult<()> {
                 job.asset_ids = vec![candidate_id];
                 job.status = "succeeded".into();
                 job.message = "已找回保存到本地的云端候选图".into();
+            } else if job.result_url.is_some() {
+                job.status = "unknown".into();
+                job.message = "应用退出，图片链接已保留；可仅重新下载已有图片".into();
             } else {
                 job.status = "unknown".into();
                 job.message =
@@ -276,6 +282,7 @@ pub(super) fn start_with_id(
         updated_at: now(),
         asset_ids: vec![],
         estimated_cost_micro_usd: estimate,
+        result_url: None,
     };
     reserve_job(
         &state,
@@ -339,11 +346,8 @@ pub(super) fn endpoint(base_url: &str, suffix: &str) -> AppResult<Url> {
     Ok(url)
 }
 
-async fn response_bytes(mut response: reqwest::Response) -> AppResult<Vec<u8>> {
-    if response
-        .content_length()
-        .is_some_and(|n| n > RESPONSE_LIMIT as u64)
-    {
+async fn response_bytes(mut response: reqwest::Response, limit: usize) -> AppResult<Vec<u8>> {
+    if response.content_length().is_some_and(|n| n > limit as u64) {
         return Err("云端图片响应超过大小限制；请核对服务商用量".into());
     }
     let mut bytes = Vec::new();
@@ -352,12 +356,151 @@ async fn response_bytes(mut response: reqwest::Response) -> AppResult<Vec<u8>> {
         .await
         .map_err(|_| "云端图片响应中断；请核对服务商用量")?
     {
-        if bytes.len() + chunk.len() > RESPONSE_LIMIT {
+        if bytes.len() + chunk.len() > limit {
             return Err("云端图片响应超过大小限制；请核对服务商用量".into());
         }
         bytes.extend_from_slice(&chunk);
     }
     Ok(bytes)
+}
+
+enum ImageResult<'a> {
+    Base64(&'a str),
+    Link(&'a str),
+}
+fn image_result(data: &Value) -> AppResult<ImageResult<'_>> {
+    if let Some(encoded) = data
+        .pointer("/data/0/b64_json")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+    {
+        return Ok(ImageResult::Base64(encoded));
+    }
+    if let Some(url) = data
+        .pointer("/data/0/url")
+        .and_then(Value::as_str)
+        .filter(|s| !s.is_empty())
+    {
+        return Ok(ImageResult::Link(url));
+    }
+    Err("图片响应缺少 b64_json 或 url；云端可能已生成，可从任务记录找回已有图片".into())
+}
+
+fn result_url(value: &str, base_url: &str) -> AppResult<Url> {
+    let api = api_base(base_url)?;
+    let url = Url::parse(value).map_err(|_| "图片下载链接无效")?;
+    let same_origin = url.origin() == api.origin();
+    let relay = api.host_str() == Some("api.wulusai.com")
+        && url.host_str() == Some("ai.wulusai.com")
+        && url.path().starts_with("/workflow/files/");
+    let openai = api.host_str() == Some("api.openai.com")
+        && url
+            .host_str()
+            .is_some_and(|host| host.ends_with(".blob.core.windows.net"));
+    if value.len() > 8192
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
+        || !(same_origin
+            || ((relay || openai)
+                && url.scheme() == "https"
+                && url.port_or_known_default() == Some(443)))
+    {
+        return Err(
+            "图片链接需属于当前图片服务或其已适配的文件域名；其他图片可通过本地素材导入".into(),
+        );
+    }
+    Ok(url)
+}
+
+async fn download_result(
+    state: &WorkflowState,
+    job: &mut CloudImageJob,
+    value: &str,
+) -> AppResult<Vec<u8>> {
+    let url = result_url(value, &job.request.base_url)?;
+    job.result_url = Some(value.into());
+    job.status = "saving".into();
+    job.message = "云端已返回图片链接，正在下载已有图片".into();
+    job.updated_at = now();
+    save(state, job)?;
+    // File hosts never receive the generation service's API key. Do not follow redirects.
+    let response = Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|_| "创建图片下载连接失败")?
+        .get(url)
+        .send()
+        .await
+        .map_err(|_| "图片链接已保留，下载中断；可仅重新下载已有图片")?;
+    if !response.status().is_success() {
+        return Err(format!(
+            "图片下载返回 HTTP {}；链接已保留，可重新下载或更新已过期的链接",
+            response.status().as_u16()
+        ));
+    }
+    response_bytes(response, MAX_IMAGE_BYTES).await
+}
+
+#[tauri::command]
+pub async fn recover_cloud_image_job(
+    app: tauri::AppHandle,
+    id: String,
+    result_url: Option<String>,
+) -> AppResult<CloudImageJob> {
+    let state = app.state::<WorkflowState>();
+    let mut job: CloudImageJob = {
+        let db = state.store.db()?;
+        let raw: String = db
+            .query_row(
+                "SELECT json FROM cloud_image_jobs WHERE id=?1",
+                [&id],
+                |r| r.get(0),
+            )
+            .map_err(|_| "云端图片任务不存在")?;
+        serde_json::from_str(&raw).map_err(|_| "图片任务记录损坏")?
+    };
+    if job.status == "succeeded" {
+        return Ok(job);
+    }
+    if job.status != "unknown" {
+        return Err("请等待图片任务结束后再找回已有结果".into());
+    }
+    let url = result_url
+        .or_else(|| job.result_url.clone())
+        .ok_or("请填写服务商本次任务的图片下载链接")?;
+    self::result_url(&url, &job.request.base_url)?;
+    {
+        let mut active = state.media_active.lock().map_err(|_| "图片任务锁不可用")?;
+        if active.is_some() {
+            return Err("已有图片任务正在执行，请等待完成".into());
+        }
+        *active = Some(ActiveRun {
+            id: job.id.clone(),
+            cancel: Arc::new(AtomicBool::new(false)),
+        });
+    }
+    let recovered = async {
+        let bytes = download_result(&state, &mut job, &url).await?;
+        store_candidate(&app, &state, &mut job, bytes).await
+    }
+    .await;
+    if let Err(error) = &recovered {
+        job.status = "unknown".into();
+        job.message = error.clone();
+    } else {
+        job.message = "已从已有图片链接找回候选图，未重新提交生成；请核对画面后选择版本".into();
+    }
+    job.updated_at = now();
+    let saved = save(&state, &job);
+    if let Ok(mut active) = state.media_active.lock() {
+        *active = None;
+    }
+    saved?;
+    recovered?;
+    Ok(job)
 }
 
 async fn execute(
@@ -431,15 +574,23 @@ async fn execute(
             _ => format!("图片服务返回 HTTP {status}；请核对服务商用量"),
         });
     }
-    let data: Value = serde_json::from_slice(&response_bytes(response).await?)
+    let data: Value = serde_json::from_slice(&response_bytes(response, RESPONSE_LIMIT).await?)
         .map_err(|_| "图片响应格式无效；请核对服务商用量")?;
-    let encoded = data
-        .pointer("/data/0/b64_json")
-        .and_then(Value::as_str)
-        .ok_or("服务未返回图片数据；请核对服务商用量")?;
-    let bytes = STANDARD
-        .decode(encoded)
-        .map_err(|_| "图片编码无效；请核对服务商用量")?;
+    let bytes = match image_result(&data)? {
+        ImageResult::Base64(encoded) => STANDARD
+            .decode(encoded)
+            .map_err(|_| "图片编码无效；请核对服务商用量")?,
+        ImageResult::Link(url) => download_result(state, job, url).await?,
+    };
+    store_candidate(app, state, job, bytes).await
+}
+
+async fn store_candidate(
+    app: &tauri::AppHandle,
+    state: &WorkflowState,
+    job: &mut CloudImageJob,
+    bytes: Vec<u8>,
+) -> AppResult<()> {
     if bytes.len() > MAX_IMAGE_BYTES {
         return Err("返回的图片超过 20 MB 限制；请核对服务商用量".into());
     }
@@ -471,7 +622,7 @@ async fn execute(
     })
     .await
     .map_err(|_| "云端图片保存任务失败")??;
-    job.asset_ids.push(id);
+    job.asset_ids = vec![id];
     job.status = "succeeded".into();
     job.message = "图片已保存，请确认是否选为镜头首帧或角色参考图".into();
     Ok(())
@@ -480,6 +631,57 @@ async fn execute(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn accepts_link_results_when_base64_is_missing_or_empty() {
+        let encoded = json!({"data":[{"b64_json":"encoded","url":"https://files.example/a.png"}]});
+        assert!(matches!(
+            image_result(&encoded),
+            Ok(ImageResult::Base64("encoded"))
+        ));
+        let link =
+            json!({"data":[{"b64_json":"","url":"https://ai.wulusai.com/workflow/files/a.png"}]});
+        assert!(matches!(
+            image_result(&link),
+            Ok(ImageResult::Link(
+                "https://ai.wulusai.com/workflow/files/a.png"
+            ))
+        ));
+        assert!(image_result(&json!({"data":[]})).is_err());
+        assert!(image_result(&json!({"task_id":"id"})).is_err());
+    }
+
+    #[test]
+    fn image_links_are_bound_to_the_service_without_credentials_or_redirects() {
+        let base = "https://api.wulusai.com/v1";
+        assert!(result_url("https://ai.wulusai.com/workflow/files/a.png", base).is_ok());
+        assert!(result_url("http://ai.wulusai.com/workflow/files/a.png", base).is_err());
+        assert!(result_url(
+            "https://ai.wulusai.com.example.com/workflow/files/a.png",
+            base
+        )
+        .is_err());
+        assert!(result_url(
+            "https://user:password@ai.wulusai.com/workflow/files/a.png",
+            base
+        )
+        .is_err());
+        assert!(result_url("https://ai.wulusai.com/workflow/files/a.png#fragment", base).is_err());
+        assert!(result_url(
+            "https://ai.wulusai.com/workflow/files/a.png",
+            "https://other.example/v1"
+        )
+        .is_err());
+        assert!(result_url(
+            "http://127.0.0.1:1234/image.png",
+            "http://127.0.0.1:1234/v1"
+        )
+        .is_ok());
+        assert!(result_url(
+            "http://127.0.0.1:1235/image.png",
+            "http://127.0.0.1:1234/v1"
+        )
+        .is_err());
+    }
     #[test]
     fn request_uses_supported_fields_without_key() {
         let request = CloudImageRequest {

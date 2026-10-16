@@ -107,6 +107,7 @@ export interface CloudImageJob {
   updatedAt: number
   assetIds: string[]
   estimatedCostMicroUsd: number
+  resultUrl?: string | null
 }
 export type BatchRequest =
   | { kind: 'cloud'; request: CloudImageRequest }
@@ -504,6 +505,11 @@ export const listCloudImageJobs = (
 export const startCloudImageJob = (
   request: CloudImageRequest,
 ): Promise<CloudImageJob> => invoke('start_cloud_image_job', { request })
+export const recoverCloudImageJob = (
+  id: string,
+  resultUrl?: string,
+): Promise<CloudImageJob> =>
+  invoke('recover_cloud_image_job', { id, resultUrl: resultUrl ?? null })
 export const videoKeyStatus = (
   region: VideoRequest['region'],
 ): Promise<boolean> =>

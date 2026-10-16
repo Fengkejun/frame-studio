@@ -8,10 +8,22 @@ import { expect } from '@playwright/test'
 export async function createCloudFixture(root) {
   const png = await readFile(path.join(root, 'src-tauri/icons/128x128.png'))
   const requests = []
+  const downloads = []
+  let downloadMode = 'success'
   let mode = 'success'
   let catalogMode = 'success'
   const catalogRequests = []
   const server = http.createServer(async (req, res) => {
+    if (req.method === 'GET' && req.url === '/generated.png') {
+      downloads.push({ authorization: req.headers.authorization ?? null })
+      if (downloadMode === 'fail') {
+        res.writeHead(503).end()
+        return
+      }
+      res.setHeader('Content-Type', 'image/png')
+      res.end(png)
+      return
+    }
     if (req.method === 'GET' && req.url === '/v1/models') {
       catalogRequests.push({ authorization: req.headers.authorization })
       res.setHeader('Content-Type', 'application/json')
@@ -55,7 +67,15 @@ export async function createCloudFixture(root) {
         .end(JSON.stringify({ error: { message: 'fixture rejection' } }))
       return
     }
-    res.end(JSON.stringify({ data: [{ b64_json: png.toString('base64') }] }))
+    res.end(
+      JSON.stringify({
+        data: [
+          mode === 'url'
+            ? { url: `http://127.0.0.1:${server.address().port}/generated.png` }
+            : { b64_json: png.toString('base64') },
+        ],
+      }),
+    )
   })
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   return {
@@ -63,6 +83,10 @@ export async function createCloudFixture(root) {
     baseUrl: `http://127.0.0.1:${server.address().port}/v1`,
     screenshotPath: path.join(root, 'artifacts/desktop-cloud-image-studio.png'),
     requests,
+    downloads,
+    setDownloadMode: (next) => {
+      downloadMode = next
+    },
     catalogRequests,
     setCatalogMode: (next) => {
       catalogMode = next
@@ -115,12 +139,31 @@ export async function testCloudMedia(page, fixture) {
   expect(fixture.requests).toHaveLength(0)
   await page.getByLabel('项目云端媒体预算上限').fill('10')
   await page.getByRole('button', { name: '保存预算' }).click()
+  fixture.setMode('url')
+  fixture.setDownloadMode('fail')
   await page.getByRole('button', { name: '生成 1 张云端候选图' }).click()
   const jobs = page.locator('.image-job-history').first().locator('article')
+  await expect(jobs.first()).toContainText('图片下载返回 HTTP 503', {
+    timeout: 20000,
+  })
+  expect(fixture.requests).toHaveLength(1)
+  fixture.setDownloadMode('success')
+  await jobs
+    .first()
+    .getByText('找回已有图片（不重新生成）', { exact: true })
+    .click()
+  await jobs
+    .first()
+    .getByRole('button', { name: '重新下载已有图片', exact: true })
+    .click()
   await expect(jobs.first().getByText('已完成', { exact: true })).toBeVisible({
     timeout: 20000,
   })
   expect(fixture.requests).toHaveLength(1)
+  expect(fixture.downloads).toEqual([
+    { authorization: null },
+    { authorization: null },
+  ])
   expect(fixture.requests[0].authorization).toBe('Bearer fixture-key')
   expect(fixture.requests[0].body).toMatchObject({
     model: 'gpt-image-2',
@@ -141,6 +184,7 @@ export async function testCloudMedia(page, fixture) {
   await candidate.getByRole('button', { name: '绑定为角色参考图' }).click()
   await expect(page.locator('.role-reference-list')).toContainText('主角小猫')
   await page.getByLabel('云端生图方式').selectOption({ index: 1 })
+  fixture.setMode('success')
   await page.getByRole('button', { name: '参考图生成 1 张候选图' }).click()
   await expect(jobs).toHaveCount(2, { timeout: 20000 })
   await expect(jobs.first().getByText('已完成', { exact: true })).toBeVisible({

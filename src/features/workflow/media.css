@@ -21,6 +21,7 @@
   padding-right: 24px;
   border-right: 1px solid var(--border);
 }
+.cloud-image-recovery .field-label,
 .image-settings .field-label,
 .timeline-studio .field-label {
   display: flex;
@@ -29,6 +30,7 @@
   margin-bottom: 16px;
   font-size: 12px;
 }
+.cloud-image-recovery input,
 .image-settings input,
 .image-settings select,
 .image-settings textarea,
