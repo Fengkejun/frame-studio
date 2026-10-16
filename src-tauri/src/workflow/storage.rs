@@ -134,6 +134,32 @@ impl Store {
         })
         .collect()
     }
+    pub fn default_workflow(&self) -> AppResult<Option<String>> {
+        let json: Option<String> = self
+            .db()?
+            .query_row(
+                "SELECT json FROM media_settings WHERE id='startup-workflow'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        let id: Option<String> = json
+            .map(|value| serde_json::from_str(&value).map_err(|e| e.to_string()))
+            .transpose()?;
+        let items = self.workflows()?;
+        Ok(id.filter(|id| items.iter().any(|item| &item.id == id)))
+    }
+    pub fn set_default_workflow(&self, id: &str) -> AppResult<()> {
+        if !self.workflows()?.iter().any(|item| item.id == id) {
+            return Err("工作流不存在，请先保存项目".into());
+        }
+        self.db()?.execute(
+            "INSERT INTO media_settings(id,json) VALUES ('startup-workflow',?1) ON CONFLICT(id) DO UPDATE SET json=excluded.json",
+            [serde_json::to_string(id).map_err(|e| e.to_string())?]
+        ).map_err(|e| e.to_string())?;
+        Ok(())
+    }
     pub fn provider(&self, id: &str) -> AppResult<Provider> {
         self.providers()?
             .into_iter()
@@ -172,6 +198,54 @@ impl Store {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn startup_project_is_explicit_and_preserves_other_projects() {
+        let store = Store::open(Path::new(":memory:")).unwrap();
+        assert_eq!(store.default_workflow().unwrap(), None);
+        assert!(store.set_default_workflow("missing").is_err());
+        let make = |id: &str| Workflow {
+            schema_version: 1,
+            id: id.into(),
+            name: id.into(),
+            updated_at: 1,
+            nodes: vec![WorkflowNode {
+                id: "brief".into(),
+                kind: NodeKind::Brief,
+                label: "需求".into(),
+                position: Position { x: 0.0, y: 0.0 },
+                config: NodeConfig {
+                    text: "hello".into(),
+                    provider_id: String::new(),
+                    instructions: String::new(),
+                    temperature: 0.4,
+                    shot_count: 3,
+                    duration: 12,
+                },
+                output: None,
+                stale: false,
+            }],
+            edges: vec![],
+            viewport: Viewport {
+                x: 0.0,
+                y: 0.0,
+                zoom: 1.0,
+            },
+        };
+        store.save_workflow(&make("default")).unwrap();
+        store.set_default_workflow("default").unwrap();
+        store.save_workflow(&make("newer")).unwrap();
+        assert_eq!(
+            store.default_workflow().unwrap().as_deref(),
+            Some("default")
+        );
+        assert_eq!(store.workflows().unwrap().len(), 2);
+        store
+            .db()
+            .unwrap()
+            .execute("DELETE FROM workflows WHERE id='default'", [])
+            .unwrap();
+        assert_eq!(store.default_workflow().unwrap(), None);
+    }
     #[test]
     fn upgrades_v8_preserving_media_and_adding_batch_storage() {
         let path = std::env::temp_dir().join(format!("frame-studio-v8-{}.sqlite", uid()));

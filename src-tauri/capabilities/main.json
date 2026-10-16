@@ -13,6 +13,8 @@
     "allow-purge-trash",
     "allow-list-workflows",
     "allow-save-workflow",
+    "allow-get-default-workflow",
+    "allow-set-default-workflow",
     "allow-export-project-bundle",
     "allow-import-project-bundle",
     "allow-choose-backup-directory",

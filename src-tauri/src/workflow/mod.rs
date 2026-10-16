@@ -83,6 +83,14 @@ pub fn save_workflow(state: tauri::State<WorkflowState>, workflow: Workflow) -> 
     state.store.save_workflow(&workflow)
 }
 #[tauri::command]
+pub fn get_default_workflow(state: tauri::State<WorkflowState>) -> AppResult<Option<String>> {
+    state.store.default_workflow()
+}
+#[tauri::command]
+pub fn set_default_workflow(state: tauri::State<WorkflowState>, id: String) -> AppResult<()> {
+    state.store.set_default_workflow(&id)
+}
+#[tauri::command]
 pub fn list_providers(state: tauri::State<WorkflowState>) -> AppResult<Vec<Provider>> {
     state.store.providers()
 }

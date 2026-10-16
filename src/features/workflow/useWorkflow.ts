@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from './api'
-import { applyRun, makeWorkflow, type RunRecord, type Workflow } from './model'
+import {
+  applyRun,
+  makeStarterWorkflow,
+  type RunRecord,
+  type Workflow,
+} from './model'
 
 export function useWorkflow() {
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
@@ -10,6 +15,7 @@ export function useWorkflow() {
   const [runs, setRuns] = useState<RunRecord[]>([])
   const [activeRun, setActiveRun] = useState<RunRecord | null>(null)
   const [starting, setStarting] = useState(false)
+  const [defaultId, setDefaultId] = useState<string | null>(null)
   const [history, setHistory] = useState<{
     past: Workflow[]
     future: Workflow[]
@@ -43,12 +49,20 @@ export function useWorkflow() {
 
   useEffect(() => {
     let disposed = false
-    api
-      .listWorkflows()
-      .then((items) => {
+    Promise.all([api.listWorkflows(), api.getDefaultWorkflow()])
+      .then(async ([items, defaultId]) => {
         if (disposed) return
+        if (!items.length) {
+          const starter = makeStarterWorkflow()
+          await api.saveWorkflow(starter)
+          await api.setDefaultWorkflow(starter.id)
+          if (disposed) return
+          items = [starter]
+          defaultId = starter.id
+        }
         setProjects(items)
-        const w = items[0] ?? makeWorkflow()
+        setDefaultId(defaultId)
+        const w = items.find((item) => item.id === defaultId) ?? items[0]!
         latest.current = w
         setWorkflow(w)
       })
@@ -174,6 +188,16 @@ export function useWorkflow() {
       setStarting(false)
     }
   }
+  async function makeDefault() {
+    if (busy || !latest.current) return
+    try {
+      await save(latest.current)
+      await api.setDefaultWorkflow(latest.current.id)
+      setDefaultId(latest.current.id)
+    } catch (e) {
+      setError(api.errorMessage(e))
+    }
+  }
   function undo(redo = false) {
     if (busy || !workflow) return
     const stack = redo ? history.future : history.past
@@ -208,6 +232,8 @@ export function useWorkflow() {
     runs,
     activeRun,
     busy,
+    defaultId,
+    makeDefault,
     stop: async () => {
       if (activeRun) {
         try {

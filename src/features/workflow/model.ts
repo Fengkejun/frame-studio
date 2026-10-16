@@ -258,6 +258,50 @@ export function makeWorkflow(): Workflow {
     updatedAt: Date.now(),
   }
 }
+export function makeStarterWorkflow(providerId = ''): Workflow {
+  const nodes = kinds.map((kind, index) => {
+    const node = makeNode(
+      kind,
+      40 + (index % 4) * 310,
+      100 + Math.floor(index / 4) * 300,
+    )
+    node.config.duration = 12
+    node.config.shotCount = 3
+    if (kind === 'story' || kind === 'storyboard' || kind === 'prompt')
+      node.config.providerId = providerId
+    return node
+  })
+  const byKind = Object.fromEntries(nodes.map((node) => [node.kind, node]))
+  byKind.brief!.config.text =
+    '制作一部12秒的治愈系AI动漫短片《星光来信》。雨夜的城市屋顶，白发蓝眼、穿蓝色雨衣的少女邮差小星，给橘白小猫送来一封发光的信。信纸化成星光小伞，为小猫遮雨。要求角色外观一致，温暖结尾，恰好3个镜头，每个4秒。'
+  byKind.story!.config.instructions =
+    '用中文写完整动漫剧本，包含角色外观、动作、情绪和温暖结尾。正文控制在300到500字，角色使用字符串数组。'
+  byKind.storyboard!.config.instructions =
+    '恰好3个镜头，每个4秒，总时长12秒。保持角色外观一致，逐镜头写清画面、对白、运镜、首帧图片提示词和视频动作提示词。'
+  byKind.prompt!.config.instructions =
+    '整理统一动漫画风、角色一致性、光影与构图提示词，负面提示词排除角色漂移、画面文字和多余肢体。'
+  const links: [NodeKind, NodeKind][] = [
+    ['brief', 'story'],
+    ['story', 'storyboard'],
+    ['storyboard', 'prompt'],
+    ['storyboard', 'image'],
+    ['image', 'video'],
+    ['video', 'timeline'],
+  ]
+  return {
+    schemaVersion: 1,
+    id: crypto.randomUUID(),
+    name: '默认 · AI 动漫短片',
+    nodes,
+    edges: links.map(([source, target]) => ({
+      id: crypto.randomUUID(),
+      source: byKind[source]!.id,
+      target: byKind[target]!.id,
+    })),
+    viewport: { x: 0, y: 0, zoom: 0.65 },
+    updatedAt: Date.now(),
+  }
+}
 export function compatible(source: NodeKind, target: NodeKind) {
   return target === 'story'
     ? source === 'brief' || source === 'prompt'

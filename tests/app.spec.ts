@@ -114,6 +114,13 @@ test('browser canvas persists graph edits and rejects native execution honestly'
 }) => {
   await page.goto('/')
   await page.getByRole('button', { name: '工作流', exact: true }).click()
+  await page.getByRole('button', { name: '＋ 新建工作流', exact: true }).click()
+  await page
+    .getByRole('button', { name: '设为默认工作流', exact: true })
+    .click()
+  await expect(
+    page.getByRole('button', { name: '✓ 默认工作流', exact: true }),
+  ).toBeDisabled()
   await page.getByRole('textbox', { name: '工作流名称' }).fill('雨夜书店分镜')
   await page.getByRole('button', { name: '提示词助手' }).click()
   await expect(page.getByRole('heading', { name: '提示词助手' })).toBeVisible()

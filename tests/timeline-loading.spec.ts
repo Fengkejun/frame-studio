@@ -14,6 +14,8 @@ test('timeline waits for its saved draft before exposing editing controls', asyn
       isTauri: true,
       __TAURI_INTERNALS__: {
         invoke: (command: string) => {
+          if (command === 'get_default_workflow') return Promise.resolve(null)
+          if (command === 'set_default_workflow') return Promise.resolve()
           if (command === 'get_app_info')
             return Promise.resolve({
               name: 'Frame Studio',

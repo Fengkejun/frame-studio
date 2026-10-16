@@ -8,6 +8,8 @@ fn main() {
             "purge_trash",
             "list_workflows",
             "save_workflow",
+            "get_default_workflow",
+            "set_default_workflow",
             "export_project_bundle",
             "import_project_bundle",
             "choose_backup_directory",

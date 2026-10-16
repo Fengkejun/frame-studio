@@ -148,6 +148,7 @@ try {
   await expect(page.getByRole('status')).toHaveText('桌面连接正常', {
     timeout: 15000,
   })
+  await page.getByRole('button', { name: '工作台', exact: true }).click()
   await expect(
     page.getByRole('heading', { name: '开始制作前，检查创作工具' }),
   ).toBeVisible()

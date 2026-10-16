@@ -16,6 +16,8 @@ test('backups save edits, retain the location on cancellation, and preserve proj
       __TAURI_INTERNALS__: {
         invoke: (command: string, args: Record<string, unknown> = {}) => {
           calls.push(command)
+          if (command === 'get_default_workflow') return Promise.resolve(null)
+          if (command === 'set_default_workflow') return Promise.resolve()
           if (command === 'get_app_info')
             return Promise.resolve({
               name: 'Frame Studio',

@@ -23,6 +23,7 @@ import {
   kinds,
   makeNode,
   makeWorkflow,
+  makeStarterWorkflow,
   parseWorkflow,
   statusLabels,
   type NodeKind,
@@ -451,6 +452,26 @@ function WorkflowEditor({
             }}
           >
             ＋ 新建工作流
+          </button>
+          <button
+            className="small-button"
+            disabled={busy}
+            onClick={() => {
+              const providerId =
+                w.nodes.find((node) => node.kind === 'story')?.config
+                  .providerId || ''
+              void c.selectProject(makeStarterWorkflow(providerId))
+              setSelected([])
+            }}
+          >
+            ＋ 完整模板
+          </button>
+          <button
+            className="small-button"
+            disabled={busy || c.defaultId === w.id}
+            onClick={() => void c.makeDefault()}
+          >
+            {c.defaultId === w.id ? '✓ 默认工作流' : '设为默认工作流'}
           </button>
         </div>
       </div>

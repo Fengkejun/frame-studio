@@ -9,12 +9,13 @@ import { useRuntime } from '@/shared/hooks/useRuntime'
 import { Icon } from '@/shared/ui/Icon'
 import packageInfo from '../../package.json'
 import './styles.css'
+import { isDesktop } from '@/shared/lib/desktop'
 
 type Page = 'workspace' | 'workflow' | 'connections' | 'settings'
 type WorkflowTab = 'shots' | 'images' | 'videos' | 'timeline'
 
 export function App() {
-  const [page, setPage] = useState<Page>('workspace')
+  const [page, setPage] = useState<Page>(isDesktop ? 'workflow' : 'workspace')
   const [workflowTab, setWorkflowTab] = useState<WorkflowTab>('shots')
   const { theme, changeTheme, storageError } = useTheme()
   const { status, retry } = useRuntime()
@@ -107,6 +108,18 @@ export function App() {
           </span>
         </header>
         <main id="main-content" className="main-content" tabIndex={-1}>
+          {page !== 'workspace' && (
+            <span className="sr-only" role="status">
+              {
+                {
+                  browser: '浏览器预览',
+                  loading: '正在连接桌面',
+                  ready: '桌面连接正常',
+                  error: '桌面连接失败',
+                }[status.state]
+              }
+            </span>
+          )}
           {page === 'workspace' ? (
             <WorkspacePage
               status={status}

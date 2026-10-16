@@ -11,6 +11,19 @@ import {
 } from './model'
 
 const previewKey = 'frame-studio.preview.workflows.v1'
+const defaultKey = 'frame-studio.default-workflow'
+export async function getDefaultWorkflow(): Promise<string | null> {
+  if (isDesktop) return invoke('get_default_workflow')
+  try {
+    return localStorage.getItem(defaultKey)
+  } catch {
+    return null
+  }
+}
+export async function setDefaultWorkflow(id: string): Promise<void> {
+  if (isDesktop) return invoke('set_default_workflow', { id })
+  localStorage.setItem(defaultKey, id)
+}
 export function errorMessage(error: unknown): string {
   if (error instanceof Error)
     return error.name === 'ZodError'

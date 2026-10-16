@@ -49,6 +49,7 @@ test('video relay keeps credentials bound to its address and sends explicit plan
                 platform: 'fixture',
                 architecture: 'fixture',
               })
+            if (command === 'get_default_workflow') return Promise.resolve(null)
             if (command === 'list_workflows') return Promise.resolve([workflow])
             if (command === 'list_image_assets')
               return Promise.resolve([

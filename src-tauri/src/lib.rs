@@ -12,6 +12,8 @@ pub fn run() {
             workflow::media::cleanup::purge_trash,
             workflow::list_workflows,
             workflow::save_workflow,
+            workflow::get_default_workflow,
+            workflow::set_default_workflow,
             workflow::package::export_project_bundle,
             workflow::package::import_project_bundle,
             workflow::package::backups::choose_backup_directory,
