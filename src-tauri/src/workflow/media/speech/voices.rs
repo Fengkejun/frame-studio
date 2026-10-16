@@ -8,6 +8,7 @@ use std::{
 const MAI_DOC: &str =
     "https://learn.microsoft.com/en-us/azure/ai-services/speech-service/mai-voices";
 const OPENAI_DOC: &str = "https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create";
+const GEMINI_DOC: &str = "https://ai.google.dev/gemini-api/docs/speech-generation#voice-options";
 const TTL: u64 = 15 * 60 * 1000;
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -17,6 +18,8 @@ pub struct SpeechVoice {
     pub name: String,
     pub locale: String,
     pub gender: String,
+    #[serde(default)]
+    pub description: String,
 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,6 +64,7 @@ fn mai_voices(markdown: &str) -> AppResult<Vec<SpeechVoice>> {
             name: id[locale.len() + 1..].into(),
             locale: locale.into(),
             gender: cells[3].into(),
+            description: String::new(),
         });
     }
     if voices.is_empty() || voices.len() > 500 {
@@ -94,8 +98,55 @@ fn openai_voices(model: &str) -> AppResult<Vec<SpeechVoice>> {
             name: (*id).into(),
             locale: "multilingual".into(),
             gender: String::new(),
+            description: String::new(),
         })
         .collect())
+}
+
+fn gemini_voices() -> Vec<SpeechVoice> {
+    // Official featured voices, checked 2026-10-16. Labels translate Google's traits,
+    // not relay-specific personas or guessed gender assignments.
+    [
+        ("Zephyr", "明亮"),
+        ("Puck", "欢快"),
+        ("Charon", "讲解感"),
+        ("Kore", "坚定"),
+        ("Fenrir", "兴奋"),
+        ("Leda", "年轻感"),
+        ("Orus", "坚定"),
+        ("Aoede", "轻快"),
+        ("Callirrhoe", "随和"),
+        ("Autonoe", "明亮"),
+        ("Enceladus", "气声"),
+        ("Iapetus", "清晰"),
+        ("Umbriel", "随和"),
+        ("Algieba", "顺滑"),
+        ("Despina", "顺滑"),
+        ("Erinome", "清晰"),
+        ("Algenib", "沙哑"),
+        ("Rasalgethi", "讲解感"),
+        ("Laomedeia", "欢快"),
+        ("Achernar", "柔和"),
+        ("Alnilam", "坚定"),
+        ("Schedar", "平稳"),
+        ("Gacrux", "成熟感"),
+        ("Pulcherrima", "直率"),
+        ("Achird", "亲切"),
+        ("Zubenelgenubi", "随性"),
+        ("Vindemiatrix", "温柔"),
+        ("Sadachbia", "活泼"),
+        ("Sadaltager", "知性感"),
+        ("Sulafat", "温暖"),
+    ]
+    .into_iter()
+    .map(|(id, description)| SpeechVoice {
+        id: id.into(),
+        name: id.into(),
+        locale: "multilingual".into(),
+        gender: String::new(),
+        description: description.into(),
+    })
+    .collect()
 }
 
 #[tauri::command]
@@ -151,6 +202,16 @@ pub async fn list_speech_voices(base_url: String, model: String) -> AppResult<Vo
                 MAI_DOC,
                 now().to_string(),
             )
+        } else if matches!(
+            model.as_str(),
+            "gemini-3.8-flash-lite-tts" | "gemini-3.8-flash-tts"
+        ) {
+            (
+                gemini_voices(),
+                "official_documentation_snapshot",
+                GEMINI_DOC,
+                "2026-10-16".into(),
+            )
         } else {
             (
                 openai_voices(&model)?,
@@ -199,6 +260,20 @@ pub(super) fn validate_selection(request: &SpeechRequest) -> AppResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn gemini_has_distinct_official_names_and_traits() {
+        let voices = gemini_voices();
+        assert_eq!(voices.len(), 30);
+        assert_eq!(
+            voices.iter().map(|v| &v.id).collect::<HashSet<_>>().len(),
+            30
+        );
+        assert_eq!(
+            voices.iter().find(|v| v.id == "Kore").unwrap().description,
+            "坚定"
+        );
+        assert!(!voices.iter().any(|v| v.id == "alloy"));
+    }
     #[test]
     fn parses_official_mai_table_without_openai_or_azure_neural_mixups() {
         let text="| Voice ID | Locale | Language | Gender | Supported models | Supported styles |\n| `zh-CN-Harper` | `zh-CN` | Chinese | Female | `MAI-Voice-2.1`, `MAI-Voice-2.1-Flash` | `neutral` |\n| `en-US-Harper` | `en-US` | English | Female | `MAI-Voice-2.1` | `neutral` |";

@@ -21,11 +21,32 @@ pub struct SpeechRequest {
     #[serde(default = "default_response_format")]
     pub response_format: String,
     #[serde(default)]
+    pub instructions: String,
+    #[serde(default)]
     pub voice_catalog_id: Option<String>,
     pub budget_reservation_micro_usd: u64,
 }
 fn default_response_format() -> String {
     "wav".into()
+}
+fn supports_instructions(model: &str) -> bool {
+    matches!(
+        model,
+        "gemini-3.8-flash-lite-tts"
+            | "gemini-3.8-flash-tts"
+            | "gpt-4o-mini-tts"
+            | "gpt-4o-mini-tts-2025-12-15"
+    )
+}
+fn speech_payload(request: &SpeechRequest) -> serde_json::Value {
+    let mut payload = json!({"model":request.model, "input":request.input, "voice":request.voice, "response_format":request.response_format});
+    if request.speed != 1.0 {
+        payload["speed"] = json!(request.speed);
+    }
+    if !request.instructions.trim().is_empty() {
+        payload["instructions"] = json!(request.instructions);
+    }
+    payload
 }
 fn audio_header_matches(bytes: &[u8], format: &str) -> bool {
     match format {
@@ -54,6 +75,18 @@ pub struct SpeechJob {
 
 fn validate(request: &SpeechRequest) -> AppResult<()> {
     cloud::api_base(&request.base_url)?;
+    if request.instructions.chars().count() > 4096
+        || (!request.instructions.trim().is_empty() && !supports_instructions(&request.model))
+    {
+        return Err("朗读要求最多 4096 字，且须选择支持此参数的模型".into());
+    }
+    if matches!(
+        request.model.as_str(),
+        "gemini-3.8-flash-lite-tts" | "gemini-3.8-flash-tts"
+    ) && (request.response_format != "wav" || request.speed != 1.0)
+    {
+        return Err("当前 Gemini 接口使用 WAV 格式；请在朗读要求中描述语速".into());
+    }
     if request.workflow_id.is_empty()
         || request.workflow_id.len() > 128
         || request.model.trim().is_empty()
@@ -214,6 +247,7 @@ mod tests {
             voice: "coral".into(),
             speed: 1.0,
             response_format: default_response_format(),
+            instructions: String::new(),
             voice_catalog_id: None,
             budget_reservation_micro_usd: 50_000,
         }
@@ -251,12 +285,36 @@ mod tests {
         assert!(!audio_header_matches(b"{\"url\":\"file.mp3\"}", "mp3"));
         let mut legacy = serde_json::to_value(request()).unwrap();
         legacy.as_object_mut().unwrap().remove("responseFormat");
+        legacy.as_object_mut().unwrap().remove("instructions");
         assert_eq!(
             serde_json::from_value::<SpeechRequest>(legacy)
                 .unwrap()
                 .response_format,
             "wav"
         );
+    }
+
+    #[test]
+    fn gemini_payload_matches_relay_contract_and_rejects_unsupported_options() {
+        let mut value = request();
+        value.model = "gemini-3.8-flash-lite-tts".into();
+        value.voice = "Kore".into();
+        value.instructions = "Speak warmly and clearly.".into();
+        assert!(validate(&value).is_ok());
+        assert_eq!(
+            speech_payload(&value),
+            json!({"model":value.model,"input":value.input,"voice":"Kore","response_format":"wav","instructions":"Speak warmly and clearly."})
+        );
+        value.speed = 1.1;
+        assert!(validate(&value).is_err());
+        value.speed = 1.0;
+        value.response_format = "mp3".into();
+        assert!(validate(&value).is_err());
+        value = request();
+        assert!(speech_payload(&value).get("instructions").is_none());
+        value.model = "mai-voice-2.1".into();
+        value.instructions = "warm".into();
+        assert!(validate(&value).is_err());
     }
 
     #[test]
@@ -409,10 +467,7 @@ async fn execute(
         .build()
         .map_err(|_| "创建配音连接失败")?;
     let request = &job.request;
-    let mut payload = json!({"model":request.model, "input":request.input, "voice":request.voice, "response_format":request.response_format});
-    if request.speed != 1.0 {
-        payload["speed"] = json!(request.speed);
-    }
+    let payload = speech_payload(request);
     let mut response = client
         .post(cloud::endpoint(&request.base_url, "audio/speech")?)
         .bearer_auth(key)

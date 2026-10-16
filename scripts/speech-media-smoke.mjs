@@ -183,6 +183,38 @@ export async function testSpeechMedia(page, fixture, root) {
   await expect
     .poll(() => custom.locator('audio').evaluate((audio) => audio.readyState))
     .toBeGreaterThan(0)
+  await page.getByLabel('配音模型 ID').fill('gemini-3.8-flash-lite-tts')
+  await page.getByLabel('配音音色').selectOption('Kore')
+  await page.getByLabel('音色备注名').fill('小美')
+  await page.getByLabel('朗读要求').fill('Speak warmly and clearly.')
+  await expect(page.getByLabel('配音文件格式')).toHaveValue('wav')
+  await page
+    .getByRole('button', { name: '生成短句试听（计费）', exact: true })
+    .click()
+  await expect(studio.locator('.speech-job')).toHaveCount(7)
+  await expect(studio.locator('.speech-job').first()).toContainText(
+    '配音已完成',
+    { timeout: 15000 },
+  )
+  expect(fixture.requests.at(-1).body).toEqual({
+    model: 'gemini-3.8-flash-lite-tts',
+    voice: 'Kore',
+    response_format: 'wav',
+    instructions: 'Speak warmly and clearly.',
+    input:
+      '你好，欢迎来到帧序工作室。这是一段音色试听，请听听我的声音是否适合你的角色。',
+  })
+  const audition = page.getByRole('region', { name: '音色试听与备注' })
+  await audition.getByRole('button', { name: '试听音频', exact: true }).click()
+  await expect
+    .poll(() => audition.locator('audio').evaluate((a) => a.duration))
+    .toBeGreaterThan(0)
+  await expect(page.getByLabel('旁白文本')).toHaveValue(
+    '你好，这是自动验证的配音旁白。',
+  )
+  await expect(page.getByLabel('配音', { exact: true })).toHaveValue(selected)
+  // Replaying the saved sample never submits another generation.
+  expect(fixture.requests).toHaveLength(7)
   await page.getByRole('button', { name: '删除配音密钥' }).click()
   await expect(
     page.getByRole('button', { name: '生成配音', exact: true }),
@@ -192,6 +224,6 @@ export async function testSpeechMedia(page, fixture, root) {
   })
   fixture.setMode('success')
   console.log(
-    'PASS: speech protocol and auth, WAV/MP3 preview, custom voice IDs, explicit version selection, rejected/invalid/oversized/lost results, budget guard, credential isolation. Local fixture only.',
+    'PASS: speech protocol and auth, WAV/MP3 preview, Gemini instructions, named voice auditions and reuse, explicit version selection, rejected/invalid/oversized/lost results, budget guard, credential isolation. Local fixture only.',
   )
 }

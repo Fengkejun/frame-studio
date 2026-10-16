@@ -571,6 +571,20 @@
   border: 1px solid var(--border);
   border-radius: 12px;
 }
+.voice-audition {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-width: 0;
+}
+.voice-audition > button {
+  justify-self: start;
+}
+.voice-audition h4 {
+  margin: 0;
+}
 .speech-connection summary {
   cursor: pointer;
   margin-bottom: 12px;

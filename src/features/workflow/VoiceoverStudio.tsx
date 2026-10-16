@@ -9,12 +9,36 @@ import type { Workflow } from './model'
 import { useSpeechVoices } from './useSpeechVoices'
 
 const storageKey = 'frame-studio.speech-settings'
+const namesKey = 'frame-studio.voice-nicknames'
+const auditionText =
+  '你好，欢迎来到帧序工作室。这是一段音色试听，请听听我的声音是否适合你的角色。'
+const geminiModels = ['gemini-3.8-flash-lite-tts', 'gemini-3.8-flash-tts']
+const instructionModels = [
+  ...geminiModels,
+  'gpt-4o-mini-tts',
+  'gpt-4o-mini-tts-2025-12-15',
+]
+function savedNames(): Record<string, string> {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(namesKey) ?? '{}')
+    if (value && typeof value === 'object' && !Array.isArray(value))
+      return Object.fromEntries(
+        Object.entries(value).filter(
+          ([, name]) => typeof name === 'string' && name.length <= 20,
+        ),
+      )
+  } catch {
+    /* Optional local nicknames. */
+  }
+  return {}
+}
 const defaults = {
   baseUrl: 'https://api.openai.com/v1',
   model: 'gpt-4o-mini-tts',
   voice: '',
   speed: 1,
   responseFormat: 'wav' as 'wav' | 'mp3',
+  instructions: '',
 }
 function savedSettings(): typeof defaults {
   try {
@@ -42,6 +66,10 @@ function savedSettings(): typeof defaults {
           'responseFormat' in value && value.responseFormat === 'mp3'
             ? 'mp3'
             : 'wav',
+        instructions:
+          'instructions' in value && typeof value.instructions === 'string'
+            ? value.instructions
+            : '',
       }
     }
   } catch {
@@ -68,6 +96,7 @@ export function VoiceoverStudio({
   captions: string
 }) {
   const [settings, setSettings] = useState(savedSettings)
+  const [nicknames, setNicknames] = useState(savedNames)
   const [input, setInput] = useState('')
   const [reservation, setReservation] = useState('0.05')
   const [key, setKey] = useState('')
@@ -82,6 +111,37 @@ export function VoiceoverStudio({
   const voiceReady =
     !!voices.catalog &&
     voices.catalog.voices.some((v) => v.id === settings.voice)
+  const isGemini = geminiModels.includes(settings.model)
+  const allowsInstructions = instructionModels.includes(settings.model)
+  const nameScope = (voice: string) =>
+    JSON.stringify([
+      settings.baseUrl.replace(/\/+$/, ''),
+      settings.model,
+      voice,
+    ])
+  const selectedVoice = voices.catalog?.voices.find(
+    (v) => v.id === settings.voice,
+  )
+  const audition = jobs.find(
+    (job) =>
+      job.status === 'succeeded' &&
+      assets.some((a) => a.versionId === job.assetId) &&
+      job.request.baseUrl.replace(/\/+$/, '') ===
+        settings.baseUrl.replace(/\/+$/, '') &&
+      job.request.model === settings.model &&
+      job.request.voice === settings.voice &&
+      job.request.speed === settings.speed &&
+      (job.request.responseFormat ?? 'wav') === settings.responseFormat &&
+      (job.request.instructions ?? '') ===
+        (allowsInstructions ? settings.instructions : ''),
+  )
+  useEffect(() => {
+    try {
+      localStorage.setItem(namesKey, JSON.stringify(nicknames))
+    } catch {
+      /* Optional. */
+    }
+  }, [nicknames])
 
   useEffect(() => {
     try {
@@ -156,7 +216,7 @@ export function VoiceoverStudio({
       setBusy(false)
     }
   }
-  async function generate() {
+  async function generate(text = input) {
     if (!voiceReady || !voices.catalog)
       throw new Error('请先获取当前模型的音色列表，再选择音色生成配音')
     const amount = Number(reservation)
@@ -166,8 +226,9 @@ export function VoiceoverStudio({
     const job = await api.startSpeechJob({
       workflowId: workflow.id,
       ...settings,
+      instructions: allowsInstructions ? settings.instructions : '',
       voiceCatalogId: voices.catalog.id,
-      input,
+      input: text,
       budgetReservationMicroUsd: Math.round(amount * 1_000_000),
     })
     setJobs((values) => [job, ...values])
@@ -219,13 +280,23 @@ export function VoiceoverStudio({
                   voice: '',
                   responseFormat: event.target.value.startsWith('mai-voice-')
                     ? 'mp3'
-                    : settings.responseFormat,
+                    : geminiModels.includes(event.target.value)
+                      ? 'wav'
+                      : settings.responseFormat,
+                  speed: geminiModels.includes(event.target.value)
+                    ? 1
+                    : settings.speed,
+                  instructions: instructionModels.includes(event.target.value)
+                    ? settings.instructions
+                    : '',
                 })
               }}
             />
             <datalist id="speech-models">
               <option value="mai-voice-2.1" />
               <option value="mai-voice-2.1-flash" />
+              <option value="gemini-3.8-flash-lite-tts" />
+              <option value="gemini-3.8-flash-tts" />
               <option value="gpt-4o-mini-tts" />
               <option value="tts-1" />
               <option value="tts-1-hd" />
@@ -333,7 +404,10 @@ export function VoiceoverStudio({
             </option>
             {voices.catalog?.voices.map((voice) => (
               <option key={voice.id} value={voice.id}>
-                {voice.name} ·{' '}
+                {nicknames[nameScope(voice.id)]
+                  ? `${nicknames[nameScope(voice.id)]} · ${voice.name}`
+                  : voice.name}
+                {voice.description ? ` · ${voice.description}` : ''} ·{' '}
                 {voice.locale === 'multilingual' ? '多语言' : voice.locale}
                 {voice.gender === 'Female'
                   ? ' · 女声'
@@ -345,7 +419,7 @@ export function VoiceoverStudio({
           </select>
           <small>
             {voices.catalog
-              ? `${voices.catalog.source === 'official_live' ? '微软官方在线目录' : 'OpenAI 官方文档目录（2026-10-16 核对）'} · ${voices.catalog.voices.length} 个音色。中转站实际开放范围需单独验证。`
+              ? `${voices.catalog.source === 'official_live' ? '微软官方在线目录' : `${isGemini ? 'Google Gemini' : 'OpenAI'} 官方文档目录（2026-10-16 核对）`} · ${voices.catalog.voices.length} 个音色。中转站实际开放范围需单独验证。`
               : '先获取当前模型的官方音色目录，再选择音色。'}
           </small>
           <button
@@ -367,7 +441,7 @@ export function VoiceoverStudio({
           <select
             aria-label="配音文件格式"
             value={settings.responseFormat}
-            disabled={busy || active}
+            disabled={busy || active || isGemini}
             onChange={(event) =>
               setSettings({
                 ...settings,
@@ -388,7 +462,7 @@ export function VoiceoverStudio({
             max={4}
             step={0.05}
             value={settings.speed}
-            disabled={busy || active}
+            disabled={busy || active || isGemini}
             onChange={(event) =>
               setSettings({ ...settings, speed: Number(event.target.value) })
             }
@@ -408,6 +482,90 @@ export function VoiceoverStudio({
           />
         </label>
       </div>
+      {allowsInstructions && (
+        <label className="field-label">
+          朗读要求
+          <textarea
+            aria-label="朗读要求"
+            rows={2}
+            maxLength={4096}
+            value={settings.instructions}
+            disabled={busy || active}
+            placeholder="例如：语气温暖、吐字清晰，适合治愈动画旁白。"
+            onChange={(event) =>
+              setSettings({ ...settings, instructions: event.target.value })
+            }
+          />
+          <small>
+            {isGemini
+              ? '当前 Gemini 接口使用 WAV；语气、情绪和语速可在此描述。'
+              : '描述语气、情绪和表达方式，此内容作为独立朗读要求发送。'}
+          </small>
+        </label>
+      )}
+      <section className="voice-audition" aria-label="音色试听与备注">
+        <h4>
+          {voiceReady && selectedVoice
+            ? `${nicknames[nameScope(settings.voice)] || selectedVoice.name}${selectedVoice.description ? ` · ${selectedVoice.description}` : ''}`
+            : '选择音色后试听'}
+        </h4>
+        <label className="field-label">
+          音色备注名
+          <input
+            aria-label="音色备注名"
+            maxLength={20}
+            placeholder="例如：小美、小帅、温柔旁白"
+            disabled={!voiceReady || busy || active}
+            value={nicknames[nameScope(settings.voice)] ?? ''}
+            onChange={(event) =>
+              setNicknames({
+                ...nicknames,
+                [nameScope(settings.voice)]: event.target.value,
+              })
+            }
+          />
+          <small>
+            仅保存到本机，按服务、模型和音色分别记录；发送给模型的仍是原音色
+            ID。
+          </small>
+        </label>
+        {voiceReady && audition?.assetId ? (
+          <>
+            <p className="field-hint">
+              当前音色与参数已有录音，播放已保存音频无需再次生成。
+            </p>
+            <AudioPreview key={audition.assetId} versionId={audition.assetId} />
+            <details>
+              <summary>这段录音的文本</summary>
+              <p className="speech-text">{audition.request.input}</p>
+            </details>
+          </>
+        ) : (
+          <p className="field-hint">选中任意音色后，可生成下面的短句试听。</p>
+        )}
+        <p className="field-hint">{auditionText}</p>
+        <button
+          className="small-button"
+          disabled={
+            !isDesktop ||
+            busy ||
+            active ||
+            !hasKey ||
+            !voiceReady ||
+            settings.instructions.length > 4096
+          }
+          onClick={() => void run(() => generate(auditionText))}
+        >
+          {active
+            ? '配音生成中…'
+            : audition
+              ? '重新生成短句试听（计费）'
+              : '生成短句试听（计费）'}
+        </button>
+        <small className="field-hint">
+          生成试听会调用当前模型并计入项目预算，使用上方预留金额；试听保留为独立音频版本，旁白文本和时间线配音保持原样。
+        </small>
+      </section>
       <p className="field-hint">
         不同模型支持的音色和语速可能不同；费用按服务商账单结算，请按其报价填写预留金额。
       </p>
@@ -420,10 +578,11 @@ export function VoiceoverStudio({
           !hasKey ||
           !input.trim() ||
           length > 4096 ||
+          settings.instructions.length > 4096 ||
           !voiceReady ||
           !settings.model.trim()
         }
-        onClick={() => void run(generate)}
+        onClick={() => void run(() => generate())}
       >
         {active ? '配音生成中…' : '生成配音'}
       </button>
@@ -464,6 +623,9 @@ export function VoiceoverStudio({
                 <summary>查看旁白与模型</summary>
                 <p>{job.request.model}</p>
                 <p className="speech-text">{job.request.input}</p>
+                {job.request.instructions && (
+                  <p>朗读要求：{job.request.instructions}</p>
+                )}
               </details>
               {asset && (
                 <>

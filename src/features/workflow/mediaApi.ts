@@ -312,6 +312,7 @@ export interface SpeechRequest {
   voice: string
   speed: number
   responseFormat?: 'wav' | 'mp3'
+  instructions?: string
   voiceCatalogId?: string | null
   budgetReservationMicroUsd: number
 }
@@ -343,6 +344,7 @@ export interface SpeechVoice {
   name: string
   locale: string
   gender: string
+  description?: string
 }
 export interface SpeechVoiceCatalog {
   id: string
