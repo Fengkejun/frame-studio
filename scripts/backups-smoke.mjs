@@ -1,3 +1,4 @@
+import { reloadFixtureProject } from './native-fixture-project.mjs'
 import path from 'node:path'
 import { readFile, writeFile, readdir, mkdir } from 'node:fs/promises'
 import { expect } from '@playwright/test'
@@ -115,7 +116,7 @@ export async function testBackups(page, profile, backupDirectory) {
   expect(
     await invoke(page, 'get_composition', { workflowId: source.id }),
   ).toEqual(originalDraft)
-  await page.reload()
+  await reloadFixtureProject(page)
   await expect(page.getByRole('status')).toHaveText('桌面连接正常')
   expect((await invoke(page, 'list_project_backups')).points.length).toBe(2)
   console.log(

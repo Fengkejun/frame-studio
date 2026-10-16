@@ -13,6 +13,7 @@ const defaults = {
   model: 'gpt-4o-mini-tts',
   voice: 'coral',
   speed: 1,
+  responseFormat: 'wav' as 'wav' | 'mp3',
 }
 function savedSettings(): typeof defaults {
   try {
@@ -36,6 +37,10 @@ function savedSettings(): typeof defaults {
         model: value.model,
         voice: value.voice,
         speed: value.speed,
+        responseFormat:
+          'responseFormat' in value && value.responseFormat === 'mp3'
+            ? 'mp3'
+            : 'wav',
       }
     }
   } catch {
@@ -264,8 +269,8 @@ export function VoiceoverStudio({
           </button>
         </div>
         <p className="field-hint">
-          兼容 POST /v1/audio/speech，返回 WAV
-          文件。连接检查只读取模型目录，实际语音权限以生成结果为准。
+          兼容 POST /v1/audio/speech，支持 WAV / MP3 和服务商自定义音色 ID。
+          连接检查只读取模型目录，实际语音权限以生成结果为准。
         </p>
         {connection && <p className="field-hint">{connection}</p>}
       </details>
@@ -290,14 +295,17 @@ export function VoiceoverStudio({
       <div className="timeline-settings-grid">
         <label className="field-label">
           配音音色
-          <select
+          <input
             aria-label="配音音色"
+            list="speech-voices"
+            maxLength={128}
             value={settings.voice}
             disabled={busy || active}
             onChange={(event) =>
               setSettings({ ...settings, voice: event.target.value })
             }
-          >
+          />
+          <datalist id="speech-voices">
             {[
               'alloy',
               'ash',
@@ -312,6 +320,26 @@ export function VoiceoverStudio({
             ].map((voice) => (
               <option key={voice}>{voice}</option>
             ))}
+          </datalist>
+          <small>
+            可输入服务商音色，例如 en-US-Harper；中文音色请使用服务商提供的 ID。
+          </small>
+        </label>
+        <label className="field-label">
+          配音文件格式
+          <select
+            aria-label="配音文件格式"
+            value={settings.responseFormat}
+            disabled={busy || active}
+            onChange={(event) =>
+              setSettings({
+                ...settings,
+                responseFormat: event.target.value as 'wav' | 'mp3',
+              })
+            }
+          >
+            <option value="wav">WAV</option>
+            <option value="mp3">MP3</option>
           </select>
         </label>
         <label className="field-label">

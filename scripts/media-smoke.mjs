@@ -1,3 +1,4 @@
+import { reloadFixtureProject } from './native-fixture-project.mjs'
 import http from 'node:http'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -363,7 +364,7 @@ export async function testMedia(page, root) {
       jobs.first().getByText('待继续查询', { exact: true }),
     ).toBeVisible({ timeout: 10000 })
     expect(submissions).toHaveLength(2)
-    await page.reload()
+    await reloadFixtureProject(page)
     await page.getByRole('button', { name: '工作流', exact: true }).click()
     await openStudio()
     await page.getByRole('button', { name: '本机 ComfyUI' }).click()

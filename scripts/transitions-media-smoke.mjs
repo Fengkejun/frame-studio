@@ -1,3 +1,4 @@
+import { reloadFixtureProject } from './native-fixture-project.mjs'
 import { execFileSync } from 'node:child_process'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -93,7 +94,7 @@ export async function testTransitions(page, root, profile, fixture) {
     await invoke(page, 'select_video', { context, versionId: asset.versionId })
   }
   await invoke(page, 'clear_video_key', { region: 'singapore' })
-  await page.reload()
+  await reloadFixtureProject(page)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByLabel('切换工作流').selectOption(workflow.id)
   await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
@@ -317,7 +318,7 @@ export async function testTransitions(page, root, profile, fixture) {
     Number(fractional.streams.find((s) => s.codec_type === 'video').nb_frames),
   ).toBe(88)
   expect(fractional.streams.some((s) => s.codec_type === 'audio')).toBe(false)
-  await page.reload()
+  await reloadFixtureProject(page)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
   await expect(page.getByLabel('镜头转场', { exact: true })).toHaveValue(

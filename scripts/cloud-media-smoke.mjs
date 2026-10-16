@@ -1,3 +1,4 @@
+import { reloadFixtureProject } from './native-fixture-project.mjs'
 import http from 'node:http'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -173,7 +174,7 @@ export async function testCloudMedia(page, fixture) {
   })
   expect(fixture.requests).toHaveLength(4)
   await expect(page.getByText(/已预留 \$1.00 \/ \$10.00/)).toBeVisible()
-  await page.reload()
+  await reloadFixtureProject(page)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '首帧与素材', exact: true }).click()
   await expect(page.locator('.first-frame-target')).toContainText(

@@ -1,3 +1,4 @@
+import { reloadFixtureProject } from './native-fixture-project.mjs'
 import http from 'node:http'
 import path from 'node:path'
 import { readFile } from 'node:fs/promises'
@@ -261,7 +262,7 @@ export async function testVideoMedia(page, root, fixture) {
   await expect(
     jobs.first().getByText('待继续查询', { exact: true }),
   ).toBeVisible({ timeout: 20000 })
-  await page.reload()
+  await reloadFixtureProject(page)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '镜头视频', exact: true }).click()
   await expect(

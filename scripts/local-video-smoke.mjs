@@ -1,3 +1,4 @@
+import { reloadFixtureProject } from './native-fixture-project.mjs'
 import { execFileSync } from 'node:child_process'
 import { open, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -154,7 +155,7 @@ export async function testLocalVideo(page, root, profile) {
       f.endsWith('.partial'),
     ),
   ).toBe(false)
-  await page.reload()
+  await reloadFixtureProject(page)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '镜头视频', exact: true }).click()
   await page

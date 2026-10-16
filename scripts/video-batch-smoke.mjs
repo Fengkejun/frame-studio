@@ -34,6 +34,7 @@ export async function testVideoBatches(page, root, fixture) {
   page.on('pageerror', captureError)
   try {
     await invoke(page, 'save_workflow', { workflow })
+    await invoke(page, 'set_default_workflow', { id: workflow.id })
     await invoke(page, 'save_video_key', {
       region: 'singapore',
       apiKey: 'fixture-wan-key',
@@ -41,6 +42,10 @@ export async function testVideoBatches(page, root, fixture) {
     await page.reload()
     await page.getByRole('button', { name: '工作流', exact: true }).click()
     await page.getByRole('button', { name: '镜头视频', exact: true }).click()
+    await page.getByLabel('视频服务', { exact: true }).selectOption('wan')
+    await expect(page.getByLabel('视频服务地区', { exact: true })).toHaveValue(
+      'singapore',
+    )
     const history = page.getByRole('region', {
       name: '视频批量队列',
       exact: true,

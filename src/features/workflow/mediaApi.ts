@@ -310,6 +310,7 @@ export interface SpeechRequest {
   input: string
   voice: string
   speed: number
+  responseFormat?: 'wav' | 'mp3'
   budgetReservationMicroUsd: number
 }
 export interface SpeechJob {

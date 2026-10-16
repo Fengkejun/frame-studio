@@ -1,3 +1,4 @@
+import { reloadFixtureProject } from './native-fixture-project.mjs'
 import { execFileSync } from 'node:child_process'
 import { access, readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -155,12 +156,14 @@ export async function testTimelineMedia(
   )
   await access(path.join(profile, 'finished-3.cover.jpg'))
   await testAlignedExport(page, root, profile, workflowId, sourceDraft)
-  await page.reload()
+  await reloadFixtureProject(page)
   await page.getByRole('button', { name: '工作流', exact: true }).click()
   await page.getByRole('button', { name: '时间线与导出', exact: true }).click()
-  await expect(page.locator('.speech-job')).toHaveCount(5)
-  await expect(page.locator('.speech-job').first()).toContainText('结果待核实')
-  expect(speechFixture.requests).toHaveLength(5)
+  await expect(page.locator('.speech-job')).toHaveCount(6)
+  await expect(
+    page.locator('.speech-job').filter({ hasText: '结果待核实' }),
+  ).toHaveCount(3)
+  expect(speechFixture.requests).toHaveLength(6)
   await expect(page.locator('.transcription-job')).toHaveCount(6)
   expect(transcriptionFixture.requests).toHaveLength(6)
   await expect(page.getByLabel('片段 1 开始')).toHaveValue('0.1')

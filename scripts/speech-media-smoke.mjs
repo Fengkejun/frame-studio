@@ -1,10 +1,24 @@
 import http from 'node:http'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
+import { execFileSync } from 'node:child_process'
 import { expect } from '@playwright/test'
 
 export async function createSpeechFixture(root) {
   const wav = await readFile(path.join(root, 'tests/fixtures/voice.wav'))
+  const mp3 = execFileSync(
+    'ffmpeg',
+    [
+      '-v',
+      'error',
+      '-i',
+      path.join(root, 'tests/fixtures/voice.wav'),
+      '-f',
+      'mp3',
+      'pipe:1',
+    ],
+    { windowsHide: true },
+  )
   const requests = []
   let mode = 'success'
   const server = http.createServer(async (request, response) => {
@@ -19,9 +33,10 @@ export async function createSpeechFixture(root) {
     }
     const chunks = []
     for await (const chunk of request) chunks.push(chunk)
+    const body = JSON.parse(Buffer.concat(chunks).toString())
     requests.push({
       authorization: request.headers.authorization,
-      body: JSON.parse(Buffer.concat(chunks).toString()),
+      body,
     })
     if (mode === 'lost') {
       request.socket.destroy()
@@ -41,7 +56,12 @@ export async function createSpeechFixture(root) {
         .end('too large')
       return
     }
-    response.writeHead(200, { 'Content-Type': 'audio/wav' }).end(wav)
+    response
+      .writeHead(200, {
+        'Content-Type':
+          body.response_format === 'mp3' ? 'audio/mpeg' : 'audio/wav',
+      })
+      .end(body.response_format === 'mp3' ? mp3 : wav)
   })
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
   return {
@@ -141,6 +161,24 @@ export async function testSpeechMedia(page, fixture, root) {
   expect(isolation).toBe(false)
   const stored = await page.evaluate(() => JSON.stringify(localStorage))
   expect(stored).not.toContain('fixture-speech-key')
+  fixture.setMode('success')
+  await page.getByLabel('配音模型 ID').fill('mai-voice-2.1')
+  await page.getByLabel('配音音色').fill('en-US-Harper')
+  await page.getByLabel('配音文件格式').selectOption('mp3')
+  await page.getByLabel('配音语速').fill('1')
+  await page.getByRole('button', { name: '生成配音', exact: true }).click()
+  const custom = studio.locator('.speech-job').first()
+  await expect(custom).toContainText('配音已完成', { timeout: 15000 })
+  expect(fixture.requests.at(-1).body).toEqual({
+    model: 'mai-voice-2.1',
+    input: '你好，这是自动验证的配音旁白。',
+    voice: 'en-US-Harper',
+    response_format: 'mp3',
+  })
+  await custom.getByRole('button', { name: '试听音频' }).click()
+  await expect
+    .poll(() => custom.locator('audio').evaluate((audio) => audio.readyState))
+    .toBeGreaterThan(0)
   await page.getByRole('button', { name: '删除配音密钥' }).click()
   await expect(
     page.getByRole('button', { name: '生成配音', exact: true }),
@@ -150,6 +188,6 @@ export async function testSpeechMedia(page, fixture, root) {
   })
   fixture.setMode('success')
   console.log(
-    'PASS: speech protocol and auth, WAV preview, explicit version selection, rejected/invalid/oversized/lost results, budget guard, credential isolation. Local fixture only.',
+    'PASS: speech protocol and auth, WAV/MP3 preview, custom voice IDs, explicit version selection, rejected/invalid/oversized/lost results, budget guard, credential isolation. Local fixture only.',
   )
 }

@@ -17,7 +17,23 @@ pub struct SpeechRequest {
     pub input: String,
     pub voice: String,
     pub speed: f64,
+    #[serde(default = "default_response_format")]
+    pub response_format: String,
     pub budget_reservation_micro_usd: u64,
+}
+fn default_response_format() -> String {
+    "wav".into()
+}
+fn audio_header_matches(bytes: &[u8], format: &str) -> bool {
+    match format {
+        "wav" => bytes.get(..4) == Some(b"RIFF") && bytes.get(8..12) == Some(b"WAVE"),
+        "mp3" => {
+            bytes.starts_with(b"ID3")
+                || (bytes.first() == Some(&0xff)
+                    && bytes.get(1).is_some_and(|byte| byte & 0xe0 == 0xe0))
+        }
+        _ => false,
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -42,10 +58,10 @@ fn validate(request: &SpeechRequest) -> AppResult<()> {
         || request.model.chars().any(char::is_control)
         || request.input.trim().is_empty()
         || request.input.chars().count() > 4096
-        || ![
-            "alloy", "ash", "ballad", "coral", "echo", "sage", "shimmer", "verse", "marin", "cedar",
-        ]
-        .contains(&request.voice.as_str())
+        || request.voice.trim().is_empty()
+        || request.voice.len() > 128
+        || request.voice.chars().any(char::is_control)
+        || !["wav", "mp3"].contains(&request.response_format.as_str())
         || !request.speed.is_finite()
         || !(0.25..=4.0).contains(&request.speed)
     {
@@ -194,6 +210,7 @@ mod tests {
             input: "你好，镜头开始。".into(),
             voice: "coral".into(),
             speed: 1.0,
+            response_format: default_response_format(),
             budget_reservation_micro_usd: 50_000,
         }
     }
@@ -202,6 +219,12 @@ mod tests {
     fn rejects_invalid_speech_before_submission() {
         let mut value = request();
         assert!(validate(&value).is_ok());
+        value.voice = "en-US-Harper".into();
+        value.response_format = "mp3".into();
+        assert!(validate(&value).is_ok());
+        value.voice = "voice\nheader".into();
+        assert!(validate(&value).is_err());
+        value = request();
         value.input = "字".repeat(4096);
         assert!(validate(&value).is_ok());
         value.input.push('字');
@@ -215,6 +238,21 @@ mod tests {
         value = request();
         value.budget_reservation_micro_usd = 0;
         assert!(validate(&value).is_err());
+    }
+    #[test]
+    fn speech_formats_keep_legacy_wav_and_reject_non_audio() {
+        assert!(audio_header_matches(b"RIFF1234WAVE", "wav"));
+        assert!(audio_header_matches(b"ID3sample", "mp3"));
+        assert!(audio_header_matches(&[0xff, 0xfb, 0x90], "mp3"));
+        assert!(!audio_header_matches(b"{\"url\":\"file.mp3\"}", "mp3"));
+        let mut legacy = serde_json::to_value(request()).unwrap();
+        legacy.as_object_mut().unwrap().remove("responseFormat");
+        assert_eq!(
+            serde_json::from_value::<SpeechRequest>(legacy)
+                .unwrap()
+                .response_format,
+            "wav"
+        );
     }
 
     #[test]
@@ -366,13 +404,14 @@ async fn execute(
         .build()
         .map_err(|_| "创建配音连接失败")?;
     let request = &job.request;
+    let mut payload = json!({"model":request.model, "input":request.input, "voice":request.voice, "response_format":request.response_format});
+    if request.speed != 1.0 {
+        payload["speed"] = json!(request.speed);
+    }
     let mut response = client
         .post(cloud::endpoint(&request.base_url, "audio/speech")?)
         .bearer_auth(key)
-        .json(&json!({
-            "model":request.model, "input":request.input, "voice":request.voice,
-            "speed":request.speed, "response_format":"wav"
-        }))
+        .json(&payload)
         .send()
         .await
         .map_err(|_| "配音请求中断，结果待核实；请核对服务商用量后再手动生成")?;
@@ -400,9 +439,9 @@ async fn execute(
         }
         bytes.extend_from_slice(&chunk);
     }
-    // WAV is requested explicitly; reject JSON/HTML or provider format mismatches.
-    if bytes.get(..4) != Some(b"RIFF") || bytes.get(8..12) != Some(b"WAVE") {
-        return Err("配音响应不是 WAV 音频；请检查接口兼容性及服务商用量".into());
+    // Check the requested format before FFprobe verifies the complete audio.
+    if !audio_header_matches(&bytes, &request.response_format) {
+        return Err("配音响应与请求的音频格式不符；请检查接口兼容性及服务商用量".into());
     }
     job.status = "saving".into();
     job.message = "正在保存配音素材".into();
@@ -411,7 +450,7 @@ async fn execute(
     let handle = app.clone();
     let id = job.id.clone();
     let workflow_id = job.request.workflow_id.clone();
-    let name = format!("AI 配音-{}.wav", &id[..8]);
+    let name = format!("AI 配音-{}.{}", &id[..8], job.request.response_format);
     let asset = tauri::async_runtime::spawn_blocking(move || {
         store_audio(
             &handle.state::<WorkflowState>(),

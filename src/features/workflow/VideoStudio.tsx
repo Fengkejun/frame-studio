@@ -34,7 +34,7 @@ function withSavedVideoSettings(request: api.VideoRequest): api.VideoRequest {
     )
     return api.normalizeVideoRequest({ ...request, ...saved })
   } catch {
-    return request
+    return api.normalizeVideoRequest(request)
   }
 }
 
@@ -498,10 +498,7 @@ function VideoForm({
       region: 'singapore',
       prompt: shot.videoPrompt,
       negativePrompt: '',
-      duration: Math.min(
-        wanVideoModel.duration.max,
-        Math.max(wanVideoModel.duration.min, Math.round(shot.duration)),
-      ),
+      duration: Math.round(shot.duration),
       resolution: wanVideoModel.defaultResolution,
     }),
   )

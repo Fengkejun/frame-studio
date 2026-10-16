@@ -1,3 +1,4 @@
+import { reloadFixtureProject } from './native-fixture-project.mjs'
 import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -250,7 +251,7 @@ export async function testVideoRelay(page, fixture) {
         ).find((j) => j.id === paused.id)?.status,
     )
     .toBe('paused')
-  await page.reload()
+  await reloadFixtureProject(page)
   fixture.setMode('success')
   await invoke(page, 'resume_video_job', { id: paused.id })
   await expect
