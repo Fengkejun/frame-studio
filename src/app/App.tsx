@@ -16,6 +16,13 @@ type WorkflowTab = 'shots' | 'images' | 'videos' | 'timeline'
 
 export function App() {
   const [page, setPage] = useState<Page>(isDesktop ? 'workflow' : 'workspace')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('frame-studio.sidebar-collapsed') === 'true'
+    } catch {
+      return false
+    }
+  })
   const [workflowTab, setWorkflowTab] = useState<WorkflowTab>('shots')
   const { theme, changeTheme, storageError } = useTheme()
   const { status, retry } = useRuntime()
@@ -25,13 +32,24 @@ export function App() {
     setWorkflowTab(tab)
     setPage('workflow')
   }
+  function toggleSidebar() {
+    const next = !sidebarCollapsed
+    setSidebarCollapsed(next)
+    try {
+      localStorage.setItem('frame-studio.sidebar-collapsed', String(next))
+    } catch {
+      /* Keep navigation usable when preference storage is blocked. */
+    }
+  }
 
   return (
-    <div className="app-shell">
+    <div
+      className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${page === 'workflow' ? 'workflow-shell' : ''}`}
+    >
       <a className="skip-link" href="#main-content">
         跳转到主要内容
       </a>
-      <aside className="sidebar">
+      <aside id="main-sidebar" className="sidebar">
         <div className="brand">
           <img src="/favicon.svg" width="36" height="36" alt="" />
           <div>
@@ -44,6 +62,7 @@ export function App() {
           <button
             className={`nav-item ${page === 'workspace' ? 'active' : ''}`}
             aria-label="工作台"
+            title="工作台"
             aria-current={page === 'workspace' ? 'page' : undefined}
             onClick={() => setPage('workspace')}
           >
@@ -53,6 +72,7 @@ export function App() {
           <button
             className={`nav-item ${page === 'workflow' ? 'active' : ''}`}
             aria-label="工作流"
+            title="工作流"
             aria-current={page === 'workflow' ? 'page' : undefined}
             onClick={() => openWorkflow('shots')}
           >
@@ -62,6 +82,7 @@ export function App() {
           <button
             className={`nav-item ${page === 'connections' ? 'active' : ''}`}
             aria-label="模型连接"
+            title="模型连接"
             aria-current={page === 'connections' ? 'page' : undefined}
             onClick={() => setPage('connections')}
           >
@@ -72,6 +93,7 @@ export function App() {
           <button
             className={`nav-item ${page === 'settings' ? 'active' : ''}`}
             aria-label="设置"
+            title="设置"
             aria-current={page === 'settings' ? 'page' : undefined}
             onClick={() => setPage('settings')}
           >
@@ -89,18 +111,32 @@ export function App() {
       </aside>
       <div className="main-shell">
         <header className="topbar">
-          <div>
-            <span className="breadcrumb-muted">工作空间</span>
-            <span className="breadcrumb-slash">/</span>
-            <span>
-              {page === 'workspace'
-                ? '工作台'
-                : page === 'workflow'
-                  ? '工作流'
-                  : page === 'connections'
-                    ? '模型连接'
-                    : '设置'}
-            </span>
+          <div className="topbar-start">
+            <button
+              className="sidebar-toggle"
+              aria-label={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+              title={sidebarCollapsed ? '展开侧栏' : '收起侧栏'}
+              aria-expanded={!sidebarCollapsed}
+              aria-controls="main-sidebar"
+              onClick={toggleSidebar}
+            >
+              <Icon
+                name={sidebarCollapsed ? 'sidebarExpand' : 'sidebarCollapse'}
+              />
+            </button>
+            <div>
+              <span className="breadcrumb-muted">工作空间</span>
+              <span className="breadcrumb-slash">/</span>
+              <span>
+                {page === 'workspace'
+                  ? '工作台'
+                  : page === 'workflow'
+                    ? '工作流'
+                    : page === 'connections'
+                      ? '模型连接'
+                      : '设置'}
+              </span>
+            </div>
           </div>
           <span className="mode-badge">
             <span className="status-dot" />

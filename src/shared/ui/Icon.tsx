@@ -1,4 +1,6 @@
 const paths = {
+  sidebarCollapse: 'M3 3h18v18H3ZM8 3v18m8-13-4 4 4 4',
+  sidebarExpand: 'M3 3h18v18H3ZM8 3v18m4-13 4 4-4 4',
   home: 'M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z',
   workflow: 'M3 3h6v6H3ZM15 15h6v6h-6ZM6 9v9h9M9 6h9v9',
   asset: 'M3 5h7l2 2h9v13H3ZM8 14h8M12 10v8',

@@ -417,10 +417,7 @@ function WorkflowEditor({
       }}
     >
       <div className="workflow-header">
-        <div>
-          <p className="eyebrow">STORY WORKSPACE</p>
-          <h1>工作流画布</h1>
-        </div>
+        <h1>工作流画布</h1>
         <div className="workflow-project">
           <label className="sr-only" htmlFor="project-select">
             切换工作流
