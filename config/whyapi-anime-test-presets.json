@@ -3,17 +3,20 @@
   "checkedAt": "2026-10-17",
   "source": "https://site.whyapi.top/api/pricing",
   "pricingVersion": "a42d372ccf0b5dd13ecf71203521f9d2",
-  "status": "template-awaiting-confirmed-api-address-and-user-credentials",
-  "instructions": "这是人工填写到 Frame Studio 界面的参数模板，不是现有项目包或一键导入格式。先将占位符替换为控制台确认、TLS 验证通过的 API 地址，再在模型连接中创建对应 providerId 的连接。密钥仅在应用内保存。未发送任何生成请求。不要直接将 pricing 页地址用作 API 地址。",
-  "placeholders": {
-    "%WHYAPI_API_ORIGIN%": "控制台确认的 HTTPS API 服务根地址（视频适配器会设置 /v1 或 /v2 路径）",
-    "%WHYAPI_OPENAI_BASE_URL%": "同一 API 服务的 OpenAI 兼容 /v1 根地址（请按控制台说明填写）"
+  "status": "template-awaiting-tls-verification-and-account-key-setup",
+  "instructions": "这是人工填写到 Frame Studio 界面的参数模板，不是现有项目包或一键导入格式。API 根地址已由用户确认。当前设备证书主机名校验未通过；验证 HTTPS 连接后再在应用中保存专用密钥，密钥不进入本文件。未发送任何认证或生成请求，未更改用户现有应用连接。",
+  "apiConnection": {
+    "origin": "https://ai.wulusai.com",
+    "openaiBaseUrl": "https://ai.wulusai.com/v1",
+    "originConfirmedByUser": true,
+    "tlsVerifiedOnCurrentDevice": false,
+    "authenticatedConnectionVerified": false
   },
   "textProviderTemplate": {
     "id": "whyapi-director-test",
     "name": "WhyAPI 导演测试",
     "kind": "openai",
-    "baseUrl": "%WHYAPI_OPENAI_BASE_URL%",
+    "baseUrl": "https://ai.wulusai.com/v1",
     "model": "gpt-6.1-sol",
     "hasKey": false
   },
@@ -56,7 +59,7 @@
             "region": "singapore",
             "resolution": "480P",
             "wulusai": {
-              "baseUrl": "%WHYAPI_API_ORIGIN%",
+              "baseUrl": "https://ai.wulusai.com",
               "model": "sd2.0-mini",
               "mode": "frame",
               "ratio": "16:9",
@@ -64,7 +67,7 @@
             }
           },
           "image": {
-            "baseUrl": "%WHYAPI_OPENAI_BASE_URL%",
+            "baseUrl": "https://ai.wulusai.com/v1",
             "model": "gpt-image-2",
             "size": "1536x1024",
             "quality": "medium",
@@ -98,7 +101,7 @@
             "region": "singapore",
             "resolution": "480P",
             "wulusai": {
-              "baseUrl": "%WHYAPI_API_ORIGIN%",
+              "baseUrl": "https://ai.wulusai.com",
               "model": "minimax-h3",
               "mode": "text",
               "ratio": "16:9",
@@ -125,7 +128,7 @@
   ],
   "optionalManualSpeech": {
     "enabledInAutomaticAgent": false,
-    "baseUrl": "%WHYAPI_OPENAI_BASE_URL%",
+    "baseUrl": "https://ai.wulusai.com/v1",
     "model": "gemini-3.8-flash-lite-tts",
     "voice": "Sulafat",
     "responseFormat": "wav",
