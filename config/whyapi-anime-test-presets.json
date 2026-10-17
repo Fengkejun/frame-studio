@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "checkedAt": "2026-10-17",
+  "source": "https://site.whyapi.top/api/pricing",
+  "pricingVersion": "a42d372ccf0b5dd13ecf71203521f9d2",
+  "status": "template-awaiting-confirmed-api-address-and-user-credentials",
+  "instructions": "这是人工填写到 Frame Studio 界面的参数模板，不是现有项目包或一键导入格式。先将占位符替换为控制台确认、TLS 验证通过的 API 地址，再在模型连接中创建对应 providerId 的连接。密钥仅在应用内保存。未发送任何生成请求。不要直接将 pricing 页地址用作 API 地址。",
+  "placeholders": {
+    "%WHYAPI_API_ORIGIN%": "控制台确认的 HTTPS API 服务根地址（视频适配器会设置 /v1 或 /v2 路径）",
+    "%WHYAPI_OPENAI_BASE_URL%": "同一 API 服务的 OpenAI 兼容 /v1 根地址（请按控制台说明填写）"
+  },
+  "textProviderTemplate": {
+    "id": "whyapi-director-test",
+    "name": "WhyAPI 导演测试",
+    "kind": "openai",
+    "baseUrl": "%WHYAPI_OPENAI_BASE_URL%",
+    "model": "gpt-6.1-sol",
+    "hasKey": false
+  },
+  "effectiveAgentTextParameters": {
+    "planTemperature": 0.3,
+    "writerTemperature": 0.4,
+    "stream": false,
+    "requestTimeoutSeconds": 180,
+    "note": "这些值已固定在当前执行器中，不是此模板新增的可配置字段；不额外发送未经验证的 reasoning 或 max_tokens 参数。"
+  },
+  "primaryProfile": "reference-frame-sd-mini",
+  "profiles": [
+    {
+      "id": "script-preflight",
+      "name": "先检查剧本与分镜",
+      "request": {
+        "goal": "制作一条完整的8秒二维治愈动漫，两个连续分镜，每个4秒。只有一名白发蓝眼、穿蓝色雨衣的少女邮差和一只橘白短毛猫，场景始终是雨夜的同一屋顶。前4秒少女蹲下递出发光信封；后4秒小猫伸爪接过，信封化成小伞。人物脸型、发色、服装、猫的花纹、道具和天气始终一致，动作简单且因果连续。必须先生成一张角色首帧，再以该图作为首帧使用图生视频模式生成整条8秒视频。横屏16:9，不要分镜板、拼图、文字、水印或字幕。只生成一次视频；输出候选供我播放审看。",
+        "config": {
+          "providerId": "whyapi-director-test",
+          "video": null,
+          "image": null,
+          "budgetMicroUsd": 2000000,
+          "autoSearchSkills": false
+        },
+        "referenceVersionId": null,
+        "parentId": null,
+        "scriptOnly": true
+      },
+      "mediaEstimateUsd": 0,
+      "note": "仅禁止媒体提交；文本推理仍由服务商计费。"
+    },
+    {
+      "id": "reference-frame-sd-mini",
+      "name": "首帧 + SD Mini 整段动漫",
+      "request": {
+        "goal": "制作一条完整的8秒二维治愈动漫，两个连续分镜，每个4秒。只有一名白发蓝眼、穿蓝色雨衣的少女邮差和一只橘白短毛猫，场景始终是雨夜的同一屋顶。前4秒少女蹲下递出发光信封；后4秒小猫伸爪接过，信封化成小伞。人物脸型、发色、服装、猫的花纹、道具和天气始终一致，动作简单且因果连续。必须先生成一张角色首帧，再以该图作为首帧使用图生视频模式生成整条8秒视频。横屏16:9，不要分镜板、拼图、文字、水印或字幕。只生成一次视频；输出候选供我播放审看。",
+        "config": {
+          "providerId": "whyapi-director-test",
+          "video": {
+            "region": "singapore",
+            "resolution": "480P",
+            "wulusai": {
+              "baseUrl": "%WHYAPI_API_ORIGIN%",
+              "model": "sd2.0-mini",
+              "mode": "frame",
+              "ratio": "16:9",
+              "budgetReservationMicroUsd": 1600000
+            }
+          },
+          "image": {
+            "baseUrl": "%WHYAPI_OPENAI_BASE_URL%",
+            "model": "gpt-image-2",
+            "size": "1536x1024",
+            "quality": "medium",
+            "budgetReservationMicroUsd": 100000
+          },
+          "budgetMicroUsd": 2000000,
+          "autoSearchSkills": false
+        },
+        "referenceVersionId": null,
+        "parentId": null,
+        "scriptOnly": false
+      },
+      "target": {
+        "seconds": 8,
+        "shots": 2,
+        "ratio": "16:9",
+        "videoResolution": "480P",
+        "imageCount": 1
+      },
+      "publishedMediaEstimateUsd": 1.57,
+      "calculation": "1 次 gpt-image-2 × 0.09 + 8 秒 sd2.0-mini 480p × 0.185 = 1.57 USD；没有参考视频。首帧图片与参考视频是不同计费类型。文本另计，价格与权限仍须服务商确认。"
+    },
+    {
+      "id": "economy-text-video",
+      "name": "MiniMax H3 文生连通性测试",
+      "request": {
+        "goal": "制作8秒、两个4秒分镜的二维动漫：雨夜屋顶，白发蓝眼蓝雨衣少女邮差递信给橘白猫，小猫接过信封。全片角色和天气一致，16:9横屏。必须选择文生视频，不生成首帧图片。一次提交整条8秒短片，不要字幕、拼图或分镜板。",
+        "config": {
+          "providerId": "whyapi-director-test",
+          "video": {
+            "region": "singapore",
+            "resolution": "480P",
+            "wulusai": {
+              "baseUrl": "%WHYAPI_API_ORIGIN%",
+              "model": "minimax-h3",
+              "mode": "text",
+              "ratio": "16:9",
+              "budgetReservationMicroUsd": 400000
+            }
+          },
+          "image": null,
+          "budgetMicroUsd": 600000,
+          "autoSearchSkills": false
+        },
+        "referenceVersionId": null,
+        "parentId": null,
+        "scriptOnly": false
+      },
+      "target": {
+        "seconds": 8,
+        "shots": 2,
+        "ratio": "16:9",
+        "videoResolution": "480P"
+      },
+      "publishedMediaEstimateUsd": 0.36,
+      "calculation": "8 秒 × 0.045 USD；文本另计。项目目前只支持此模型文生模式。"
+    }
+  ],
+  "optionalManualSpeech": {
+    "enabledInAutomaticAgent": false,
+    "baseUrl": "%WHYAPI_OPENAI_BASE_URL%",
+    "model": "gemini-3.8-flash-lite-tts",
+    "voice": "Sulafat",
+    "responseFormat": "wav",
+    "speed": 1,
+    "instructions": "请用自然清晰的普通话，温暖、轻柔地朗读，不添加背景音乐。",
+    "input": "雨夜里，一封信，为小猫撑起了星光。",
+    "budgetReservationMicroUsd": 100000,
+    "requiredBeforeGeneration": "在时间线的语音工具中刷新本模型音色目录并选择 Sulafat；voiceCatalogId 由应用生成，不能复用旧目录 ID。",
+    "priceNote": "站点按输入 5 USD/百万token、音频输出 60 USD/百万token 计费，0.10 USD 是本地预留额，不是固定生成价。"
+  },
+  "testOrder": [
+    "script-preflight",
+    "reference-frame-sd-mini",
+    "optionalManualSpeech"
+  ],
+  "resultHandling": {
+    "retryUnknownSubmissions": false,
+    "reviewBeforeNewGeneration": true,
+    "keepOriginalVersions": true
+  }
+}

@@ -1,0 +1,2958 @@
+{
+  "checkedAt": "2026-10-17",
+  "sourceUrl": "https://site.whyapi.top/api/pricing",
+  "pricingPage": "https://site.whyapi.top/pricing",
+  "pricingVersion": "a42d372ccf0b5dd13ecf71203521f9d2",
+  "sourceModelCount": 145,
+  "note": "第三方站点公开目录快照；模型名称不证明上游身份、实际权限、JSON/视觉能力或请求参数兼容。项目已有适配器不代表此站点已实测。金额为站内 USD，分组倍率及实际账单需核对。TLS 在本机校验失败，API 根地址尚未确认；本文件不含密钥且不执行生成。",
+  "endpoints": {
+    "anthropic": {
+      "path": "/v1/messages",
+      "method": "POST"
+    },
+    "audio-speech": {
+      "path": "/v1/audio/speech",
+      "method": "POST"
+    },
+    "capabilities": {
+      "path": "/v1/capabilities/invoke",
+      "method": "POST"
+    },
+    "embeddings": {
+      "path": "/v1/embeddings",
+      "method": "POST"
+    },
+    "evaluate": {
+      "path": "/v1/evaluate",
+      "method": "POST"
+    },
+    "gemini": {
+      "path": "/v1beta/models/{model}:generateContent",
+      "method": "POST"
+    },
+    "image-generation": {
+      "path": "/v1/images/generations",
+      "method": "POST"
+    },
+    "jina-rerank": {
+      "path": "/v1/rerank",
+      "method": "POST"
+    },
+    "mcp": {
+      "path": "/mcp",
+      "method": "POST"
+    },
+    "openai": {
+      "path": "/v1/chat/completions",
+      "method": "POST"
+    },
+    "openai-alpha-search": {
+      "path": "/v1/alpha/search",
+      "method": "POST"
+    },
+    "openai-response": {
+      "path": "/v1/responses",
+      "method": "POST"
+    },
+    "openai-response-compact": {
+      "path": "/v1/responses/compact",
+      "method": "POST"
+    },
+    "openai-video": {
+      "path": "/v1/videos",
+      "method": "POST"
+    },
+    "query": {
+      "path": "/v2/query/video_upscale/{task_id}",
+      "method": "GET"
+    },
+    "submit": {
+      "path": "/v2/video_upscale",
+      "method": "POST"
+    },
+    "systemone": {
+      "path": "/v1/systemone",
+      "method": "POST"
+    },
+    "video-upscale": {
+      "path": "/v2/video_upscale",
+      "method": "POST"
+    },
+    "workflow": {
+      "path": "/v2/video_generation",
+      "method": "POST"
+    }
+  },
+  "groupRatios": {
+    "all_officia": 0.3,
+    "china_bargain": 0.1,
+    "claude": 0.46,
+    "claude_anti": 0.35,
+    "claude_cursor_": 0.45,
+    "claude_full_marks": 0.65,
+    "claude_kiro": 0.08,
+    "claude_kiro_pro": 0.3,
+    "claude_max_": 0.9,
+    "claude_max_constrain": 0.75,
+    "claude_max_enterprise": 1.1,
+    "claude_overseas": 0.65,
+    "claude_vn": 0.65,
+    "codex_backstop": 0.2,
+    "codex_backstop_pro": 0.21,
+    "codex_bt": 0.055,
+    "codex_luna": 0.3,
+    "codex_official_key": 0.35,
+    "codex_pro": 0.15,
+    "codex_pro_plus": 0.128,
+    "codex_pro_plus_02": 0.126,
+    "codex_uncensored": 0.25,
+    "deepseek_special_offer": 0.09,
+    "default": 1,
+    "evaluation": 1,
+    "free-new": 1,
+    "gemini": 0.3,
+    "grok_free": 0.045,
+    "grok_heavy": 0.1,
+    "meta": 0.68,
+    "retrieval": 1,
+    "tools": 1,
+    "workflow": 1
+  },
+  "models": [
+    {
+      "id": "claude-fable-5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "anthropic",
+        "openai-response",
+        "openai-response-compact",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "claude",
+        "claude_kiro_pro",
+        "claude_overseas",
+        "default",
+        "claude_cursor_",
+        "claude_max_constrain",
+        "claude_vn",
+        "claude_max_enterprise",
+        "claude_full_marks",
+        "claude_max_"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-fable-5-1",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "default",
+        "claude",
+        "claude_max_constrain",
+        "claude_vn",
+        "claude_full_marks",
+        "claude_max_enterprise",
+        "claude_kiro_pro",
+        "claude_overseas",
+        "claude_cursor_",
+        "claude_max_"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 5,
+        "completionRatio": 5,
+        "cacheRatio": 0.025
+      }
+    },
+    {
+      "id": "claude-haiku-4-5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["anthropic", "openai"],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-haiku-4-5-20251001",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "anthropic",
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default", "cursor_claude"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-haiku-5-5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": [
+        "claude_max_enterprise",
+        "claude_max_",
+        "all_officia",
+        "default"
+      ],
+      "billingExpression": "len <= 100000 ? tier(\"standard\", p * 0.1 + c * 0.5 + cr * 0.01 + cc * 0.13 + cc1h * 0.2) : tier(\"long_context\", p * 0.5 + c * 2.5 + cr * 0.05 + cc * 0.63 + cc1h * 1)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 1
+      }
+    },
+    {
+      "id": "claude-opus-4-5-20251101",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["default", "claude_full_marks"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-opus-4-6",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "anthropic",
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "claude_vn",
+        "claude_full_marks",
+        "claude_overseas",
+        "claude_kiro",
+        "claude_cursor_",
+        "claude_max_enterprise",
+        "claude_kiro_pro",
+        "claude_max_",
+        "default",
+        "claude_anti",
+        "cursor_claude",
+        "claude",
+        "claude_max_constrain"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-opus-4-7",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "anthropic",
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "default",
+        "claude_kiro",
+        "claude",
+        "claude_vn",
+        "claude_full_marks",
+        "claude_overseas",
+        "claude_cursor_",
+        "cursor_claude",
+        "claude_max_constrain",
+        "claude_max_enterprise",
+        "claude_kiro_pro",
+        "claude_max_"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-opus-4-8",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "anthropic",
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "cursor_claude",
+        "claude",
+        "claude_max_constrain",
+        "claude_full_marks",
+        "claude_max_enterprise",
+        "claude_cursor_",
+        "claude_kiro",
+        "claude_vn",
+        "claude_kiro_pro",
+        "claude_overseas",
+        "claude_max_",
+        "default"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-opus-5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "anthropic",
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "default",
+        "claude_full_marks",
+        "claude_overseas",
+        "claude_max_",
+        "claude_kiro",
+        "claude",
+        "claude_cursor_",
+        "claude_vn",
+        "claude_max_constrain",
+        "claude_max_enterprise",
+        "claude_kiro_pro",
+        "cursor_claude"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-opus-5-5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "anthropic",
+        "openai-response",
+        "openai-response-compact",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "claude_anti",
+        "claude_cursor_",
+        "claude_full_marks",
+        "claude_kiro_pro",
+        "claude_max_",
+        "claude_kiro",
+        "claude_vn",
+        "claude_max_constrain",
+        "claude_max_enterprise",
+        "claude",
+        "claude_overseas",
+        "default"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2,
+        "completionRatio": 5,
+        "cacheRatio": 0.05
+      }
+    },
+    {
+      "id": "claude-sonnet-4-5-20250929",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["default", "claude_full_marks"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1.5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-sonnet-4-6",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "anthropic",
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "default",
+        "claude_kiro",
+        "claude",
+        "claude_max_constrain",
+        "claude_full_marks",
+        "claude_kiro_pro",
+        "claude_overseas",
+        "claude_anti",
+        "claude_cursor_",
+        "claude_vn",
+        "claude_max_enterprise",
+        "claude_max_",
+        "cursor_claude"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1.5,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-sonnet-5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "anthropic",
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "cursor_claude",
+        "default",
+        "claude",
+        "claude_max_constrain",
+        "claude_full_marks",
+        "claude_max_enterprise",
+        "claude_vn",
+        "claude_overseas",
+        "claude_max_",
+        "claude_kiro",
+        "claude_cursor_",
+        "claude_kiro_pro"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "claude-sonnet-5-5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai", "anthropic"],
+      "groups": [
+        "default",
+        "claude_kiro",
+        "claude_kiro_pro",
+        "claude_max_",
+        "claude",
+        "claude_max_constrain",
+        "claude_anti",
+        "claude_full_marks",
+        "all_officia",
+        "claude_max_enterprise"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "deepseek-v4-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.5,
+        "completionRatio": 2,
+        "cacheRatio": 0.2
+      }
+    },
+    {
+      "id": "deepseek-v4-flash-0731",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "default"],
+      "billingExpression": "(tier(\"base\", p * 1 + c * 4 + cr * 0.02)) * (hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12 ? 2 : 1) * (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18 ? 2 : 1)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 1
+      }
+    },
+    {
+      "id": "deepseek-v4-flash-vision-exp",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "default"],
+      "billingExpression": "(tier(\"base\", p * 1 + c * 4 + cr * 0.02)) * (hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12 ? 2 : 1) * (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18 ? 2 : 1)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 1
+      }
+    },
+    {
+      "id": "deepseek-v4-pro",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 6,
+        "completionRatio": 2,
+        "cacheRatio": 0.08333333333
+      }
+    },
+    {
+      "id": "deepseek-v4-pro-0813",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "default"],
+      "billingExpression": "(tier(\"base\", p * 4.5 + c * 13.5 + cr * 0.15)) * (hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12 ? 2 : 1) * (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18 ? 2 : 1)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 1
+      }
+    },
+    {
+      "id": "deepseek-v4.1-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["default", "all_officia", "china_bargain"],
+      "billingExpression": "(tier(\"base\", p * 1 + c * 4 + cr * 0.02)) * (hour(\"Asia/Shanghai\") >= 9 && hour(\"Asia/Shanghai\") < 12 ? 2 : 1) * (hour(\"Asia/Shanghai\") >= 14 && hour(\"Asia/Shanghai\") < 18 ? 2 : 1)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 1
+      }
+    },
+    {
+      "id": "gemini-3.1-pro-preview",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default", "gemini"],
+      "billingExpression": "len <= 200000 ? tier(\"standard\", p * 2 + c * 12 + cr * 0.2 + cc * 4.5) : tier(\"long_context\", p * 4 + c * 18 + cr * 0.4 + cc * 4.5)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 6,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "gemini-3.5-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default", "gemini"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.75,
+        "completionRatio": 6,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "gemini-3.6-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default", "gemini"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.75,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "gemini-3.7-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default", "gemini"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.375,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "gemini-3.8-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default", "gemini"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.375,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "gemini-4-argon",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["gemini", "default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2,
+        "completionRatio": 5,
+        "cacheRatio": 0.05
+      }
+    },
+    {
+      "id": "glm-5.1",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 4,
+        "completionRatio": 3.5,
+        "cacheRatio": 0.25
+      }
+    },
+    {
+      "id": "glm-5.2",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "default", "all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 4,
+        "completionRatio": 3.5,
+        "cacheRatio": 0.25
+      }
+    },
+    {
+      "id": "glm-5.3",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["default", "china_bargain", "all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 4,
+        "completionRatio": 3.5,
+        "cacheRatio": 0.25
+      }
+    },
+    {
+      "id": "glm-5.3-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["default", "all_officia", "china_bargain"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.4,
+        "completionRatio": 3.5,
+        "cacheRatio": 0.2875
+      }
+    },
+    {
+      "id": "glm-5.3-flashx",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "all_officia", "default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 3.5,
+        "cacheRatio": 0.285
+      }
+    },
+    {
+      "id": "gpt-5.5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "codex_backstop",
+        "codex_bt",
+        "codex_backstop_pro",
+        "default",
+        "codex_uncensored",
+        "codex_official_key",
+        "codex_pro",
+        "codex_pro_plus",
+        "codex_pro_plus_02"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.5,
+        "completionRatio": 6,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "gpt-5.6-luna",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["codex_luna", "default", "all_officia"],
+      "billingExpression": "len <= 272000 ? tier(\"standard\", p * 0.2 + c * 1.2 + cr * 0.02 + cc * 0.25) : tier(\"272k_plus\", p * 0.4 + c * 1.8 + cr * 0.04 + cc * 0.5)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.1,
+        "completionRatio": 6,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "gpt-5.6-sol",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "codex_backstop_pro",
+        "codex_backstop",
+        "codex_uncensored",
+        "codex_official_key",
+        "codex_pro_plus_02",
+        "default",
+        "codex_bt",
+        "codex_pro_plus",
+        "codex_pro"
+      ],
+      "billingExpression": "len < 272000 ? tier(\"base\", p * 5 + c * 30 + cr * 0.5 + cc * 6.25) : len >= 272000 ? tier(\"超过272K\", p * 10 + c * 45 + cr * 1 + cc * 12.5) : tier(\"基础计费\", p * 5 + c * 30 + cr * 0.5 + cc * 6.25)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 6
+      }
+    },
+    {
+      "id": "gpt-5.6-terra",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "codex_backstop_pro",
+        "codex_backstop",
+        "codex_official_key",
+        "codex_pro",
+        "codex_pro_plus_02",
+        "default",
+        "codex_pro_plus",
+        "codex_bt",
+        "codex_uncensored"
+      ],
+      "billingExpression": "len < 272000 ? tier(\"base\", p * 2.5 + c * 15 + cr * 0.25 + cc * 3.125) : len >= 272000 ? tier(\"超过272K\", p * 5 + c * 22.5 + cr * 0.5 + cc * 6.25) : tier(\"基础计费\", p * 2.5 + c * 15 + cr * 0.25 + cc * 3.125)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 6
+      }
+    },
+    {
+      "id": "gpt-6-astra",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "codex_pro_plus",
+        "codex_pro_plus_02",
+        "codex_official_key",
+        "default",
+        "codex_backstop_pro",
+        "codex_uncensored",
+        "codex_backstop",
+        "codex_bt",
+        "codex_pro"
+      ],
+      "billingExpression": "len <= 272000 ? tier(\"standard\", p * 10 + c * 50 + cr * 1 + cc * 12.5) : tier(\"long_context\", p * 20 + c * 75 + cr * 2 + cc * 25)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 2
+      }
+    },
+    {
+      "id": "gpt-6-luna",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia"],
+      "billingExpression": "len <= 272000 ? tier(\"standard\", p * 0.1 + c * 0.5 + cr * 0.015 + cc * 0.25) : tier(\"272k_plus\", p * 0.2 + c * 0.75 + cr * 0.03 + cc * 0.5)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 2
+      }
+    },
+    {
+      "id": "gpt-6-sol",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": [
+        "codex_bt",
+        "codex_pro",
+        "codex_pro_plus",
+        "codex_backstop",
+        "default",
+        "codex_pro_plus_02",
+        "codex_uncensored",
+        "codex_backstop_pro",
+        "codex_official_key"
+      ],
+      "billingExpression": "len <= 272000 ? tier(\"standard\", p * 2 + c * 10 + cr * 0.2 + cc * 2.5) : tier(\"long_context\", p * 4 + c * 15 + cr * 0.4 + cc * 5)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 2
+      }
+    },
+    {
+      "id": "gpt-6.1-sol",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": [
+        "default",
+        "codex_bt",
+        "codex_official_key",
+        "codex_uncensored",
+        "codex_backstop_pro",
+        "codex_pro_plus_02",
+        "codex_pro_plus",
+        "codex_pro",
+        "codex_backstop"
+      ],
+      "billingExpression": "len <= 272000 ? tier(\"standard\", p * 2 + c * 10 + cr * 0.1 + cc * 2.5) : tier(\"long_context\", p * 4 + c * 15 + cr * 0.2 + cc * 5)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 2
+      }
+    },
+    {
+      "id": "grok-4.5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default", "grok_heavy", "grok_free"],
+      "billingExpression": "len < 200000 ? tier(\"standard\", p * 2 + c * 6 + cr * 0.3) : tier(\"long_context\", p * 4 + c * 12 + cr * 0.6)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 3,
+        "cacheRatio": 0.15
+      }
+    },
+    {
+      "id": "grok-4.6",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default", "grok_heavy", "grok_free"],
+      "billingExpression": "len < 200000 ? tier(\"standard\", p * 2 + c * 6 + cr * 0.5) : tier(\"long_context\", p * 4 + c * 12 + cr * 1.0)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 3,
+        "cacheRatio": 0.25
+      }
+    },
+    {
+      "id": "grok-4.7",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default", "grok_heavy"],
+      "billingExpression": "len < 200000 ? tier(\"standard\", p * 2 + c * 6 + cr * 0.5) : tier(\"long_context\", p * 4 + c * 12 + cr * 1.0)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 3,
+        "cacheRatio": 0.25
+      }
+    },
+    {
+      "id": "hy3",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "all_officia", "default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.5,
+        "completionRatio": 4,
+        "cacheRatio": 0.25
+      }
+    },
+    {
+      "id": "hy4-preview",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 3,
+        "completionRatio": 3,
+        "cacheRatio": 0.05
+      }
+    },
+    {
+      "id": "kimi-k2.6",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia", "default", "china_bargain"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 3.25,
+        "completionRatio": 4.153846153846154,
+        "cacheRatio": 0.16923076923076924
+      }
+    },
+    {
+      "id": "kimi-k3",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["default", "china_bargain", "all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 10,
+        "completionRatio": 5,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "longcat-2.0",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.5,
+        "completionRatio": 4,
+        "cacheRatio": 0.02
+      }
+    },
+    {
+      "id": "longcat-2.5-preview",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.5,
+        "completionRatio": 4,
+        "cacheRatio": 0.02
+      }
+    },
+    {
+      "id": "mimo-v2.5",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia", "default", "china_bargain"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.5,
+        "completionRatio": 2,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "mimo-v2.5-pro",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1.55,
+        "completionRatio": 1.9677419354838708,
+        "cacheRatio": 0.03225806451612903
+      }
+    },
+    {
+      "id": "mimo-v2.6-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia", "default", "china_bargain"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 0.5,
+        "cacheRatio": 0.001
+      }
+    },
+    {
+      "id": "mimo-v2.6-pro",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia", "default", "china_bargain"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1.5,
+        "completionRatio": 2,
+        "cacheRatio": 0.008333333333333333
+      }
+    },
+    {
+      "id": "mimo-v2.6-pro-ultraspeed",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia", "default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 15,
+        "completionRatio": 2,
+        "cacheRatio": 0.008333333333333333
+      }
+    },
+    {
+      "id": "MiniMax-M2.7",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia", "china_bargain", "default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1.05,
+        "completionRatio": 4,
+        "cacheRatio": 0.2
+      }
+    },
+    {
+      "id": "MiniMax-M2.7-highspeed",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.1,
+        "completionRatio": 4,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "MiniMax-M3",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "all_officia", "default"],
+      "billingExpression": "len <= 512000 ? tier(\"base\", p * 2.1 + c * 8.4 + cr * 0.42) : tier(\"超过512K\", p * 4.2 + c * 16.8 + cr * 0.84)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1.05,
+        "completionRatio": 4,
+        "cacheRatio": 0.2
+      }
+    },
+    {
+      "id": "muse-spark-1.2",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["meta"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.75,
+        "completionRatio": 2,
+        "cacheRatio": 0.02
+      }
+    },
+    {
+      "id": "muse-spark-1.3",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["meta"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.7352941176470588,
+        "completionRatio": 2,
+        "cacheRatio": 0.02
+      }
+    },
+    {
+      "id": "qwen3.7-max",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 6,
+        "completionRatio": 3,
+        "cacheRatio": 0.2
+      }
+    },
+    {
+      "id": "qwen3.7-plus",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia"],
+      "billingExpression": "len <= 256000 ? tier(\"standard\", p * 2 + c * 8 + cr * 0.2 + cc * 2.5) : tier(\"256k_plus\", p * 6 + c * 24 + cr * 0.6 + cc * 7.5)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 4,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "qwen3.8-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "default", "all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.4,
+        "completionRatio": 3.375,
+        "cacheRatio": 0.19999999999999998
+      }
+    },
+    {
+      "id": "qwen3.8-max",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["china_bargain", "all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 6,
+        "completionRatio": 3,
+        "cacheRatio": 0.2
+      }
+    },
+    {
+      "id": "seed-2.1-pro",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 3,
+        "completionRatio": 5,
+        "cacheRatio": 1.6666666666666667
+      }
+    },
+    {
+      "id": "seed-2.1-turbo",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1.5,
+        "completionRatio": 2.6666666666666665,
+        "cacheRatio": 0.2
+      }
+    },
+    {
+      "id": "step-3.7-flash",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.675,
+        "completionRatio": 5.999999999999999,
+        "cacheRatio": 0.2
+      }
+    },
+    {
+      "id": "step-5-preview",
+      "role": "director-text-candidate",
+      "compatibility": "json-and-vision-capabilities-unverified",
+      "endpoints": ["openai"],
+      "groups": ["all_officia"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 3.5,
+        "completionRatio": 2.857142857142857,
+        "cacheRatio": 0.049999999999999996
+      }
+    },
+    {
+      "id": "acgn_image",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation", "openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每张图片",
+          "usd": 0.1,
+          "unit": "张"
+        }
+      ],
+      "pricingConflict": "结构化价表为每张 0.10 USD，说明文本为每张 0.20 USD；未选入首测。"
+    },
+    {
+      "id": "flux-3-image",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "普通分辨率",
+          "usd": 0.15,
+          "unit": "张"
+        },
+        {
+          "label": "4K",
+          "usd": 0.65,
+          "unit": "张"
+        }
+      ],
+      "pricingConflict": "model_price 为 0.24，详细价表普通图为 0.15、4K 为 0.65 USD；需核对。"
+    },
+    {
+      "id": "gpt-image-2",
+      "role": "first-frame",
+      "compatibility": "project-adapter-exists-service-untested",
+      "endpoints": ["image-generation", "openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每次请求",
+          "usd": 0.09,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "gpt-image-2.5",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation", "openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每次请求",
+          "usd": 0.09,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "gpt-image-2.5-flare",
+      "role": "first-frame",
+      "compatibility": "project-adapter-exists-service-untested",
+      "endpoints": ["image-generation", "openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每张图片",
+          "usd": 0.09,
+          "unit": "张"
+        }
+      ]
+    },
+    {
+      "id": "gpt-image-2.5-sunburst",
+      "role": "first-frame",
+      "compatibility": "project-adapter-exists-service-untested",
+      "endpoints": ["image-generation", "openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每张图片",
+          "usd": 0.09,
+          "unit": "张"
+        }
+      ]
+    },
+    {
+      "id": "grok-imagine-image-2.0",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每张输出",
+          "usd": 0.6,
+          "unit": "张"
+        },
+        {
+          "label": "每张改图输入",
+          "usd": 0.6,
+          "unit": "张"
+        }
+      ]
+    },
+    {
+      "id": "muse-image-1.0",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation", "openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每张图片",
+          "usd": 0.095,
+          "unit": "张"
+        }
+      ]
+    },
+    {
+      "id": "nano-banana-2",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每次请求",
+          "usd": 0.32,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "nano-banana-2.1",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每次请求",
+          "usd": 0.18,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "nano-banana-pro",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每次请求",
+          "usd": 0.27,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "qwen-image-2.1",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每张图片",
+          "usd": 0.15,
+          "unit": "张"
+        }
+      ]
+    },
+    {
+      "id": "recraft-v4.1-flash",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每张图片",
+          "usd": 0.07,
+          "unit": "张"
+        }
+      ]
+    },
+    {
+      "id": "seedream-5.0-pro",
+      "role": "first-frame",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每张输出",
+          "usd": 0.4,
+          "unit": "张"
+        },
+        {
+          "label": "输入 token",
+          "usd": 0.03,
+          "unit": "100万token"
+        }
+      ]
+    },
+    {
+      "id": "suno-v6",
+      "role": "music",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每次生成音乐",
+          "usd": 0.52,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "person-substitution",
+      "role": "postprocessing",
+      "compatibility": "needs-adapter",
+      "endpoints": ["workflow"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "480P",
+          "usd": 0.2,
+          "unit": "秒"
+        },
+        {
+          "label": "768P",
+          "usd": 0.25,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "proteus",
+      "role": "postprocessing",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "不超过 1 秒，720p 到 4K",
+          "usd": 0.8,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 5 秒，720p 或 1080p",
+          "usd": 0.8,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 5 秒，4K",
+          "usd": 2.4,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 10 秒，720p",
+          "usd": 0.8,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 10 秒，1080p",
+          "usd": 1.6,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 10 秒，4K",
+          "usd": 4.8,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 60 秒，720p",
+          "usd": 3.2,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 60 秒，1080p",
+          "usd": 6.4,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 60 秒，4K",
+          "usd": 24.8,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 300 秒，720p",
+          "usd": 13.6,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 300 秒，1080p",
+          "usd": 30.4,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 300 秒，4K",
+          "usd": 120.8,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 600 秒，720p",
+          "usd": 27.2,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 600 秒，1080p",
+          "usd": 60.8,
+          "unit": "次"
+        },
+        {
+          "label": "不超过 600 秒，4K",
+          "usd": 241.6,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "starlight-precise-2.6",
+      "role": "postprocessing",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "1080p 及以下，30帧",
+          "usd": 0.9,
+          "unit": "秒"
+        },
+        {
+          "label": "4K，30帧",
+          "usd": 2,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "upscale-2k",
+      "role": "postprocessing",
+      "compatibility": "needs-adapter",
+      "endpoints": ["video-upscale"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "2K 超分",
+          "usd": 0.11,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "upscale-4k",
+      "role": "postprocessing",
+      "compatibility": "needs-adapter",
+      "endpoints": ["video-upscale"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "4K 超分",
+          "usd": 0.28,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "video-upscale",
+      "role": "postprocessing",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "720p ×1，保持原帧率 ×1，standard ×1",
+          "usd": 0.02244,
+          "unit": "秒"
+        },
+        {
+          "label": "1080p x2，保持原帧率 ×1，standard ×1",
+          "usd": 0.04488,
+          "unit": "秒"
+        },
+        {
+          "label": "2k x4，保持原帧率 ×1，standard ×1",
+          "usd": 0.08976,
+          "unit": "秒"
+        },
+        {
+          "label": "4k x8，保持原帧率 ×1，standard ×1",
+          "usd": 0.17952,
+          "unit": "秒"
+        },
+        {
+          "label": "8k x32，保持原帧率 ×1，standard ×1",
+          "usd": 0.71808,
+          "unit": "秒"
+        },
+        {
+          "label": "720p standard，60帧 ×2",
+          "usd": 0.04488,
+          "unit": "秒"
+        },
+        {
+          "label": "720p standard，120帧 ×4",
+          "usd": 0.08976,
+          "unit": "秒"
+        },
+        {
+          "label": "720p 保持原帧率，professional ×10",
+          "usd": 0.22440000000000002,
+          "unit": "秒"
+        },
+        {
+          "label": "8k ×32，120帧 ×4，professional ×10",
+          "usd": 28.723200000000002,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "wonder-3.5",
+      "role": "postprocessing",
+      "compatibility": "needs-adapter",
+      "endpoints": ["image-generation"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "8MP 及以下",
+          "usd": 0.8,
+          "unit": "次"
+        },
+        {
+          "label": "8 到 16MP",
+          "usd": 1.6,
+          "unit": "次"
+        },
+        {
+          "label": "16 到 24MP",
+          "usd": 2.4,
+          "unit": "次"
+        },
+        {
+          "label": "24 到 32MP",
+          "usd": 3.2,
+          "unit": "次"
+        },
+        {
+          "label": "32 到 40MP",
+          "usd": 4,
+          "unit": "次"
+        },
+        {
+          "label": "40 到 50MP",
+          "usd": 5.6,
+          "unit": "次"
+        },
+        {
+          "label": "50 到 64MP",
+          "usd": 6.4,
+          "unit": "次"
+        },
+        {
+          "label": "64 到 100MP",
+          "usd": 10.4,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "acgn_image-tool",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["mcp"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.1,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "browserbase-fetch",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["mcp"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.01,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "browserbase-search",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["mcp"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.07,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "codestral-embed",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.75,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "exa-search",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["mcp"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.07,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "gemini-embedding-2",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 1,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "id-card-ocr",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["capabilities"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.05,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "invoice-ocr",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["capabilities"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.05,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "invoice-ocr-enhanced",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["capabilities"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.07,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "jev",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["evaluate", "systemone"],
+      "groups": ["evaluation", "free-new"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.005,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "jev-tool",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["mcp"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.005,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "muse-image-1.0-tools",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["mcp"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.095,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "parallel-search",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["mcp"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.05,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "perplexity-search",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["mcp"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.05,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "pplx-embed-v1-0.6b",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.02,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "pplx-embed-v1-4b",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.15,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "qwen3-embedding-0.6b",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.05,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "qwen3-embedding-4b",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.1,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "qwen3-embedding-8b",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.05,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "rerank-3",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "jina-rerank"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.25,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "rerank-3-lite",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "jina-rerank"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.1,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "tako-search",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["mcp"],
+      "groups": ["tools"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.07,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "voyage-4",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.3,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "voyage-4-large",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.6,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "voyage-4-lite",
+      "role": "retrieval-tools-or-other",
+      "compatibility": "not-selected-for-anime-generation",
+      "endpoints": ["openai", "embeddings"],
+      "groups": ["retrieval"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.1,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "codex-auto-review",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": [
+        "codex_backstop_pro",
+        "codex_pro_plus_02",
+        "codex_bt",
+        "default",
+        "codex_official_key",
+        "codex_pro_plus",
+        "codex_uncensored",
+        "codex_backstop",
+        "codex_pro"
+      ],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2.5,
+        "completionRatio": 6,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "d1",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["evaluation"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.002,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "kimi-k2.7-code",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["all_officia", "default", "china_bargain"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 3.25,
+        "completionRatio": 4.153846153846154,
+        "cacheRatio": 0.2
+      }
+    },
+    {
+      "id": "kimi-k2.7-code-highspeed",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["all_officia"],
+      "billingExpression": "tier(\"base\", p * 13 + c * 54 + cr * 2.6)",
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 37.5,
+        "completionRatio": 1
+      }
+    },
+    {
+      "id": "laguna-s-2.1-free",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.000001,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "mimo-v2.5-free",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.000001,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "muse-spark-1.2-contributor-free",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.000001,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "nemotron-3-ultra-free",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.000001,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "nemotron-3.5-lightning-free",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.000001,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "seed-code",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": [
+        "openai",
+        "openai-response",
+        "openai-response-compact",
+        "anthropic",
+        "gemini",
+        "openai-alpha-search"
+      ],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 2,
+        "completionRatio": 4,
+        "cacheRatio": 0.2
+      }
+    },
+    {
+      "id": "union-alpha",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["free-new"],
+      "rawPricing": {
+        "quotaType": 0,
+        "modelPrice": 0,
+        "modelRatio": 0.005,
+        "completionRatio": 1,
+        "cacheRatio": 0.1
+      }
+    },
+    {
+      "id": "x-preview-f-free",
+      "role": "specialized-or-unverified-chat",
+      "compatibility": "not-selected-for-first-test",
+      "endpoints": ["openai"],
+      "groups": ["default"],
+      "rawPricing": {
+        "quotaType": 1,
+        "modelPrice": 0.000001,
+        "modelRatio": 0,
+        "completionRatio": 0
+      }
+    },
+    {
+      "id": "gemini-3.8-flash-lite-tts",
+      "role": "speech",
+      "compatibility": "manual-timeline-tool-service-untested",
+      "endpoints": ["audio-speech"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "输入",
+          "usd": 5,
+          "unit": "100万token"
+        },
+        {
+          "label": "音频输出",
+          "usd": 60,
+          "unit": "100万token"
+        }
+      ]
+    },
+    {
+      "id": "gemini-3.8-flash-tts",
+      "role": "speech",
+      "compatibility": "manual-timeline-tool-service-untested",
+      "endpoints": ["audio-speech"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "输入",
+          "usd": 5,
+          "unit": "100万token"
+        },
+        {
+          "label": "音频输出",
+          "usd": 90,
+          "unit": "100万token"
+        }
+      ]
+    },
+    {
+      "id": "mai-voice-2.1",
+      "role": "speech",
+      "compatibility": "manual-timeline-tool-service-untested",
+      "endpoints": ["audio-speech"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每个字符",
+          "usd": 0.00022,
+          "unit": "字符"
+        }
+      ]
+    },
+    {
+      "id": "mai-voice-2.1-flash",
+      "role": "speech",
+      "compatibility": "manual-timeline-tool-service-untested",
+      "endpoints": ["audio-speech"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "每个字符",
+          "usd": 0.00015,
+          "unit": "字符"
+        }
+      ]
+    },
+    {
+      "id": "flux-3-video",
+      "role": "video",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "full 720p，无视频输入",
+          "usd": 1.32,
+          "unit": "秒"
+        },
+        {
+          "label": "full 720p，有视频输入",
+          "usd": 1.848,
+          "unit": "秒"
+        },
+        {
+          "label": "full 1080p，无视频输入",
+          "usd": 2.112,
+          "unit": "秒"
+        },
+        {
+          "label": "full 1080p，有视频输入",
+          "usd": 2.376,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "gemini-omni-flash-preview",
+      "role": "video",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "4秒",
+          "usd": 0.3744,
+          "unit": "次"
+        },
+        {
+          "label": "6秒",
+          "usd": 0.5516,
+          "unit": "次"
+        },
+        {
+          "label": "8秒",
+          "usd": 0.7488,
+          "unit": "次"
+        },
+        {
+          "label": "10秒",
+          "usd": 0.946,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "grok-imagine-video-1.5",
+      "role": "video",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "任意分辨率",
+          "usd": 0.18,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "grok-imagine-video-1.5-lite",
+      "role": "video",
+      "compatibility": "project-adapter-exists-service-untested",
+      "endpoints": ["openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "480p",
+          "usd": 0.2,
+          "unit": "秒"
+        },
+        {
+          "label": "720p",
+          "usd": 0.3,
+          "unit": "秒"
+        },
+        {
+          "label": "1080p",
+          "usd": 1.4,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "heygen-video-1",
+      "role": "video",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai", "openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "文生或图生 480p",
+          "usd": 0.1,
+          "unit": "秒"
+        },
+        {
+          "label": "文生或图生 768p",
+          "usd": 0.2,
+          "unit": "秒"
+        },
+        {
+          "label": "文生或图生 1080p",
+          "usd": 0.5,
+          "unit": "秒"
+        },
+        {
+          "label": "文生或图生 2K",
+          "usd": 0.5,
+          "unit": "秒"
+        },
+        {
+          "label": "参考生成 480p",
+          "usd": 0.2,
+          "unit": "秒"
+        },
+        {
+          "label": "参考生成 768p",
+          "usd": 0.3,
+          "unit": "秒"
+        },
+        {
+          "label": "参考生成 1080p",
+          "usd": 0.9,
+          "unit": "秒"
+        },
+        {
+          "label": "参考生成 2K",
+          "usd": 0.9,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "minimax-h3",
+      "role": "video",
+      "compatibility": "project-adapter-exists-service-untested",
+      "endpoints": ["workflow"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "480P",
+          "usd": 0.045,
+          "unit": "秒"
+        },
+        {
+          "label": "768P",
+          "usd": 0.06,
+          "unit": "秒"
+        },
+        {
+          "label": "1080P",
+          "usd": 0.135,
+          "unit": "秒"
+        },
+        {
+          "label": "2K",
+          "usd": 0.21,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "sd2.0",
+      "role": "video",
+      "compatibility": "project-adapter-exists-service-untested",
+      "endpoints": ["openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "480p 无参考视频",
+          "usd": 0.374,
+          "unit": "秒"
+        },
+        {
+          "label": "480p 有参考视频成片",
+          "usd": 0.455,
+          "unit": "秒"
+        },
+        {
+          "label": "480p 参考视频附加",
+          "usd": 0.443,
+          "unit": "参考秒"
+        },
+        {
+          "label": "720p 无参考视频",
+          "usd": 0.82,
+          "unit": "秒"
+        },
+        {
+          "label": "720p 有参考视频成片",
+          "usd": 0.48,
+          "unit": "秒"
+        },
+        {
+          "label": "720p 参考视频附加",
+          "usd": 0.443,
+          "unit": "参考秒"
+        },
+        {
+          "label": "1080p 无参考视频",
+          "usd": 2.1,
+          "unit": "秒"
+        },
+        {
+          "label": "1080p 有参考视频成片",
+          "usd": 1.02,
+          "unit": "秒"
+        },
+        {
+          "label": "1080p 参考视频附加",
+          "usd": 0.985,
+          "unit": "参考秒"
+        },
+        {
+          "label": "4k 无参考视频",
+          "usd": 4.3,
+          "unit": "秒"
+        },
+        {
+          "label": "4k 有参考视频成片",
+          "usd": 2.65,
+          "unit": "秒"
+        },
+        {
+          "label": "4k 参考视频附加",
+          "usd": 2.22,
+          "unit": "参考秒"
+        }
+      ]
+    },
+    {
+      "id": "sd2.0-903-720-per-use",
+      "role": "video",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "720p，4–15 秒",
+          "usd": 3.3,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "sd2.0-903-720-per-use-1",
+      "role": "video",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "720p，4–15 秒",
+          "usd": 1.35,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "sd2.0-933-720",
+      "role": "video",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "720p",
+          "usd": 0.23,
+          "unit": "秒"
+        }
+      ]
+    },
+    {
+      "id": "sd2.0-933-720-per-use",
+      "role": "video",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "720p，9:16，5–15 秒",
+          "usd": 3.1,
+          "unit": "次"
+        }
+      ]
+    },
+    {
+      "id": "sd2.0-fast",
+      "role": "video",
+      "compatibility": "project-adapter-exists-service-untested",
+      "endpoints": ["openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "480p 无参考视频",
+          "usd": 0.29,
+          "unit": "秒"
+        },
+        {
+          "label": "480p 有参考视频成片",
+          "usd": 0.355,
+          "unit": "秒"
+        },
+        {
+          "label": "480p 参考视频附加",
+          "usd": 0.443,
+          "unit": "参考秒"
+        },
+        {
+          "label": "720p 无参考视频",
+          "usd": 0.665,
+          "unit": "秒"
+        },
+        {
+          "label": "720p 有参考视频成片",
+          "usd": 0.385,
+          "unit": "秒"
+        },
+        {
+          "label": "720p 参考视频附加",
+          "usd": 0.443,
+          "unit": "参考秒"
+        }
+      ]
+    },
+    {
+      "id": "sd2.0-mini",
+      "role": "video",
+      "compatibility": "project-adapter-exists-service-untested",
+      "endpoints": ["openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "480p 无参考视频",
+          "usd": 0.185,
+          "unit": "秒"
+        },
+        {
+          "label": "480p 有参考视频成片",
+          "usd": 0.22,
+          "unit": "秒"
+        },
+        {
+          "label": "480p 参考视频附加",
+          "usd": 0.443,
+          "unit": "参考秒"
+        },
+        {
+          "label": "720p 无参考视频",
+          "usd": 0.42,
+          "unit": "秒"
+        },
+        {
+          "label": "720p 有参考视频成片",
+          "usd": 0.257,
+          "unit": "秒"
+        },
+        {
+          "label": "720p 参考视频附加",
+          "usd": 0.443,
+          "unit": "参考秒"
+        }
+      ]
+    },
+    {
+      "id": "sd2.5",
+      "role": "video",
+      "compatibility": "project-adapter-exists-service-untested",
+      "endpoints": ["openai-video"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "480p 无参考视频",
+          "usd": 0.525,
+          "unit": "秒"
+        },
+        {
+          "label": "480p 有参考视频成片",
+          "usd": 0.668,
+          "unit": "秒"
+        },
+        {
+          "label": "480p 参考视频附加",
+          "usd": 0.64,
+          "unit": "参考秒"
+        },
+        {
+          "label": "720p 无参考视频",
+          "usd": 1.28,
+          "unit": "秒"
+        },
+        {
+          "label": "720p 有参考视频成片",
+          "usd": 0.7,
+          "unit": "秒"
+        },
+        {
+          "label": "720p 参考视频附加",
+          "usd": 0.64,
+          "unit": "参考秒"
+        },
+        {
+          "label": "1080p 无参考视频",
+          "usd": 3.26,
+          "unit": "秒"
+        },
+        {
+          "label": "1080p 有参考视频成片",
+          "usd": 1.52,
+          "unit": "秒"
+        },
+        {
+          "label": "1080p 参考视频附加",
+          "usd": 1.42,
+          "unit": "参考秒"
+        }
+      ]
+    },
+    {
+      "id": "speech-2.8",
+      "role": "voice-cloning",
+      "compatibility": "needs-adapter",
+      "endpoints": ["openai"],
+      "groups": ["workflow"],
+      "publishedPrices": [
+        {
+          "label": "turbo 输入",
+          "usd": 442,
+          "unit": "100万token"
+        },
+        {
+          "label": "turbo 输出",
+          "usd": 442,
+          "unit": "100万token"
+        },
+        {
+          "label": "hd 输入",
+          "usd": 772,
+          "unit": "100万token"
+        },
+        {
+          "label": "hd 输出",
+          "usd": 772,
+          "unit": "100万token"
+        },
+        {
+          "label": "创建克隆音色",
+          "usd": 0.11,
+          "unit": "次"
+        },
+        {
+          "label": "音色首次合成",
+          "usd": 20.88,
+          "unit": "条"
+        },
+        {
+          "label": "查询我的音色",
+          "usd": 0,
+          "unit": "次"
+        }
+      ]
+    }
+  ]
+}
