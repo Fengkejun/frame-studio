@@ -84,3 +84,84 @@ fn rounding_drift_is_aligned_without_another_model_request() {
     assert!((total - 12.0).abs() < 0.001);
     assert!(align_storyboard(&mut value, 15).is_err());
 }
+
+#[test]
+fn follow_up_writers_receive_previous_work_and_board_uses_revised_story() {
+    let (plan, mut session) = fixture();
+    let mut original = make_workflow(&session, &plan);
+    original.nodes[1].output = Some(artifact(
+        NodeKind::Story,
+        json!({"title":"星光来信","content":"邮差给小猫送信，小猫在屋顶收信。"}),
+    ));
+    original.nodes[2].output = Some(artifact(
+        NodeKind::Storyboard,
+        json!({"shots":[{"id":"original-shot","dialogue":"这封信是给你的。"}]}),
+    ));
+    let previous = json!({"goal":session.request.goal,"plan":plan,"workflow":original});
+    session.request.goal = "只把结尾改成小猫主动回信，保留其他设定。".into();
+    session.request.parent_id = Some("parent-session".into());
+    let mut revised = make_workflow(&session, &plan);
+    let story_input = text_input(&session, &plan, &revised, "连续性技能", Some(&previous));
+    assert_eq!(story_input["goal"], session.request.goal);
+    assert_eq!(story_input["previous"], previous);
+    assert_eq!(
+        story_input["previous"]["workflow"]["nodes"][1]["output"]["value"]["title"],
+        "星光来信"
+    );
+    assert!(story_input["story"].is_null());
+
+    revised.nodes[1].output = Some(artifact(
+        NodeKind::Story,
+        json!({"title":"星光回信","content":"邮差给小猫送信，小猫写下回信。"}),
+    ));
+    let board_input = text_input(&session, &plan, &revised, "连续性技能", Some(&previous));
+    assert_eq!(board_input["previous"], previous);
+    assert_eq!(board_input["story"]["value"]["title"], "星光回信");
+    assert_eq!(
+        board_input["previous"]["workflow"]["nodes"][2]["output"]["value"]["shots"][0]["id"],
+        "original-shot"
+    );
+    assert_eq!(
+        original.nodes[1].output.as_ref().unwrap().value["title"],
+        "星光来信"
+    );
+    assert_eq!(
+        original.nodes[2].output.as_ref().unwrap().value["shots"][0]["id"],
+        "original-shot"
+    );
+}
+
+#[test]
+fn new_creation_has_no_previous_work_in_writer_input() {
+    let (plan, session) = fixture();
+    let workflow = make_workflow(&session, &plan);
+    let input = text_input(&session, &plan, &workflow, "", None);
+    assert!(input["previous"].is_null());
+    assert_eq!(input["goal"], session.request.goal);
+    assert_eq!(input["segmentDuration"], 12);
+}
+
+#[test]
+fn video_recovery_does_not_read_or_replace_original_skills() {
+    let (plan, mut session) = fixture();
+    session.plan = Some(plan.clone());
+    // No skill directory exists: only new text generation needs those documents.
+    let state = WorkflowState {
+        store: Store::open(std::path::Path::new(":memory:")).unwrap(),
+        active: Mutex::new(None),
+        media_active: Mutex::new(None),
+        video_active: Mutex::new(HashMap::new()),
+        export_active: Mutex::new(None),
+        speech_active: Mutex::new(None),
+        transcription_active: Mutex::new(None),
+        model_pull: Mutex::new(None),
+        comfy_download: Mutex::new(None),
+        directory: std::env::temp_dir().join(format!("frame-agent-missing-{}", uid())),
+    };
+    assert!(load_instructions(&state, &mut session, true)
+        .unwrap()
+        .is_empty());
+    assert_eq!(session.plan.as_ref().unwrap().skill_ids, plan.skill_ids);
+    assert!(session.events.is_empty());
+    assert!(load_instructions(&state, &mut session, false).is_err());
+}

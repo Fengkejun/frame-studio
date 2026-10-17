@@ -43,4 +43,5 @@ jobs:
         run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt,clippy
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked --all-targets -- -D warnings

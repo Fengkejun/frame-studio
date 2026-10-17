@@ -182,10 +182,10 @@ fn snapshot(store: &Store, workflow_id: &str) -> AppResult<Snapshot> {
         video_ids.extend(draft.clips.iter().map(|clip| clip.version_id.clone()));
     }
     for video in &all_videos {
-        if video.context.workflow_id == workflow_id || video_ids.contains(&video.version_id) {
-            if !video.first_frame_version_id.is_empty() {
-                image_ids.insert(video.first_frame_version_id.clone());
-            }
+        if (video.context.workflow_id == workflow_id || video_ids.contains(&video.version_id))
+            && !video.first_frame_version_id.is_empty()
+        {
+            image_ids.insert(video.first_frame_version_id.clone());
         }
     }
     let videos: Vec<_> = all_videos

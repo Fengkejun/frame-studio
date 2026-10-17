@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp } from 'node:fs/promises'
+import { mkdir, mkdtemp, rename } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { openTutorialApp } from './tutorial-runtime.mjs'
@@ -41,14 +41,21 @@ try {
     (await app.invoke('get_agent_session', { id: started.id })).status,
   ).toBe('interrupted')
   fixture.relay.setMode('success')
-  await app.invoke('resume_agent', { id: started.id })
-  await expect
-    .poll(
-      async () =>
-        (await app.invoke('get_agent_session', { id: started.id })).status,
-      { timeout: 25000 },
-    )
-    .toBe('succeeded')
+  const skillDirectory = path.join(profile, 'agent/skills')
+  const movedSkills = path.join(profile, 'agent/skills-during-recovery')
+  await rename(skillDirectory, movedSkills)
+  try {
+    await app.invoke('resume_agent', { id: started.id })
+    await expect
+      .poll(
+        async () =>
+          (await app.invoke('get_agent_session', { id: started.id })).status,
+        { timeout: 25000 },
+      )
+      .toBe('succeeded')
+  } finally {
+    await rename(movedSkills, skillDirectory)
+  }
   expect(fixture.relay.requests.length).toBe(submissions)
   console.log(
     'PASS: genuine app restart preserves Agent job identity and resumes the original remote video without another POST.',

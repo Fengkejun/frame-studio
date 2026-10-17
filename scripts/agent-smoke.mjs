@@ -56,6 +56,8 @@ export async function createAgentFixture(root) {
         ? content.find((c) => c.type === 'text').text
         : content,
     )
+    const revisingEnding =
+      !!input.previous && input.goal.includes('把结尾改成小猫主动回信')
     let result
     if (system.includes('storyDuration')) {
       const frame = !!input.referenceImage || useImage
@@ -90,10 +92,17 @@ export async function createAgentFixture(root) {
         shots: [1, 2, 3].map((i) => ({
           id: `shot-${i}`,
           title: `连续镜头 ${i}`,
-          description: '小星在雨夜屋顶将发光信递给小猫。',
+          description: revisingEnding
+            ? '小猫在雨夜屋顶将写好的回信递给小星。'
+            : '小星在雨夜屋顶将发光信递给小猫。',
           duration: 4,
           characters: ['小星', '小猫'],
-          dialogue: i === 2 ? '这封信是给你的。' : '',
+          dialogue:
+            i === 2
+              ? revisingEnding
+                ? '这是我写给你的回信。'
+                : '这封信是给你的。'
+              : '',
           camera: '平稳推进',
           imagePrompt: '白发蓝衣小星与同一只橘白猫，雨夜屋顶，二维动漫。',
           videoPrompt: `第${i}个动作承接上一镜头，信化为星光小伞，保持角色和雨夜不变。`,
@@ -101,10 +110,11 @@ export async function createAgentFixture(root) {
       }
     else
       result = {
-        title: '星光来信',
+        title: revisingEnding ? '星光回信' : '星光来信',
         logline: '一封信照亮雨夜。',
-        content:
-          '雨夜，小星抱着发光的信走近屋顶的小猫。她蹲下递信，信化成星光小伞，小猫安心地蹭她的手。',
+        content: revisingEnding
+          ? '雨夜，小星抱着发光的信走近屋顶的小猫。小猫主动写下回信，递到她的手中。'
+          : '雨夜，小星抱着发光的信走近屋顶的小猫。她蹲下递信，信化成星光小伞，小猫安心地蹭她的手。',
         characters: ['小星：白发蓝眼，蓝雨衣', '同一只橘白短毛猫'],
       }
     res.setHeader('Content-Type', 'application/json')
@@ -275,6 +285,25 @@ export async function testAgent(page, root, profile, fixture) {
     JSON.parse(fixture.requests[3].messages[1].content).previous.workflow
       .nodes[1].output.value.title,
   ).toBe('星光来信')
+  const planningContext = JSON.parse(
+    fixture.requests[3].messages[1].content,
+  ).previous
+  for (const request of fixture.requests.slice(4, 6)) {
+    const input = JSON.parse(request.messages[1].content)
+    expect(input.previous).toEqual(planningContext)
+    expect(input.previous.workflow.nodes[2].output.value.shots).toHaveLength(3)
+    expect(input.goal).toContain('把结尾改成小猫主动回信')
+  }
+  expect(
+    JSON.parse(fixture.requests[5].messages[1].content).story.value.title,
+  ).toBe('星光回信')
+  const revisedProject = (await invoke('list_workflows')).find(
+    (w) => w.id === next.workflowId,
+  )
+  expect(revisedProject.nodes[1].output.value.content).toContain('主动写下回信')
+  expect(revisedProject.nodes[2].output.value.shots[1].dialogue).toBe(
+    '这是我写给你的回信。',
+  )
   expect(
     (await invoke('get_agent_session', { id: first.id })).videoVersionId,
   ).toBe(first.videoVersionId)
